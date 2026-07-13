@@ -13,6 +13,7 @@ https://huangmj0.github.io/road-to-send/
 - Per-activity weekly limits (e.g. climbing counts up to 4×/week, rest days up to 2×/week)
 - A +2 "balanced week" bonus for logging climbing, strength, and care work in the same week (16 max)
 - Group progress and leaderboard
+- Personal weekly progress ("You this week") for the remembered logger, plus a group points-per-week trend chart
 - Recent activity feed with delete/undo for mistaken entries (works in both local and shared mode)
 - Live sync status with a manual refresh control
 - Climbing bingo
