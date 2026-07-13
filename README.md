@@ -9,7 +9,9 @@ https://huangmj0.github.io/road-to-send/
 ## What it includes
 
 - Eight activities with automatic point values
-- A 14-point weekly cap per person
+- A 14-point weekly cap per person, applied to the week each activity actually happened
+- Per-activity weekly limits (e.g. climbing counts up to 4×/week, rest days up to 2×/week)
+- A +2 "balanced week" bonus for logging climbing, strength, and care work in the same week (16 max)
 - Group progress and leaderboard
 - Recent activity feed
 - Climbing bingo
