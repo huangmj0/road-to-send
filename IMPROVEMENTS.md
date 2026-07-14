@@ -4,6 +4,8 @@ This backlog records work that should follow the current sync-diagnostics, inlin
 
 ## P0 — Define and enforce the challenge window
 
+Status: implemented in API v6.
+
 The interface describes a ten-week challenge, but the data model only has a trip date and currently counts activities outside any defined start/end window.
 
 - Add an explicit challenge start date and decide whether the trip date is inclusive.
@@ -12,28 +14,9 @@ The interface describes a ten-week challenge, but the data model only has a trip
 - Add unit tests for the first and last valid day, Sunday/Monday week boundaries, daylight-saving transitions, and entries logged after the trip.
 - Derive “ten-week” and “November” copy from settings instead of hard-coding it.
 
-## P1 — Strengthen bounty and benchmark integrity
+## P1 — Improve maintainability and automated coverage
 
-Bounties and send pyramids intentionally use an honor system, but organizers still need enough context to resolve mistakes or obvious abuse.
-
-- Add organizer review and correction controls for bounty claims and benchmark check-ins.
-- Show the reference grade or circuit band used for relative bounty claims.
-- Add an audit trail when a baseline or final check-in is replaced.
-- Preserve explicit local-only behavior for demos and offline use.
-
-## P1 — Add security and organizer controls
-
-Anyone holding the Apps Script URL can currently submit activities or alter setup.
-
-API version 5 now allowlists activity types and tags, derives duration-based points server-side, validates participant/date/text fields, and returns structured errors. The remaining work is authorization and abuse recovery:
-
-- Separate participant logging permissions from organizer settings and deletion permissions.
-- Add rate limiting or another abuse-control strategy appropriate for Apps Script.
-- Add idempotency keys so retries cannot create duplicate activities.
-- Keep an audit history for settings changes and deletions, with a recoverable undo path.
-- Document the privacy implications of putting the endpoint in a shared URL.
-
-## P2 — Improve maintainability and automated coverage
+Status: implemented with source generation, shared contracts, smoke coverage, and CI.
 
 The application, styles, and embedded Apps Script currently live in one compact HTML file. That makes reviews and behavioral tests unnecessarily difficult.
 
@@ -47,7 +30,17 @@ The application, styles, and embedded Apps Script currently live in one compact 
 
 ## P2 — Clarify recovery and data ownership
 
+Status: implemented with separated caches, retry-safe messaging, diagnostics, and recovery documentation.
+
 - Distinguish “save failed” from “saved, but refresh failed” to prevent duplicate retries.
 - Provide export, backup, and restore instructions for organizers.
 - Keep local demo entries separate from cached shared entries.
 - Show protocol version, last successful sync, and a copyable sanitized error code in diagnostics.
+
+## P3 — Improve the available bounties
+
+Status: implemented with simplified 1–3 point quests.
+
+- Remove circuit board references
+- Consider improvements to the bounties, simplify
+- Each should have a fun name, then a simple description and how many points it is worth (adaptive to the difficulty)

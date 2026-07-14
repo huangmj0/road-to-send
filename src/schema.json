@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huangmj0.github.io/road-to-send/schema/v6.json",
+  "title": "Road to Send protocol v6",
+  "type": "object",
+  "required": ["version", "features", "activities", "benchmarks", "config"],
+  "properties": {
+    "version": { "const": 6 },
+    "features": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "activities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/activity" }
+    },
+    "benchmarks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/benchmark" }
+    },
+    "config": {
+      "anyOf": [
+        { "$ref": "#/$defs/settings" },
+        { "type": "null" }
+      ]
+    },
+    "configErrors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/errorDetail" }
+    },
+    "serverDate": { "$ref": "#/$defs/date" },
+    "timeZone": { "type": "string" },
+    "fetchedAt": { "type": "string" }
+  },
+  "$defs": {
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "settings": {
+      "type": "object",
+      "required": ["startDate", "tripDate", "goal", "crew"],
+      "properties": {
+        "startDate": { "$ref": "#/$defs/date" },
+        "tripDate": { "$ref": "#/$defs/date" },
+        "goal": { "type": "integer", "minimum": 50, "maximum": 10000 },
+        "crew": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 30 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "activity": {
+      "type": "object",
+      "required": ["id", "name", "type", "points", "date", "createdAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 30 },
+        "type": { "type": "string" },
+        "points": { "type": "number" },
+        "date": { "$ref": "#/$defs/date" },
+        "createdAt": { "type": "string" },
+        "note": { "type": "string", "maxLength": 120 },
+        "durationBand": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "bountyId": { "type": "string" },
+        "bountyTitle": { "type": "string" }
+      }
+    },
+    "benchmark": {
+      "type": "object",
+      "required": ["name", "phase", "gym", "gradeScale", "grades", "createdAt"],
+      "properties": {
+        "name": { "type": "string" },
+        "phase": { "enum": ["baseline", "final"] },
+        "gym": { "type": "string" },
+        "gradeScale": { "type": "string" },
+        "grades": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "type": "integer" }
+        },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "errorDetail": {
+      "type": "object",
+      "required": ["field", "reason"],
+      "properties": {
+        "field": { "type": "string" },
+        "reason": { "type": "string" },
+        "cell": { "type": "string" }
+      }
+    },
+    "errorResponse": {
+      "type": "object",
+      "required": ["version", "ok", "error"],
+      "properties": {
+        "version": { "const": 6 },
+        "ok": { "const": false },
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" },
+            "details": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/errorDetail" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "weekCap": 16,
+  "balancedBonus": 2,
+  "bountyWeekLimit": 2,
+  "activityPoints": {
+    "pull": 2,
+    "core": 1,
+    "prehab": 1,
+    "mobility": 1,
+    "rest": 1
+  },
+  "durationPoints": {
+    "60-119": 3,
+    "120-179": 4,
+    "180-plus": 5
+  },
+  "weeklyLimits": {
+    "climb": 4,
+    "pull": 3,
+    "core": 3,
+    "prehab": 4,
+    "mobility": 4,
+    "rest": 2
+  },
+  "climbTags": ["new-area", "new-style", "project-progress"]
+}

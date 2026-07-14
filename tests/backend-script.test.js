@@ -69,7 +69,7 @@ test('invalid settings return field errors without manufacturing a config', () =
   context.tab = name => ({
     getDataRange: () => ({
       getValues: () => name === 'Settings'
-        ? [['key', 'value'], [' Trip Date ', '2027-02-29'], ['GROUP_goal', 'five hundred']]
+        ? [['key', 'value'], [' challenge_start ', '2027-02-30'], [' Trip Date ', '2027-02-29'], ['GROUP_goal', 'five hundred']]
         : [['name'], ['Maya']],
     }),
   });
@@ -77,10 +77,23 @@ test('invalid settings return field errors without manufacturing a config', () =
   assert.equal(result.config, null);
   assert.deepEqual(
     Array.from(result.errors, item => item.field),
-    ['tripDate', 'groupGoal'],
+    ['challengeStart', 'tripDate', 'groupGoal'],
   );
   assert.equal(result.errors[0].cell, 'Settings!B2');
   assert.equal(result.errors[1].cell, 'Settings!B3');
+  assert.equal(result.errors[2].cell, 'Settings!B4');
+});
+
+test('challenge window is inclusive and rejects pre-start and post-trip activity dates', () => {
+  const context = loadScript();
+  context.readConfig = () => ({config: {startDate:'2027-09-06',tripDate:'2027-11-14'}, errors: []});
+  const entry = date => ({name:'Maya',type:'pull',points:2,date});
+  assert.equal(context.validateActivityEligibility(entry('2027-09-06'), []).date, '2027-09-06');
+  assert.equal(context.validateActivityEligibility(entry('2027-11-14'), []).date, '2027-11-14');
+  assert.throws(() => context.validateActivityEligibility(entry('2027-09-05'), []), error => error.code === 'outside_challenge_window');
+  assert.throws(() => context.validateActivityEligibility(entry('2027-11-15'), []), error => error.code === 'outside_challenge_window');
+  assert.equal(context.weekKeyValue('2027-11-14'),'2027-11-08','Sunday stays in the preceding Monday week');
+  assert.equal(context.weekKeyValue('2027-11-15'),'2027-11-15','Monday starts a new week');
 });
 
 test('activity validation derives points instead of trusting the request', () => {
@@ -144,6 +157,7 @@ test('daily bounty selection is deterministic, balanced, and unique within a wee
     assert.equal(day.length, 3);
     assert.equal(new Set(Array.from(day, item => item.category)).size, 3);
     assert.ok(Array.from(day, item => item.access).filter(access => access === 'solo').length >= 2);
+    assert.ok(Array.from(day, item => item.points).every(points => [1, 2, 3].includes(points)));
   }
   assert.equal(new Set(selections.flatMap(day => Array.from(day, item => item.id))).size, 21);
 });
@@ -151,12 +165,13 @@ test('daily bounty selection is deterministic, balanced, and unique within a wee
 test('bounty claims require evidence and a credited same-day climb', () => {
   const context = loadScript();
   context.participantNames = () => ['Maya'];
+  context.readConfig = () => ({config: null, errors: []});
   context.sheetToday = () => '2027-11-15';
   const bounty = context.dailyBounties('2027-11-15')[0];
   const climb = {id: 'climb-1', name: 'Maya', type: 'climb', points: 3, date: '2027-11-15', createdAt: '2027-11-15T10:00:00Z'};
   const claim = context.validateBountyClaim({name: 'maya', bountyId: bounty.id, note: 'Sent it clean.'}, [climb]);
   assert.equal(claim.name, 'Maya');
-  assert.equal(claim.points, 2);
+  assert.equal(claim.points, bounty.points);
   assert.equal(claim.bountyTitle, bounty.title);
   assert.throws(
     () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: ''}, [climb]),
@@ -171,6 +186,7 @@ test('bounty claims require evidence and a credited same-day climb', () => {
 test('bounty validation enforces daily and weekly claim limits', () => {
   const context = loadScript();
   context.participantNames = () => ['Maya'];
+  context.readConfig = () => ({config: null, errors: []});
   context.sheetToday = () => '2027-11-18';
   const bounty = context.dailyBounties('2027-11-18')[0];
   const climbs = [
@@ -193,6 +209,7 @@ test('bounty validation enforces daily and weekly claim limits', () => {
 test('a climb after the base cap cannot unlock a bounty', () => {
   const context = loadScript();
   context.participantNames = () => ['Maya'];
+  context.readConfig = () => ({config: null, errors: []});
   context.sheetToday = () => '2027-11-18';
   const bounty = context.dailyBounties('2027-11-18')[0];
   const entries = [
@@ -239,9 +256,10 @@ test('benchmark validation compares the same gym and grade scale', () => {
   );
 });
 
-test('version 5 advertises fresh-start archiving and feature flags', () => {
+test('version 6 advertises the challenge window and preserves v5 activity data', () => {
   const context = loadScript();
   assert.match(context.__source, /Activities Archive/);
-  assert.match(context.__source, /FEATURES=\['scoring-v2','bounties','benchmarks'\]/);
-  assert.match(context.__source, /roadToSendSchema'\)!=='5'/);
+  assert.match(context.__source, /FEATURES=\['scoring-v2','bounties','benchmarks','challenge-window'\]/);
+  assert.match(context.__source, /schema!=='5'&&schema!=='6'/);
+  assert.match(context.__source, /setProperty\('roadToSendSchema','6'\)/);
 });
