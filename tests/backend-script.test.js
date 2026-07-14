@@ -15,6 +15,7 @@ function loadScript() {
   const context = {
     __source: outer.SCRIPT,
     Utilities: {
+      getUuid() { return 'uuid-test'; },
       formatDate(date) {
         return [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, '0'), String(date.getUTCDate()).padStart(2, '0')].join('-');
       },
@@ -108,4 +109,61 @@ test('activity rows normalize Sheet Date cells without shifting their day', () =
     ['id', 'name', 'type', 'points', 'date', 'note', 'createdAt'],
   );
   assert.equal(row.date, '2027-11-15');
+});
+
+test('daily bounty selection is deterministic, balanced, and unique within a week', () => {
+  const context = loadScript();
+  const dates = ['2027-11-15', '2027-11-16', '2027-11-17', '2027-11-18', '2027-11-19', '2027-11-20', '2027-11-21'];
+  const selections = dates.map(date => Array.from(context.dailyBounties(date)));
+  assert.deepEqual(
+    Array.from(selections[0], item => item.id),
+    Array.from(context.dailyBounties(dates[0]), item => item.id),
+  );
+  for (const day of selections) {
+    assert.equal(day.length, 3);
+    assert.equal(new Set(Array.from(day, item => item.category)).size, 3);
+  }
+  assert.equal(new Set(selections.flatMap(day => Array.from(day, item => item.id))).size, 21);
+});
+
+test('bounty claims require evidence and a credited same-day climb', () => {
+  const context = loadScript();
+  context.participantNames = () => ['Maya'];
+  context.sheetToday = () => '2027-11-15';
+  const bounty = context.dailyBounties('2027-11-15')[0];
+  const climb = {id: 'climb-1', name: 'Maya', type: 'climb', points: 3, date: '2027-11-15', createdAt: '2027-11-15T10:00:00Z'};
+  const claim = context.validateBountyClaim({name: 'maya', bountyId: bounty.id, note: 'Sent it clean.'}, [climb]);
+  assert.equal(claim.name, 'Maya');
+  assert.equal(claim.points, 2);
+  assert.equal(claim.bountyTitle, bounty.title);
+  assert.throws(
+    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: ''}, [climb]),
+    error => error.code === 'invalid_bounty',
+  );
+  assert.throws(
+    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, []),
+    error => error.code === 'missing_climb',
+  );
+});
+
+test('bounty validation enforces daily and weekly claim limits', () => {
+  const context = loadScript();
+  context.participantNames = () => ['Maya'];
+  context.sheetToday = () => '2027-11-18';
+  const bounty = context.dailyBounties('2027-11-18')[0];
+  const climbs = [
+    {id: 'c1', name: 'Maya', type: 'climb', points: 3, date: '2027-11-18', createdAt: '1'},
+  ];
+  const prior = ['2027-11-15', '2027-11-16', '2027-11-17'].map((date, i) => ({
+    id: `b${i}`, name: 'Maya', type: 'bounty', points: 2, date, createdAt: String(i), bountyId: 'historical', bountyTitle: 'Historical',
+  }));
+  assert.throws(
+    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, climbs.concat(prior)),
+    error => error.code === 'weekly_bounty_limit',
+  );
+  const todayClaim = {id: 'today', name: 'Maya', type: 'bounty', points: 2, date: '2027-11-18'};
+  assert.throws(
+    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, climbs.concat(todayClaim)),
+    error => error.code === 'daily_bounty_limit',
+  );
 });
