@@ -39,7 +39,7 @@ The first centralized save creates three tabs in the Sheet:
 - `Settings` stores `tripDate` and `groupGoal`.
 - `Participants` stores one crew member per row.
 
-You can edit `Settings` or `Participants` directly in Google Sheets at any time. Every connected browser pulls those changes on its next sync (normally within 45 seconds), so changing the roster or goal does not require a redeploy or a new crew link. Existing activity rows remain intact when a participant is removed.
+You can edit `Settings` or `Participants` directly in Google Sheets at any time. Every connected browser makes a cache-bypassing read on its next sync (normally within 45 seconds), so changing the roster or goal does not require a redeploy or a new crew link. Tap the sync status under the progress bar to refresh immediately. Existing activity rows remain intact when a participant is removed.
 
 The script also supports deleting entries: the activity feed shows a small **×** on each recent entry, which removes the matching row from the Sheet (and doubles as undo for a mistaken log).
 
