@@ -8,7 +8,7 @@ assert.ok(script,'index.html contains an inline application script');
 assert.doesNotThrow(()=>new Function(script),'application JavaScript parses');
 const ids=[...html.matchAll(/\sid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,'HTML ids are unique');
-for(const id of ['hardestGrade','pullUps','activityDate','identityMember','proxyMember','endpoint','challengeStart','tripDate','groupGoalInput'])assert.match(html,new RegExp(`<label[^>]+for="${id}"`),`${id} has an associated label`);
+for(const id of ['hardestGrade','pullUps','activityDate','identityMember','newParticipantName','proxyMember','endpoint','challengeStart','tripDate','groupGoalInput'])assert.match(html,new RegExp(`<label[^>]+for="${id}"`),`${id} has an associated label`);
 for(const tab of ['you','record','crew']){
   assert.match(html,new RegExp(`data-panel="${tab}"`),`${tab} panel exists`);
   assert.match(html,new RegExp(`data-tab="${tab}"`),`${tab} navigation exists`);
@@ -27,6 +27,8 @@ assert.match(script,/const DAILY_CAP=SCORING\.dailyCap,GRADES=SCORING\.grades/,'
 assert.match(script,/const DAILY_CAP=SCORING\.dailyCap,GRADES=SCORING\.grades/,'Apps Script uses shared scoring config');
 assert.doesNotMatch(html,/Daily bounties|Balanced week bonus|Record send pyramid|Core session|Mobility \(10\+ min\)/i,'removed features are absent from the UI');
 assert.match(script,/Saved to the Sheet, but refresh failed\. Do not retry/,'confirmed saves are distinguished from refresh failures');
-assert.match(script,/roadToSendLogsV6Archive/,'old local activity is archived');
+assert.match(html,/Hard mode[\s\S]*10 pull-ups = 3 pts/,'hard mode requirements are shown');
+assert.match(html,/Super hard mode[\s\S]*20 pull-ups = 3 pts/,'super hard mode requirements are shown');
+assert.equal((html.match(/<table>/g)||[]).length,1,'all modes share one leaderboard');
 assert.match(html,/env\(safe-area-inset-bottom\)/,'mobile navigation respects safe areas');
 console.log('Road to Send static accessibility and UX checks passed.');

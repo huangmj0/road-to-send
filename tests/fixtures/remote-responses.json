@@ -1,15 +1,15 @@
 {
   "current": {
-    "version": 7,
-    "features": ["daily-cap-v1", "participant-pull-category", "challenge-window"],
+    "version": 8,
+    "features": ["daily-cap-v1", "participant-pull-mode", "challenge-window", "self-registration-v1"],
     "activities": [
-      {"id":"a1","name":"Alex","type":"pull","points":3,"date":"2026-09-07","createdAt":"2026-09-07T16:00:00.000Z","hardestGrade":"","pullUps":20,"pullCategory":"men"}
+      {"id":"a1","name":"Alex","type":"pull","points":3,"date":"2026-09-07","createdAt":"2026-09-07T16:00:00.000Z","hardestGrade":"","pullUps":20,"pullMode":"super-hard"}
     ],
     "config": {
       "startDate": "2026-09-07",
       "tripDate": "2026-11-15",
       "goal": 750,
-      "crew": [{"name":"Alex","pullCategory":"men"},{"name":"Maya","pullCategory":"women"}]
+      "crew": [{"name":"Alex","pullMode":"super-hard"},{"name":"Maya","pullMode":"hard"}]
     },
     "configErrors": [],
     "serverDate": "2026-09-07",
@@ -17,6 +17,6 @@
     "fetchedAt": "2026-09-07T16:00:00.000Z"
   },
   "legacy": [{"id":"legacy-1","name":"Alex","type":"climb","points":3,"date":"2026-09-07"}],
-  "malformed": {"version":7,"features":"not-an-array","activities":[null,42,{"id":"valid-row"}],"config":null,"configErrors":[{"field":"startDate","reason":"must be a real calendar date"}]},
-  "partial": {"version":7,"features":["challenge-window"],"activities":[],"config":null,"configErrors":[{"field":"tripDate","cell":"Settings!B3","reason":"must be a real calendar date"}]}
+  "malformed": {"version":8,"features":"not-an-array","activities":[null,42,{"id":"valid-row"}],"config":null,"configErrors":[{"field":"startDate","reason":"must be a real calendar date"}]},
+  "partial": {"version":8,"features":["challenge-window"],"activities":[],"config":null,"configErrors":[{"field":"tripDate","cell":"Settings!B3","reason":"must be a real calendar date"}]}
 }
