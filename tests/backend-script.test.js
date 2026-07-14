@@ -1,247 +1,133 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
 function loadScript() {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
   const match = html.match(/const SCRIPT=(`[^`]*`);\nconst SUPPORTED_API_VERSIONS/);
   assert.ok(match, 'embedded Apps Script was found');
   const outer = {};
   vm.createContext(outer);
   vm.runInContext(`SCRIPT=${match[1]}`, outer);
-
   const context = {
-    __source: outer.SCRIPT,
     Utilities: {
-      getUuid() { return 'uuid-test'; },
-      formatDate(date) {
-        return [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, '0'), String(date.getUTCDate()).padStart(2, '0')].join('-');
-      },
+      getUuid: () => 'uuid-test',
+      formatDate: date => [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, '0'), String(date.getUTCDate()).padStart(2, '0')].join('-'),
     },
-    SpreadsheetApp: {
-      getActive() {
-        return { getSpreadsheetTimeZone: () => 'UTC' };
-      },
-    },
+    SpreadsheetApp: {getActive: () => ({getSpreadsheetTimeZone: () => 'UTC'})},
   };
   vm.createContext(context);
   vm.runInContext(outer.SCRIPT, context);
+  context.__source = outer.SCRIPT;
   return context;
 }
 
-test('embedded Apps Script is syntactically valid', () => {
+test('embedded v8 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();
-  assert.equal(typeof context.doGet, 'function');
-  assert.equal(typeof context.doPost, 'function');
-  assert.doesNotMatch(context.__source, /\.clearContents\(/);
+  assert.equal(vm.runInContext('API_VERSION', context), 8);
+  assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['daily-cap-v1', 'participant-pull-mode', 'challenge-window', 'self-registration-v1']);
+  assert.doesNotMatch(context.__source, /claimBounty|saveBenchmark|balancedBonus/);
 });
 
-test('settings keys ignore case, whitespace, underscores, and hyphens', () => {
-  const context = loadScript();
-  assert.equal(context.normalizeKey(' Trip Date '), 'tripdate');
-  assert.equal(context.normalizeKey('GROUP_goal'), 'groupgoal');
-  assert.equal(context.normalizeKey('group-goal'), 'groupgoal');
-});
-
-test('dates are canonicalized and impossible dates are rejected', () => {
-  const context = loadScript();
-  assert.equal(context.parseDateValue('2027-2-9').value, '2027-02-09');
-  assert.equal(context.parseDateValue('11/15/2027').value, '2027-11-15');
-  assert.equal(context.parseDateValue('November 15, 2027').value, '2027-11-15');
-  assert.equal(context.parseDateValue('15 Nov 2027').value, '2027-11-15');
-  assert.match(context.parseDateValue('2027-02-29').error, /real calendar date/);
-  assert.match(context.parseDateValue('15/11/2027').error, /real calendar date/);
-});
-
-test('goals must be finite in-range integers', () => {
-  const context = loadScript();
-  assert.equal(context.parseGoal('1,250').value, 1250);
-  assert.match(context.parseGoal('not a number').error, /whole number/);
-  assert.match(context.parseGoal('500.5').error, /whole number/);
-  assert.match(context.parseGoal('49').error, /50 to 10,000/);
-  assert.match(context.parseGoal('10001').error, /50 to 10,000/);
-});
-
-test('invalid settings return field errors without manufacturing a config', () => {
-  const context = loadScript();
-  context.tab = name => ({
-    getDataRange: () => ({
-      getValues: () => name === 'Settings'
-        ? [['key', 'value'], [' Trip Date ', '2027-02-29'], ['GROUP_goal', 'five hundred']]
-        : [['name'], ['Maya']],
-    }),
-  });
-  const result = context.readConfig();
-  assert.equal(result.config, null);
-  assert.deepEqual(
-    Array.from(result.errors, item => item.field),
-    ['tripDate', 'groupGoal'],
-  );
-  assert.equal(result.errors[0].cell, 'Settings!B2');
-  assert.equal(result.errors[1].cell, 'Settings!B3');
-});
-
-test('activity validation derives points instead of trusting the request', () => {
-  const context = loadScript();
-  context.participantNames = () => ['Maya'];
-  const activity = context.validateActivity({
-    name: 'maya',
-    type: 'climb',
-    points: 9999,
-    durationBand: '120-179',
-    tags: ['new-area', 'project-progress'],
-    date: '2027-11-15',
-    note: 'Good session',
-  });
-  assert.equal(activity.name, 'Maya');
-  assert.equal(activity.points, 4);
-  assert.deepEqual(Array.from(activity.tags), ['new-area', 'project-progress']);
-  assert.throws(
-    () => context.validateActivity({ name: 'Other', type: 'climb', date: '2027-11-15' }),
-    error => error.code === 'invalid_activity' && error.details.some(item => item.field === 'name'),
-  );
-});
-
-test('climbing duration boundaries and tags are validated', () => {
-  const context = loadScript();
-  context.participantNames = () => ['Maya'];
-  for (const [durationBand, points] of [['60-119', 3], ['120-179', 4], ['180-plus', 5]]) {
-    assert.equal(context.validateActivity({name: 'Maya', type: 'climb', durationBand, date: '2027-11-15'}).points, points);
-  }
-  assert.throws(
-    () => context.validateActivity({name: 'Maya', type: 'climb', date: '2027-11-15'}),
-    error => error.details.some(item => item.field === 'durationBand'),
-  );
-  assert.throws(
-    () => context.validateActivity({name: 'Maya', type: 'climb', durationBand: '60-119', tags: ['fake'], date: '2027-11-15'}),
-    error => error.details.some(item => item.field === 'tags'),
-  );
-  assert.equal(context.validateActivity({name: 'Maya', type: 'prehab', points: 99, date: '2027-11-15'}).points, 1);
-});
-
-test('activity rows normalize Sheet Date cells without shifting their day', () => {
-  const context = loadScript();
-  const sheetDate = vm.runInContext('new Date(Date.UTC(2027, 10, 15))', context);
-  const row = context.normalizeActivityRow(
-    ['id-1', 'Maya', 'climb', 3, sheetDate, '', 'created', '60-119', '["new-style"]'],
-    ['id', 'name', 'type', 'points', 'date', 'note', 'createdAt', 'durationBand', 'tags'],
-  );
-  assert.equal(row.date, '2027-11-15');
-  assert.deepEqual(Array.from(row.tags), ['new-style']);
-});
-
-test('daily bounty selection is deterministic, balanced, and unique within a week', () => {
-  const context = loadScript();
-  const dates = ['2027-11-15', '2027-11-16', '2027-11-17', '2027-11-18', '2027-11-19', '2027-11-20', '2027-11-21'];
-  const selections = dates.map(date => Array.from(context.dailyBounties(date)));
-  assert.deepEqual(
-    Array.from(selections[0], item => item.id),
-    Array.from(context.dailyBounties(dates[0]), item => item.id),
-  );
-  for (const day of selections) {
-    assert.equal(day.length, 3);
-    assert.equal(new Set(Array.from(day, item => item.category)).size, 3);
-    assert.ok(Array.from(day, item => item.access).filter(access => access === 'solo').length >= 2);
-  }
-  assert.equal(new Set(selections.flatMap(day => Array.from(day, item => item.id))).size, 21);
-});
-
-test('bounty claims require evidence and a credited same-day climb', () => {
-  const context = loadScript();
-  context.participantNames = () => ['Maya'];
-  context.sheetToday = () => '2027-11-15';
-  const bounty = context.dailyBounties('2027-11-15')[0];
-  const climb = {id: 'climb-1', name: 'Maya', type: 'climb', points: 3, date: '2027-11-15', createdAt: '2027-11-15T10:00:00Z'};
-  const claim = context.validateBountyClaim({name: 'maya', bountyId: bounty.id, note: 'Sent it clean.'}, [climb]);
-  assert.equal(claim.name, 'Maya');
-  assert.equal(claim.points, 2);
-  assert.equal(claim.bountyTitle, bounty.title);
-  assert.throws(
-    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: ''}, [climb]),
-    error => error.code === 'invalid_bounty',
-  );
-  assert.throws(
-    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, []),
-    error => error.code === 'missing_climb',
-  );
-});
-
-test('bounty validation enforces daily and weekly claim limits', () => {
-  const context = loadScript();
-  context.participantNames = () => ['Maya'];
-  context.sheetToday = () => '2027-11-18';
-  const bounty = context.dailyBounties('2027-11-18')[0];
-  const climbs = [
-    {id: 'c1', name: 'Maya', type: 'climb', points: 3, date: '2027-11-18', createdAt: '1'},
+test('pull-up scoring covers every threshold boundary', () => {
+  const {pullPoints} = loadScript();
+  const cases = [
+    ['super-hard', 0, 0], ['super-hard', 19, 0], ['super-hard', 20, 3], ['super-hard', 29, 3], ['super-hard', 30, 4], ['super-hard', 39, 4], ['super-hard', 40, 5], ['super-hard', 80, 5],
+    ['hard', 0, 0], ['hard', 9, 0], ['hard', 10, 3], ['hard', 14, 3], ['hard', 15, 4], ['hard', 19, 4], ['hard', 20, 5], ['hard', 80, 5],
   ];
-  const prior = ['2027-11-15', '2027-11-16'].map((date, i) => ({
-    id: `b${i}`, name: 'Maya', type: 'bounty', points: 2, date, createdAt: String(i), bountyId: 'historical', bountyTitle: 'Historical',
-  }));
-  assert.throws(
-    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, climbs.concat(prior)),
-    error => error.code === 'weekly_bounty_limit',
-  );
-  const todayClaim = {id: 'today', name: 'Maya', type: 'bounty', points: 2, date: '2027-11-18'};
-  assert.throws(
-    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, climbs.concat(todayClaim)),
-    error => error.code === 'daily_bounty_limit',
-  );
+  for (const [category, count, points] of cases) assert.equal(pullPoints(count, category), points, `${category} ${count}`);
+  assert.equal(pullPoints(-1, 'super-hard'), 0);
+  assert.equal(pullPoints(20.5, 'hard'), 0);
 });
 
-test('a climb after the base cap cannot unlock a bounty', () => {
+test('backend derives points and participant mode instead of trusting the request', () => {
   const context = loadScript();
-  context.participantNames = () => ['Maya'];
-  context.sheetToday = () => '2027-11-18';
-  const bounty = context.dailyBounties('2027-11-18')[0];
-  const entries = [
-    {id: 'c1', name: 'Maya', type: 'climb', points: 5, date: '2027-11-15'},
-    {id: 'c2', name: 'Maya', type: 'climb', points: 5, date: '2027-11-16'},
-    {id: 'c3', name: 'Maya', type: 'climb', points: 5, date: '2027-11-17'},
-    {id: 'p1', name: 'Maya', type: 'pull', points: 2, date: '2027-11-17'},
-    {id: 'c4', name: 'Maya', type: 'climb', points: 3, date: '2027-11-18'},
-  ];
-  assert.equal(context.baseCreditInfo(entries).c4, 0);
-  assert.throws(
-    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, entries),
-    error => error.code === 'missing_climb',
-  );
+  context.participantRecords = () => [{name: 'Alex', pullMode: 'super-hard'}, {name: 'Maya', pullMode: 'hard'}];
+  const pull = context.validateActivity({name: 'alex', type: 'pull', pullUps: 30, pullMode: 'hard', points: 999, date: '2026-07-13'});
+  assert.equal(pull.name, 'Alex');
+  assert.equal(pull.pullMode, 'super-hard');
+  assert.equal(pull.points, 4);
+  const climb = context.validateActivity({name: 'Maya', type: 'climb', hardestGrade: 'V7', points: 0, date: '2026-07-13'});
+  assert.equal(climb.points, 5);
+  assert.equal(climb.hardestGrade, 'V7');
+  assert.throws(() => context.validateActivity({name: 'Maya', type: 'climb', hardestGrade: 'VB', date: '2026-07-13'}), error => error.code === 'invalid_activity');
+  assert.throws(() => context.validateActivity({name: 'Maya', type: 'pull', pullUps: -1, date: '2026-07-13'}), error => error.code === 'invalid_activity');
 });
 
-test('base credit allocation is date ordered, climb first, and capped at 16', () => {
+test('missing roster mode blocks pull-ups but not climbing', () => {
+  const context = loadScript();
+  context.participantRecords = () => [{name: 'Taylor', pullMode: null}];
+  assert.equal(context.validateActivity({name: 'Taylor', type: 'climb', hardestGrade: 'V0', date: '2026-07-13'}).points, 5);
+  assert.throws(() => context.validateActivity({name: 'Taylor', type: 'pull', pullUps: 20, date: '2026-07-13'}), error => error.details.some(x => x.field === 'pullMode'));
+});
+
+test('self-registration adds one opted-in participant and rejects duplicate names', () => {
+  const context = loadScript();
+  const current = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex', pullMode: 'hard'}]};
+  context.readConfig = () => ({config: current, errors: []});
+  context.writeConfig = config => config;
+  const added = context.addParticipant('Maya', 'super-hard');
+  assert.equal(added.participant.pullMode, 'super-hard');
+  assert.deepEqual(Array.from(added.config.crew, person => ({...person})), [
+    {name: 'Alex', pullMode: 'hard'},
+    {name: 'Maya', pullMode: 'super-hard'},
+  ]);
+  assert.throws(() => context.addParticipant('alex', 'hard'), error => error.code === 'duplicate_participant');
+});
+
+test('daily credits follow creation order, cap at five, and recompute after deletion', () => {
   const context = loadScript();
   const entries = [
-    {id: 'late', name: 'Maya', type: 'climb', points: 5, date: '2027-11-18', createdAt: '1'},
-    {id: 'care', name: 'Maya', type: 'prehab', points: 1, date: '2027-11-15', createdAt: '0'},
-    {id: 'early', name: 'Maya', type: 'climb', points: 5, date: '2027-11-15', createdAt: '9'},
-    {id: 'middle', name: 'Maya', type: 'climb', points: 5, date: '2027-11-16', createdAt: '8'},
-    {id: 'pull', name: 'Maya', type: 'pull', points: 2, date: '2027-11-17', createdAt: '7'},
+    {id: 'later', name: 'Alex', type: 'climb', hardestGrade: 'V5', date: '2026-07-13', createdAt: '2'},
+    {id: 'first', name: 'Alex', type: 'pull', pullUps: 20, pullMode: 'super-hard', date: '2026-07-13', createdAt: '1'},
+    {id: 'other', name: 'Maya', type: 'climb', hardestGrade: 'V4', date: '2026-07-13', createdAt: '1'},
   ];
-  const credit = context.baseCreditInfo(entries);
-  assert.equal(credit.early, 5, 'climb is allocated before care on the same date');
-  assert.equal(credit.care, 1);
-  assert.equal(credit.middle, 5);
-  assert.equal(credit.pull, 2);
-  assert.equal(credit.late, 3);
+  const credit = context.dailyCreditInfo(entries);
+  assert.equal(credit.first.credit, 3);
+  assert.equal(credit.later.credit, 2);
+  assert.equal(credit.other.credit, 5);
+  const afterDelete = context.dailyCreditInfo(entries.filter(x => x.id !== 'first'));
+  assert.equal(afterDelete.later.credit, 5);
 });
 
-test('benchmark validation compares the same gym and grade scale', () => {
+test('challenge window remains inclusive', () => {
   const context = loadScript();
-  context.participantNames = () => ['Maya'];
-  context.sheetToday = () => '2027-11-15';
-  const baseline = {name: 'Maya', phase: 'baseline', gym: 'Home Gym', gradeScale: 'V scale', grades: [4, 4, 3, 3, 2], createdAt: '1'};
-  const result = context.validateBenchmark({name: 'Maya', phase: 'final', gym: 'home gym', gradeScale: 'v SCALE', grades: [5, 4, 4, 3, 3]}, [baseline]);
-  assert.deepEqual(Array.from(result.grades), [5, 4, 4, 3, 3]);
-  assert.throws(
-    () => context.validateBenchmark({name: 'Maya', phase: 'final', gym: 'Other Gym', gradeScale: 'V scale', grades: [5, 4, 4, 3, 3]}, [baseline]),
-    error => error.code === 'invalid_benchmark',
-  );
+  context.readConfig = () => ({config: {startDate: '2026-07-01', tripDate: '2026-07-31'}, errors: []});
+  assert.equal(context.validateActivityWindow({date: '2026-07-01'}).date, '2026-07-01');
+  assert.equal(context.validateActivityWindow({date: '2026-07-31'}).date, '2026-07-31');
+  assert.throws(() => context.validateActivityWindow({date: '2026-08-01'}), error => error.code === 'outside_challenge_window');
 });
 
-test('version 5 advertises fresh-start archiving and feature flags', () => {
+test('v8 setup archives pre-v7 activity and benchmark sheets exactly once', () => {
   const context = loadScript();
-  assert.match(context.__source, /Activities Archive/);
-  assert.match(context.__source, /FEATURES=\['scoring-v2','bounties','benchmarks'\]/);
-  assert.match(context.__source, /roadToSendSchema'\)!=='5'/);
+  class Sheet {
+    constructor(book, name, values = []) { this.book = book; this.name = name; this.values = values.map(row => [...row]); }
+    getName() { return this.name; }
+    setName(name) { delete this.book.sheets[this.name]; this.name = name; this.book.sheets[name] = this; }
+    getLastRow() { return this.values.length; }
+    getLastColumn() { return Math.max(0, ...this.values.map(row => row.length)); }
+    appendRow(row) { this.values.push([...row]); }
+    getRange(row, col, rows = 1, cols = 1) { return {
+      getValues: () => Array.from({length: rows}, (_, r) => Array.from({length: cols}, (_, c) => this.values[row - 1 + r]?.[col - 1 + c] ?? '')),
+      setValue: value => { this.values[row - 1] ||= []; this.values[row - 1][col - 1] = value; },
+    }; }
+  }
+  const book = {sheets: {}, getSheetByName(name) { return this.sheets[name] || null; }, insertSheet(name) { return this.sheets[name] = new Sheet(this, name); }, getSpreadsheetTimeZone: () => 'UTC'};
+  book.sheets.Activities = new Sheet(book, 'Activities', [['id'], ['old']]);
+  book.sheets.Benchmarks = new Sheet(book, 'Benchmarks', [['id'], ['old-benchmark']]);
+  book.sheets.Settings = new Sheet(book, 'Settings', [['key', 'value']]);
+  book.sheets.Participants = new Sheet(book, 'Participants', [['name'], ['Alex']]);
+  let schema = '6';
+  context.SpreadsheetApp.getActive = () => book;
+  context.PropertiesService = {getDocumentProperties: () => ({getProperty: () => schema, setProperty: (_, value) => { schema = value; }})};
+  context.formatSheets = () => {};
+  context.setup();
+  context.setup();
+  assert.equal(schema, '8');
+  assert.equal(Object.keys(book.sheets).filter(name => name.startsWith('Activities Archive')).length, 1);
+  assert.equal(Object.keys(book.sheets).filter(name => name.startsWith('Benchmarks Archive')).length, 1);
+  assert.deepEqual(book.sheets.Activities.values[0], Array.from(vm.runInContext('ACTIVITY_HEADERS', context)));
+  assert.deepEqual(book.sheets.Participants.values[0], ['name', 'pullMode']);
+  assert.equal(book.sheets.Participants.values[1][0], 'Alex');
 });

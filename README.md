@@ -1,71 +1,79 @@
 # Road to Send
 
-A mobile-friendly group fitness challenge for a November climbing trip.
+A self-contained, mobile-first climbing challenge. The app has three views: **You**, **Record**, and **Crew**. It remembers the selected person on each device, lets new crew members create their own profile, supports temporary proxy recording, and shares data through Google Sheets and Apps Script.
 
-## Live site
+## Scoring
 
-https://huangmj0.github.io/road-to-send/
+- Maximum **5 credited points per person per day**.
+- A climbing session is 5 points and records the hardest grade sent from V0 through V17.
+- Pull-ups use the mode each participant chooses when creating their profile:
+  - Hard mode: 10 / 15 / 20 pull-ups earn 3 / 4 / 5 points.
+  - Super hard mode: 20 / 30 / 40 pull-ups earn 3 / 4 / 5 points.
+- Below-threshold pull-ups may be logged for 0 points.
+- Same-day activities receive credit in creation order until the 5-point cap is reached. Deleting an earlier activity can free credit for a later entry.
+- Everyone appears together in one leaderboard regardless of mode. Weekly totals are informational; there are no weekly caps, bonuses, bounties, benchmarks, or activity-frequency limits.
 
-## What it includes
+## Shared setup
 
-- Six activities with points derived by the server
-- Duration-scaled climbing: 3 points for 60–119 minutes, 4 for 120–179, and 5 for 180+
-- A 16-point weekly activity cap, plus a +2 balanced-week bonus and up to two +2 bounties (22 max)
-- Per-activity weekly limits, one scoring climbing session per day, and recovery-day conflict checks
-- Non-scoring new-area, new-style, and project-progress tags on climbing sessions
-- Three rotating daily bounties, with at least two solo/no-equipment choices each day
-- Week 1 and final-week send-pyramid check-ins for a personal-baseline Most Improved award
-- Group progress and leaderboard
-- Personal weekly progress ("You this week") for the remembered logger, plus a group points-per-week trend chart
-- Recent activity feed with delete/undo for mistaken entries (works in both local and shared mode)
-- Live sync status with a manual refresh control
-- Centrally managed trip date, crew roster, and group goal
-- Shared logging through a private-to-your-group Google Sheet
+GitHub Pages hosts the interface, while a Google Sheet stores shared settings and activity:
 
-## Turn on shared logging
+1. Create a Google Sheet and open **Extensions → Apps Script**.
+2. Open the app’s settings, expand **Apps Script source**, copy it, and replace the editor contents.
+3. Choose **Deploy → New deployment → Web app**. Execute as yourself and allow access to anyone with the link.
+4. Paste the `/exec` deployment URL into the app.
+5. Set the challenge dates and group goal. Participants can join from the identity prompt and choose Hard or Super hard mode; organizers can also manage them in setup.
+6. Save setup and distribute the copied crew link.
 
-GitHub Pages hosts the interface, but a static site cannot save group activity by itself. One organizer completes this once:
+The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains `name` and `pullMode`; `Activities` contains raw activity details, while the app deterministically applies the daily cap.
 
-1. Open the live site and select **Shared setup**.
-2. Create a Google Sheet, then open **Extensions → Apps Script**.
-3. Copy the Apps Script shown in the setup window into the editor.
-4. Select **Deploy → New deployment → Web app**.
-5. Set **Execute as** to yourself and access to **Anyone**.
-6. Paste the resulting `/exec` URL into the site and press **Test connection** to confirm the deployment answers correctly before saving.
-7. Set the trip date, group goal, and comma-separated crew names.
-8. Select **Save centrally & copy crew link**, then send that generated link to everyone.
+### Upgrading to API v8
 
-API version 5 creates four active tabs in the Sheet:
+Paste the v8 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
 
-- `Activities` stores duration bands, tags, activities, and bounty claims.
-- `Settings` stores `tripDate` and `groupGoal`.
-- `Participants` stores one crew member per row.
-- `Benchmarks` stores baseline and final send pyramids.
+- Existing `Activities` and `Benchmarks` tabs are renamed to timestamped archive tabs.
+- A fresh activity sheet is created only when upgrading from pre-v7 data.
+- Existing settings and participant names remain.
+- A `pullMode` column is added to `Participants`.
 
-The first version-5 request starts the redesigned challenge fresh. If the existing `Activities` tab contains rows, the script renames it to a timestamped `Activities Archive …` tab before creating the new version-5 `Activities` tab. No historical rows are deleted or included in the new leaderboard.
+Legacy Men values migrate to Super hard mode and Women values migrate to Hard mode so existing thresholds and activity scores remain unchanged. Climbing can still be recorded for a participant with a missing mode, but pull-ups are blocked until a mode is chosen. Older endpoints are rejected by the new client so incompatible profile writes cannot mix with API v8.
 
-You can edit `Settings` or `Participants` directly in Google Sheets at any time. Every connected browser makes a cache-bypassing read on its next sync (normally within 45 seconds), so changing the roster or goal does not require a redeploy or a new crew link. Tap the sync status under the progress bar to refresh immediately. Existing activity rows remain intact when a participant is removed.
+Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
 
-Settings keys ignore capitalization, spaces, underscores, and hyphens, so `tripDate`, `Trip Date`, and `trip_date` are equivalent. Trip dates may be Sheet date cells, `YYYY-MM-DD`, US-style `MM/DD/YYYY`, or unambiguous named-month dates such as `November 15, 2026`. The group goal must be a whole number from 50 through 10,000.
+## API v8
 
-The version 5 read response is `{ version, features, activities, benchmarks, config, configErrors, serverDate, timeZone, fetchedAt }`. Feature flags are `scoring-v2`, `bounties`, and `benchmarks`. Invalid settings produce `config: null` plus field-specific errors while valid activity rows still load. Writes return `{ version: 5, ok, ... }`; failures include `{ error: { code, message, details } }`.
+Reads return:
 
-The backend ignores submitted point values. It derives climbing points from `durationBand`, derives other points from the activity type, validates climbing tags, enforces daily/weekly eligibility, and uses the Sheet timezone for bounty dates. A bounty requires a positively credited climbing session that day, one claim per day, and no more than two claims per week.
+```json
+{
+  "version": 8,
+  "features": ["daily-cap-v1", "participant-pull-mode", "challenge-window", "self-registration-v1"],
+  "activities": [],
+  "config": {
+    "startDate": "2026-07-01",
+    "tripDate": "2026-11-15",
+    "goal": 750,
+    "crew": [{"name": "Alex", "pullMode": "super-hard"}]
+  },
+  "configErrors": [],
+  "serverDate": "2026-07-13",
+  "timeZone": "America/Los_Angeles"
+}
+```
 
-Relative bounty terms are deliberately personal rather than gendered: “recent maximum” is the hardest send in the prior 30 days, “flash level” is the hardest level flashed at least twice in that period, and “project level” is a problem with completed individual moves but no send. Without 30-day history, use the Week 1 benchmark.
+Activity writes send `name`, `type`, `date`, and either `hardestGrade` or `pullUps`. The backend ignores submitted points and pull-up modes, looks up the participant centrally, and derives the raw score. New profiles use the `addParticipant` action with `name` and `pullMode`. Writes return `{ version: 8, ok, ... }`; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
 
-For Most Improved, each climber records five Week 1 sends and five final-week sends from the same gym and ordered scale. The app compares mean grade movement, then improvement in the lowest send as the tiebreaker. Bounties do not affect this award.
-
-The script also supports deleting entries: the activity feed shows a small **×** on each recent entry, which removes the matching row from the Sheet (and doubles as undo for a mistaken log).
-
-**Already deployed an earlier version?** Paste the new script over the old one, then choose **Deploy → Manage deployments → Edit → Version: New version → Deploy**. The web-app URL stays the same. The site rejects older API responses because they lack duration data and cannot safely apply scoring v2.
-
-The generated link carries the shared Sheet connection; the challenge settings come from the Sheet itself. Anyone with that link can submit or change setup through the site, so only share it with the climbing group and do not store sensitive information.
+The app distinguishes **Save failed** from **Saved to the Sheet, but refresh failed**. In the latter case, do not submit again; use the Crew sync control.
 
 ## Development
 
-The app is intentionally self-contained in `index.html`. Pushes to `main` deploy automatically through the Pages workflow.
+The editable sources live in `src/`. `npm run build` generates the self-contained `index.html`; do not edit the generated file directly.
 
-Run `npm test` before publishing. It runs the embedded backend contract tests, scoring and state tests, and static checks for the activity, bounty, benchmark, dialog, live-region, and sync interfaces.
+```bash
+npm run build
+npm test
+python3 -m http.server 8000
+```
 
-See `IMPROVEMENTS.md` for the prioritized product and engineering backlog.
+Open `http://localhost:8000/`. `npm test` verifies the generated artifact, client scoring/state, Apps Script validation and migration, protocol fixtures, shared workflow, accessibility, and required mobile UI hooks.
+
+Pushes to `main` are expected to deploy through GitHub Pages. Shared-mode backend changes also require copying and redeploying the embedded Apps Script.
