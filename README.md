@@ -41,6 +41,10 @@ The first centralized save creates three tabs in the Sheet:
 
 You can edit `Settings` or `Participants` directly in Google Sheets at any time. Every connected browser makes a cache-bypassing read on its next sync (normally within 45 seconds), so changing the roster or goal does not require a redeploy or a new crew link. Tap the sync status under the progress bar to refresh immediately. Existing activity rows remain intact when a participant is removed.
 
+Settings keys ignore capitalization, spaces, underscores, and hyphens, so `tripDate`, `Trip Date`, and `trip_date` are equivalent. Trip dates may be Sheet date cells, `YYYY-MM-DD`, US-style `MM/DD/YYYY`, or unambiguous named-month dates such as `November 15, 2026`. The group goal must be a whole number from 50 through 10,000. The script formats these cells and installs data-validation guidance when API version 4 is first used.
+
+The version 4 read response is `{ version, activities, config, configErrors, fetchedAt }`. Invalid or incomplete settings produce `config: null` plus field-specific `configErrors`; activity rows still load. Write failures return `{ version: 4, ok: false, error: { code, message, details } }`. Activity writes validate names, types, dates, and notes, and the script derives points from the activity type rather than trusting client-supplied points. If the `Participants` tab contains names, activity names must match one of them.
+
 The script also supports deleting entries: the activity feed shows a small **×** on each recent entry, which removes the matching row from the Sheet (and doubles as undo for a mistaken log).
 
 **Already deployed an earlier version of the script?** Paste the new script over the old one in Apps Script, then choose **Deploy → Manage deployments → Edit → Version: New version → Deploy**. This keeps the same web-app URL, so the existing crew link keeps working. The site detects the older activity-only response and will not attempt to write centralized settings until the script is upgraded.
@@ -50,3 +54,7 @@ The generated link carries the shared Sheet connection; the challenge settings c
 ## Development
 
 The app is intentionally self-contained in `index.html`. Pushes to `main` deploy automatically through the Pages workflow.
+
+Run `npm test` before publishing. It runs both the embedded backend contract tests and lightweight static checks that compile the browser script and guard key form, dialog, live-region, sync, and bingo accessibility semantics.
+
+See `IMPROVEMENTS.md` for the prioritized product and engineering backlog.

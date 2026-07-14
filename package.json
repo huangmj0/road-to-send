@@ -1,0 +1,7 @@
+{
+  "name": "road-to-send",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/backend-script.test.js tests/client-state.test.js && node tests/static-check.mjs"
+  }
+}
