@@ -18,7 +18,6 @@ test('current fixture follows the versioned settings and collection contract', (
   assert.equal(fixtures.current.version, schema.properties.version.const);
   assert.ok(Array.isArray(fixtures.current.features));
   assert.ok(Array.isArray(fixtures.current.activities));
-  assert.ok(Array.isArray(fixtures.current.benchmarks));
   assert.deepEqual(
     Object.keys(fixtures.current.config).sort(),
     schema.$defs.settings.required.slice().sort(),

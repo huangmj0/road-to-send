@@ -1,26 +1,9 @@
 {
-  "weekCap": 16,
-  "balancedBonus": 2,
-  "bountyWeekLimit": 2,
-  "activityPoints": {
-    "pull": 2,
-    "core": 1,
-    "prehab": 1,
-    "mobility": 1,
-    "rest": 1
+  "dailyCap": 5,
+  "climbPoints": 5,
+  "pullThresholds": {
+    "men": [[20, 3], [30, 4], [40, 5]],
+    "women": [[10, 3], [15, 4], [20, 5]]
   },
-  "durationPoints": {
-    "60-119": 3,
-    "120-179": 4,
-    "180-plus": 5
-  },
-  "weeklyLimits": {
-    "climb": 4,
-    "pull": 3,
-    "core": 3,
-    "prehab": 4,
-    "mobility": 4,
-    "rest": 2
-  },
-  "climbTags": ["new-area", "new-style", "project-progress"]
+  "grades": ["V0", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16", "V17"]
 }

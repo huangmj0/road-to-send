@@ -25,7 +25,7 @@ The application, styles, and embedded Apps Script currently live in one compact 
 - Centralize scoring constants so browser and backend cannot drift.
 - Keep unit coverage for settings validation, duration boundaries, scoring caps, balanced-week bonuses, bounties, benchmarks, malformed rows, and local-calendar date formatting current.
 - Add contract fixtures for current, legacy, malformed, and partial Apps Script responses.
-- Add an end-to-end smoke test covering connection, settings save, activity add, sync, and deletion.
+- Add browser-driven visual regression coverage for the You, Record, and Crew tabs at common mobile widths.
 - Run the static UX checks and future behavioral tests in continuous integration.
 
 ## P2 — Clarify recovery and data ownership

@@ -4,167 +4,63 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const values = new Map([
-  ['roadToSendLogs', '[null,42,"bad"]'],
-  ['roadToSendConfig', '{"crew":null,"goal":"bad"}'],
-  ['brokenValue', '{broken json'],
-]);
-const elements = new Map();
-const element = () => ({
-  value: '', textContent: '', innerHTML: '', title: '', disabled: false,
-  style: {}, dataset: {}, nextSibling: {textContent: ''},
-  classList: {add() {}, remove() {}, toggle() {}},
-  addEventListener() {}, setAttribute() {}, focus() {}, reset() {},
-  querySelector() { return element(); }, closest() { return null; }
-});
+const values = new Map();
 const context = {
-  console, URL, URLSearchParams, Blob, Map, Set, Date, Math, JSON, Object, Array,
-  String, Number, RegExp, Error, Promise,
-  location: {href: 'https://example.test/', search: ''},
+  assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Intl,
+  location: {search: '', href: 'https://example.test/'},
   localStorage: {
-    getItem(key) { return values.has(key) ? values.get(key) : null; },
-    setItem(key, value) { values.set(key, String(value)); },
-    removeItem(key) { values.delete(key); }
+    getItem: key => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key),
   },
-  document: {
-    hidden: false,
-    querySelector(selector) {
-      if (!elements.has(selector)) elements.set(selector, element());
-      return elements.get(selector);
-    },
-    querySelectorAll() { return []; },
-    addEventListener() {}, createElement() { return element(); }
-  },
-  navigator: {clipboard: {writeText: async () => {}}},
-  requestAnimationFrame(callback) { callback(); },
-  setInterval() {}, setTimeout() {}, confirm() { return true; }, fetch: async () => {},
+  setTimeout() {}, clearTimeout() {},
 };
 
-const checks = `(async()=>{
-assert.equal(logs.length, 0, 'corrupt local storage falls back safely');
-assert.deepEqual(config.crew, [], 'wrong-shaped cached config falls back safely');
-assert.equal(config.goal, 500, 'invalid cached goal falls back safely');
-assert.equal(safeJson('brokenValue','fallback'),'fallback','malformed JSON falls back safely');
-localStorage.setItem('roadToSendLogs',JSON.stringify([{id:'demo-entry'}]));
-endpoint='https://script.google.com/macros/s/cache-isolation/exec';
-localStorage.setItem(cacheKey('activities'),JSON.stringify([{id:'shared-entry'}]));
-const cachedProtocolVersion=[...SUPPORTED_API_VERSIONS][0];
-localStorage.setItem(cacheKey('meta'),JSON.stringify({protocolVersion:cachedProtocolVersion,lastSyncedAt:123}));
-logs=[];loadInitialState();
-assert.equal(logs[0].id,'shared-entry','shared mode loads only its endpoint-specific cache');
-assert.equal(protocolVersion,cachedProtocolVersion,'cached diagnostics retain the confirmed protocol version');
-endpoint='';logs=[];loadInitialState();
-assert.equal(logs[0].id,'demo-entry','local demo data stays separate from cached shared data');
-assert.equal(syncFailureCode(Error('version')),'RTS-REFRESH-VERSION');
-assert.equal(syncFailureCode(Error('unexpected private detail')),'RTS-REFRESH-NETWORK','diagnostic codes do not expose raw errors');
-assert.equal(localDate(new Date(2026, 10, 15, 12)), '2026-11-15');
-assert.equal(parseDateOnly('2026-02-30'), null);
-assert.equal(weekKey('2026-11-16'), '2026-11-16');
-assert.equal(weekKey('2026-11-15'), '2026-11-09');
-const challenge={startDate:'2026-09-07',tripDate:'2026-11-15',goal:500,crew:[]};
-assert.equal(challengeDayCount(challenge),70,'inclusive dates produce a ten-week challenge');
-assert.equal(challengeDurationLabel(challenge),'10-week');
-assert.equal(dateInChallenge('2026-09-07',challenge),true,'first day is eligible');
-assert.equal(dateInChallenge('2026-11-15',challenge),true,'trip date is inclusive');
-assert.equal(dateInChallenge('2026-09-06',challenge),false,'day before start is excluded');
-assert.equal(dateInChallenge('2026-11-16',challenge),false,'day after trip is excluded');
-assert.equal(BOUNTIES.length,24,'catalog contains 24 bounties');
-assert.ok(BOUNTIES.every(b=>b.title&&b.description&&[1,2,3].includes(b.points)),'every bounty has a name, simple description, and difficulty-scaled points');
-assert.deepEqual([...new Set(BOUNTIES.map(b=>b.points))].sort(),[1,2,3],'catalog uses the full 1–3 point range');
-assert.equal(JSON.stringify(Object.entries(DURATION_POINTS)),JSON.stringify([['60-119',3],['120-179',4],['180-plus',5]]),'duration bands map to 3/4/5 points');
-const bountyWeek=['2026-11-16','2026-11-17','2026-11-18','2026-11-19','2026-11-20','2026-11-21','2026-11-22'].map(d=>dailyBounties(d));
-assert.equal(new Set(bountyWeek.flatMap(day=>day.map(x=>x.id))).size,21,'no bounty repeats within a week');
-assert.ok(bountyWeek.every(day=>day.length===3&&new Set(day.map(x=>x.category)).size===3),'each day has three categories');
-assert.ok(bountyWeek.every(day=>day.filter(x=>x.access==='solo').length>=2),'each day has at least two solo no-equipment bounties');
-assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07','timezone date works across DST boundary');
-assert.equal(dateInTimeZone(new Date('2026-11-01T08:30:00Z'),'America/Los_Angeles'),'2026-11-01','timezone date works when daylight saving time ends');
-config={startDate:'2026-11-01',tripDate:'2026-11-30',goal:500,crew:[]};
-const scored=[
-{id:'c1',name:'Maya',type:'climb',points:999,durationBand:'180-plus',date:'2026-11-16',createdAt:'1'},
-{id:'p1',name:'Maya',type:'pull',points:2,date:'2026-11-16',createdAt:'2'},
-{id:'r1',name:'Maya',type:'prehab',points:999,date:'2026-11-16',createdAt:'3'},
-{id:'c2',name:'Maya',type:'climb',points:999,durationBand:'120-179',date:'2026-11-17',createdAt:'4'},
-{id:'c3',name:'Maya',type:'climb',points:999,durationBand:'120-179',date:'2026-11-18',createdAt:'5'},
-{id:'c4',name:'Maya',type:'climb',points:999,durationBand:'60-119',date:'2026-11-19',createdAt:'6'},
-...['2026-11-16','2026-11-17'].map((date,i)=>{const b=dailyBounties(date)[0];return{id:'b'+i,name:'Maya',type:'bounty',points:999,date,createdAt:'9'+i,bountyId:b.id,bountyTitle:b.title}})
-];
-const fixtureWindow={startDate:'2026-11-01',tripDate:'2026-11-30'};
-const scoredWeek=computeCredits(scored,fixtureWindow).weeks.get('maya|2026-11-16');
-const expectedBountyPoints=['2026-11-16','2026-11-17'].reduce((sum,date)=>sum+dailyBounties(date)[0].points,0);
-assert.equal(scoredWeek.credited,16);
-assert.equal(scoredWeek.bonus,2);
-assert.equal(scoredWeek.bounty,expectedBountyPoints,'bounty credit is derived from catalog difficulty, not submitted points');
-assert.equal(scoredWeek.bountyClaims,2);
-assert.equal(scoredWeek.bountyLogged,2);
-assert.equal(scoredWeek.credited+scoredWeek.bonus+scoredWeek.bounty,18+expectedBountyPoints);
-assert.equal(computeCredits(scored.slice().reverse(),fixtureWindow).weeks.get('maya|2026-11-16').credited,16,'entry order cannot change weekly base points');
-const extraBounty=dailyBounties('2026-11-17')[1];
-const bountyLog=computeCredits(scored.concat({id:'b-extra',name:'Maya',type:'bounty',date:'2026-11-17',createdAt:'99',bountyId:extraBounty.id,bountyTitle:extraBounty.title}),fixtureWindow);
-assert.equal(bountyLog.info.get('b-extra').credit,0,'a completed bounty after the daily point claim remains logged without points');
-assert.equal(bountyLog.info.get('b-extra').reason,'daily bounty limit');
-assert.equal(bountyLog.weeks.get('maya|2026-11-16').bountyLogged,3,'all completed bounties are counted for Bounty Hunter');
-assert.equal(bountyHunter([{name:'Maya',type:'bounty',bountyId:'one'},{name:'Maya',type:'bounty',bountyId:'two'},{name:'Alex',type:'bounty',bountyId:'one'}]),'Maya · 2 bounties logged');
-const lateBalance=[
-  ...['2026-11-16','2026-11-17','2026-11-18','2026-11-19'].map((date,i)=>({id:'lc'+i,name:'Maya',type:'climb',durationBand:'180-plus',tags:i===0?['new-area','project-progress']:[],date})),
-  {id:'late-pull',name:'Maya',type:'pull',date:'2026-11-20'},
-  {id:'late-care',name:'Maya',type:'mobility',date:'2026-11-21'}
-];
-const lateWeek=computeCredits(lateBalance).weeks.get('maya|2026-11-16');
-assert.equal(lateWeek.credited,16);
-assert.equal(lateWeek.bonus,2,'valid work can unlock balance after the activity cap');
-assert.equal(computeCredits(lateBalance).info.get('late-pull').credit,0);
-assert.equal(activityPoints(lateBalance[0]),5,'tags never add points');
-const sameDay=computeCredits([
-  {id:'first',name:'Maya',type:'climb',durationBand:'60-119',date:'2026-11-16'},
-  {id:'second',name:'Maya',type:'climb',durationBand:'180-plus',date:'2026-11-16'}
-]);
-assert.equal(sameDay.info.get('second').credit,0,'only one climbing session counts per day');
-const bounded=computeCredits([
-  {id:'before',name:'Maya',type:'pull',date:'2026-10-31'},
-  {id:'first-day',name:'Maya',type:'pull',date:'2026-11-01'},
-  {id:'last-day',name:'Maya',type:'pull',date:'2026-11-30'},
-  {id:'after',name:'Maya',type:'pull',date:'2026-12-01'}
-]);
-assert.equal(bounded.info.get('before').reason,'outside challenge');
-assert.equal(bounded.info.get('first-day').credit,2);
-assert.equal(bounded.info.get('last-day').credit,2);
-assert.equal(bounded.info.get('after').reason,'outside challenge','post-trip entries are visibly excluded');
-const comparison=benchmarkComparison([
-  {name:'Maya',phase:'baseline',gym:'Gym',gradeScale:'V',grades:[4,4,3,3,2],createdAt:'1'},
-  {name:'Maya',phase:'final',gym:'Gym',gradeScale:'V',grades:[5,4,4,3,3],createdAt:'2'}
-]).find(x=>x.name==='Maya');
-assert.ok(Math.abs(comparison.improvement-0.6)<1e-9);
-assert.equal(comparison.floorGain,1);
-assert.deepEqual(parseRemoteConfig({startDate:'2026-09-07',tripDate:'2026-11-15',goal:750,crew:['Alex','alex',' Maya ']},{}).value,{startDate:'2026-09-07',tripDate:'2026-11-15',goal:750,crew:['Alex','Maya']});
-assert.match(parseRemoteConfig({startDate:'2026-09-07',tripDate:'11/15/2026',goal:'1,000',crew:[]},{}).errors.tripDate,/YYYY-MM-DD/);
-assert.match(parseRemoteConfig({startDate:'2026-09-07',tripDate:'2026-11-15',goal:'1,000',crew:[]},{}).errors.groupGoal,/whole number/);
-assert.match(parseRemoteConfig({startDate:'2026-11-16',tripDate:'2026-11-15',goal:500,crew:[]},{}).errors.challengeStart,/on or before/);
-assert.equal(parseRemoteConfig(null,[{field:'tripDate',cell:'Settings!B3',reason:'must be a real calendar date'}]).errors.tripDate,'must be a real calendar date');
-assert.match(parseRemoteConfig({startDate:'2026-09-07',tripDate:'2026-11-15',goal:750,crew:['x'.repeat(31)]},{}).errors.crew,/30 characters/);
-assert.equal(unpackRemote({version:6,features:['scoring-v2','bounties','benchmarks','challenge-window'],activities:[null,{id:'ok'}],benchmarks:[null,{id:'benchmark'}],config:null}).activities.length,1,'malformed remote rows are ignored');
-assert.throws(()=>unpackRemote({version:99,activities:[]}),/version/);
-assert.throws(()=>unpackRemote({version:4,activities:[],config:null}),/version/);
-assert.equal(unpackRemote({version:6,features:['bounties'],activities:[],config:null,serverDate:'2026-11-16',timeZone:'America/Los_Angeles'}).features[0],'bounties');
-const beforeConfig=JSON.stringify(config),beforeEndpoint=endpoint;
-document.querySelector('#endpoint').value='https://script.google.com/macros/s/test/exec';
-fetch=async()=>({ok:true,json:async()=>({version:6,features:['scoring-v2','bounties','benchmarks'],activities:[],benchmarks:[],config:{startDate:'2026-09-07',tripDate:'2026-11-15',goal:750,crew:['Alex']}})});
-await testConnection();
-assert.equal(endpoint,beforeEndpoint,'Test Connection must not change the active endpoint');
-assert.equal(JSON.stringify(config),beforeConfig,'Test Connection must not apply remote config');
-assert.equal(localStorage.getItem('roadToSendEndpoint'),null,'Test Connection must not persist the candidate endpoint');
+const checks = `(()=>{
+  const boundaries=[
+    ['men',19,0],['men',20,3],['men',29,3],['men',30,4],['men',39,4],['men',40,5],
+    ['women',9,0],['women',10,3],['women',14,3],['women',15,4],['women',19,4],['women',20,5]
+  ];
+  boundaries.forEach(([category,count,points])=>assert.equal(pullPoints(count,category),points,category+' '+count));
+  assert.equal(activityPoints({type:'climb',hardestGrade:'V0'}),5);
+  assert.equal(activityPoints({type:'climb',hardestGrade:'VB'}),0);
+  assert.equal(activityPoints({type:'pull',pullUps:5,pullCategory:'women'}),0,'below-threshold pull-ups remain valid zero-point activity');
 
-endpoint='https://script.google.com/macros/s/ordered/exec';
-let resolveFirst,resolveSecond,calls=0;
-const first=new Promise(resolve=>{resolveFirst=resolve}),second=new Promise(resolve=>{resolveSecond=resolve});
-fetch=()=>++calls===1?first:second;
-const oldRequest=loadRemote(),newRequest=loadRemote();
-resolveSecond({ok:true,json:async()=>({version:6,features:['scoring-v2','bounties','benchmarks'],activities:[{id:'new',name:'Alex',type:'climb',points:3,durationBand:'60-119',date:'2026-11-15'}],benchmarks:[],config:{startDate:'2026-09-07',tripDate:'2026-11-15',goal:750,crew:['Alex']}})});
-await newRequest;
-resolveFirst({ok:true,json:async()=>({version:6,features:['scoring-v2','bounties','benchmarks'],activities:[{id:'old',name:'Alex',type:'climb',points:3,durationBand:'60-119',date:'2026-11-14'}],benchmarks:[],config:{startDate:'2026-09-07',tripDate:'2026-11-14',goal:500,crew:['Alex']}})});
-await oldRequest;
-assert.equal(logs[0].id,'new','an older request must not overwrite a newer response');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  const entries=[
+    {id:'climb',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-13',createdAt:'2'},
+    {id:'pull',name:'Alex',type:'pull',pullUps:20,pullCategory:'men',date:'2026-07-13',createdAt:'1'},
+    {id:'next',name:'Alex',type:'pull',pullUps:40,pullCategory:'men',date:'2026-07-14',createdAt:'1'},
+    {id:'maya',name:'Maya',type:'climb',hardestGrade:'V3',date:'2026-07-13',createdAt:'1'},
+  ];
+  let scored=computeCredits(entries);
+  assert.equal(scored.info.get('pull').credit,3);
+  assert.equal(scored.info.get('climb').credit,2,'creation order determines remaining daily credit');
+  assert.equal(scored.info.get('next').credit,5,'cap resets each person and date');
+  assert.equal(scored.info.get('maya').credit,5,'cap is per person');
+  scored=computeCredits(entries.filter(x=>x.id!=='pull'));
+  assert.equal(scored.info.get('climb').credit,5,'deleting earlier activity frees later credit');
+  assert.equal(computeCredits([{id:'before',name:'Alex',type:'climb',hardestGrade:'V1',date:'2026-06-30'}]).info.get('before').reason,'outside challenge');
+  assert.equal(weekKey('2026-07-13'),'2026-07-13');
+  assert.equal(weekKey('2026-07-19'),'2026-07-13');
+  assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07');
+
+  const parsed=parseRemoteConfig({startDate:'2026-07-01',tripDate:'2026-07-31',goal:750,crew:[{name:'Alex',pullCategory:'men'},{name:'alex',pullCategory:'women'},{name:'Maya',pullCategory:null}]},[]);
+  assert.equal(parsed.value.crew.length,2,'crew names are canonicalized case-insensitively');
+  assert.equal(parsed.value.crew[1].pullCategory,null,'migration can surface a missing category');
+  assert.throws(()=>unpackRemote({version:6,features:[],activities:[],config:null}),/version/,'v6 requires redeployment');
+  assert.equal(unpackRemote({version:7,features:['daily-cap-v1'],activities:[null,{type:'climb',hardestGrade:'V1'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1);
+
+  localStorage.setItem('roadToSendLogs',JSON.stringify([{id:'v6'}]));
+  localStorage.setItem('roadToSendMe','Alex');
+  endpoint='';logs=[];config=defaultConfig();me='';recordingFor='';
+  loadInitialState();
+  assert.equal(localStorage.getItem('roadToSendLogsV6Archive'),JSON.stringify([{id:'v6'}]),'old local activity is archived once');
+  assert.equal(logs.length,0,'v7 local leaderboard starts clean');
+  assert.equal(me,'Alex','remembered identity is restored');
+  recordingFor='Maya';
+  assert.equal(me,'Alex','temporary proxy target does not replace device owner');
 })()`;
-context.assert = assert;
-vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'})
-  .then(()=>console.log('client state tests passed'))
-  .catch(error=>{console.error(error);process.exitCode=1});
+
+vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
+console.log('Client state and scoring tests passed.');

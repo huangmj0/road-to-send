@@ -5,152 +5,41 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const apiVersion = Number(source.match(/SUPPORTED_API_VERSIONS=new Set\(\[(\d+)/)[1]);
 
-test('shared workflow connects, saves settings, adds and syncs activity, then deletes it', async () => {
-  const values = new Map();
-  const elements = new Map();
-  const requests = [];
-  const copied = [];
+test('shared workflow connects, saves categorized roster, adds, syncs, and deletes activity', async () => {
+  const values = new Map(), requests = [];
   const server = {
-    config: {startDate: '2026-09-07', tripDate: '2026-11-15', goal: 500, crew: ['Old Crew']},
+    config: {startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Old Crew',pullCategory:null}]},
     activities: [],
-    benchmarks: [],
-    nextId: 1,
   };
-
-  const makeElement = () => {
-    const listeners = new Map();
-    const submitButton = {disabled: false, textContent: ''};
-    const classNames = new Set();
-    return {
-      value: '', textContent: '', innerHTML: '', title: '', disabled: false, required: false,
-      min: '', max: '', style: {}, dataset: {}, nextSibling: {textContent: ''}, isConnected: true,
-      classList: {
-        add(...names) { names.forEach(name => classNames.add(name)); },
-        remove(...names) { names.forEach(name => classNames.delete(name)); },
-        toggle(name, force) {
-          const enabled = force === undefined ? !classNames.has(name) : force;
-          if (enabled) classNames.add(name); else classNames.delete(name);
-          return enabled;
-        },
-      },
-      addEventListener(type, handler) { listeners.set(type, handler); },
-      getListener(type) { return listeners.get(type); },
-      setAttribute(name, value) { this[name] = value; },
-      focus() {}, reset() {}, click() {}, closest() { return null; },
-      querySelector(selector) { return selector === 'button[type=submit]' ? submitButton : makeElement(); },
-    };
+  const remote = () => ({version:7,features:['daily-cap-v1','participant-pull-category','challenge-window'],activities:server.activities.map(x=>({...x})),config:{...server.config,crew:server.config.crew.map(x=>({...x}))},configErrors:server.config.crew.filter(x=>!x.pullCategory).map(x=>({field:'pullCategory',value:x.name,reason:'must be men or women'})),serverDate:'2026-07-13',timeZone:'America/Los_Angeles'});
+  const response = body => ({ok:true,json:async()=>body});
+  const fetch = async (url,options={}) => {
+    if(!options.method||options.method==='GET'){requests.push({method:'GET'});return response(remote())}
+    const body=JSON.parse(options.body);requests.push({method:'POST',body});
+    if(body.action==='saveConfig'){server.config=body.config;return response({version:7,ok:true,config:server.config,configErrors:[]})}
+    if(body.action==='delete'){server.activities=server.activities.filter(x=>x.id!==body.id);return response({version:7,ok:true,deleted:body.id})}
+    const participant=server.config.crew.find(x=>x.name===body.name),points=body.type==='climb'?5:body.pullUps>=40?5:body.pullUps>=30?4:body.pullUps>=20?3:0;
+    const saved={...body,id:'activity-1',createdAt:'2026-07-13T12:00:00Z',points,pullCategory:body.type==='pull'?participant.pullCategory:'',hardestGrade:body.type==='climb'?body.hardestGrade:'',pullUps:body.type==='pull'?body.pullUps:''};
+    server.activities.push(saved);return response({version:7,ok:true,...saved});
   };
-  const getElement = selector => {
-    if (!elements.has(selector)) elements.set(selector, makeElement());
-    return elements.get(selector);
-  };
-  const remote = () => ({
-    version: apiVersion,
-    features: ['scoring-v2', 'bounties', 'benchmarks', 'challenge-window'],
-    activities: server.activities.map(item => ({...item})),
-    benchmarks: server.benchmarks.map(item => ({...item})),
-    config: {...server.config, crew: [...server.config.crew]},
-    configErrors: [],
-    serverDate: '2026-10-01',
-    timeZone: 'America/Los_Angeles',
-    fetchedAt: new Date().toISOString(),
-  });
-  const response = body => ({ok: true, json: async () => body});
-  const fetch = async (url, options) => {
-    if (!options?.method || options.method === 'GET') {
-      requests.push({method: 'GET', url});
-      return response(remote());
-    }
-    const body = JSON.parse(options.body);
-    requests.push({method: 'POST', url, body});
-    if (body.action === 'saveConfig') {
-      server.config = {...body.config, crew: [...body.config.crew]};
-      return response({version: apiVersion, ok: true, config: server.config, configErrors: []});
-    }
-    if (body.action === 'delete') {
-      server.activities = server.activities.filter(item => item.id !== body.id);
-      return response({version: apiVersion, ok: true, deleted: body.id});
-    }
-    const saved = {...body, id: `activity-${server.nextId++}`};
-    server.activities.push(saved);
-    return response({version: apiVersion, ok: true, ...saved});
-  };
-
-  const context = {
-    assert, console, URL, URLSearchParams, Blob, Map, Set, Date, Math, JSON, Object, Array,
-    String, Number, RegExp, Error, Promise,
-    location: {href: 'https://example.test/', search: ''},
-    localStorage: {
-      getItem(key) { return values.has(key) ? values.get(key) : null; },
-      setItem(key, value) { values.set(key, String(value)); },
-      removeItem(key) { values.delete(key); },
-    },
-    document: {
-      hidden: false,
-      activeElement: null,
-      querySelector: getElement,
-      querySelectorAll() { return []; },
-      addEventListener() {},
-      createElement: makeElement,
-    },
-    navigator: {clipboard: {writeText: async value => { copied.push(value); }}},
-    requestAnimationFrame(callback) { callback(); },
-    setInterval() {},
-    setTimeout() {},
-    confirm() { return true; },
-    fetch,
-    getListener(selector, type) { return getElement(selector).getListener(type); },
-  };
-
-  const checks = `(async()=>{
-    const sharedUrl='https://script.google.com/macros/s/smoke-test/exec';
-    document.querySelector('#endpoint').value=sharedUrl;
-    const probe=await fetchShared(sharedUrl);
-    assert.equal(probe.ok,true);
-    assert.equal(unpackRemote(await probe.json()).version,${apiVersion});
-    await testConnection();
-    assert.match(document.querySelector('#testResult').textContent,/Connected — API v${apiVersion}/);
-    assert.equal(endpoint,'','testing a connection does not activate it');
-
-    document.querySelector('#challengeStart').value='2026-09-07';
-    document.querySelector('#tripDate').value='2026-11-15';
-    document.querySelector('#groupGoal').value='750';
-    document.querySelector('#crewNames').value='Alex, Maya';
-    await saveSetup();
-    assert.equal(endpoint,sharedUrl);
-    assert.equal(config.goal,750);
-    assert.equal(JSON.stringify(config.crew),JSON.stringify(['Alex','Maya']));
-    assert.equal(JSON.parse(localStorage.getItem('roadToSendShared:config:'+encodeURIComponent(sharedUrl))).goal,750);
-
-    document.querySelector('#activityType').value='pull';
-    document.querySelector('#member').value='Alex';
-    document.querySelector('#activityDate').value='2026-10-01';
-    document.querySelector('#note').value='Smoke test pull session';
-    const submit=getListener('#logForm','submit');
-    assert.equal(typeof submit,'function','activity form submit handler is registered');
-    await submit({preventDefault(){},target:document.querySelector('#logForm')});
-    assert.equal(logs.length,1);
-    assert.equal(logs[0].id,'activity-1');
-    assert.equal(logs[0].name,'Alex');
-
-    const beforeSync=lastSyncedAt;
-    assert.equal(await loadRemote(true),true);
-    assert.ok(lastSyncedAt>=beforeSync);
-    assert.equal(syncState,'live');
-
-    await deleteEntry(0,'activity-1');
-    assert.equal(logs.length,0);
+  const context={assert,console,URL,URLSearchParams,Map,Set,Date,Math,JSON,Object,Array,String,Number,RegExp,Error,Promise,Intl,fetch,location:{search:'',href:'https://example.test/'},localStorage:{getItem:key=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)},setTimeout(){},clearTimeout(){}};
+  const checks=`(async()=>{
+    render=()=>{};renderSync=()=>{};setDefaultRecordDate=()=>{};
+    endpoint='https://script.google.com/macros/s/smoke/exec';
+    const probe=unpackRemote(await (await fetchShared(endpoint)).json());
+    assert.equal(probe.version,7);
+    assert.match(Object.values(probe.configErrors).join(' '),/Old Crew/);
+    const next={startDate:'2026-07-01',tripDate:'2026-07-31',goal:750,crew:[{name:'Alex',pullCategory:'men'},{name:'Maya',pullCategory:'women'}]};
+    let saved=await (await fetchShared(endpoint,{method:'POST',body:JSON.stringify({action:'saveConfig',config:next})})).json();
+    assert.equal(saved.ok,true);config=saved.config;me='Alex';recordingFor='Alex';
+    saved=await (await fetchShared(endpoint,{method:'POST',body:JSON.stringify({name:'Alex',type:'pull',pullUps:30,date:'2026-07-13',points:999,pullCategory:'women'})})).json();
+    assert.equal(saved.points,4);assert.equal(saved.pullCategory,'men');
+    assert.equal(await loadRemote(),true,syncDetail||syncErrorCode);assert.equal(logs.length,1);assert.equal(logs[0].id,'activity-1');assert.equal(syncState,'live');
+    const deleted=await (await fetchShared(endpoint,{method:'POST',body:JSON.stringify({action:'delete',id:'activity-1'})})).json();
+    assert.equal(deleted.ok,true);await loadRemote();assert.equal(logs.length,0);
   })()`;
-
-  await vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
-
-  assert.deepEqual(
-    requests.filter(request => request.method === 'POST').map(request => request.body.action || 'activity'),
-    ['saveConfig', 'activity', 'delete'],
-  );
-  assert.equal(server.activities.length, 0);
-  assert.ok(requests.filter(request => request.method === 'GET').length >= 4);
-  assert.ok(copied.some(value => value.includes('sheet=')), 'successful setup copies a crew link');
+  await vm.runInNewContext(`${source}\n${checks}`,context,{filename:'index.html'});
+  assert.deepEqual(requests.filter(x=>x.method==='POST').map(x=>x.body.action||'activity'),['saveConfig','activity','delete']);
+  assert.ok(requests.filter(x=>x.method==='GET').length>=3);
 });

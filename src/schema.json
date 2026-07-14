@@ -1,41 +1,29 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://huangmj0.github.io/road-to-send/schema/v6.json",
-  "title": "Road to Send protocol v6",
+  "$id": "https://huangmj0.github.io/road-to-send/schema/v7.json",
+  "title": "Road to Send protocol v7",
   "type": "object",
-  "required": ["version", "features", "activities", "benchmarks", "config"],
+  "required": ["version", "features", "activities", "config"],
   "properties": {
-    "version": { "const": 6 },
-    "features": {
-      "type": "array",
-      "items": { "type": "string" }
-    },
-    "activities": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/activity" }
-    },
-    "benchmarks": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/benchmark" }
-    },
-    "config": {
-      "anyOf": [
-        { "$ref": "#/$defs/settings" },
-        { "type": "null" }
-      ]
-    },
-    "configErrors": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/errorDetail" }
-    },
+    "version": { "const": 7 },
+    "features": { "type": "array", "items": { "type": "string" } },
+    "activities": { "type": "array", "items": { "$ref": "#/$defs/activity" } },
+    "config": { "anyOf": [{ "$ref": "#/$defs/settings" }, { "type": "null" }] },
+    "configErrors": { "type": "array", "items": { "$ref": "#/$defs/errorDetail" } },
     "serverDate": { "$ref": "#/$defs/date" },
     "timeZone": { "type": "string" },
     "fetchedAt": { "type": "string" }
   },
   "$defs": {
-    "date": {
-      "type": "string",
-      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "participant": {
+      "type": "object",
+      "required": ["name", "pullCategory"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 30 },
+        "pullCategory": { "enum": ["men", "women", null] }
+      },
+      "additionalProperties": false
     },
     "settings": {
       "type": "object",
@@ -44,10 +32,7 @@
         "startDate": { "$ref": "#/$defs/date" },
         "tripDate": { "$ref": "#/$defs/date" },
         "goal": { "type": "integer", "minimum": 50, "maximum": 10000 },
-        "crew": {
-          "type": "array",
-          "items": { "type": "string", "minLength": 1, "maxLength": 30 }
-        }
+        "crew": { "type": "array", "items": { "$ref": "#/$defs/participant" } }
       },
       "additionalProperties": false
     },
@@ -57,33 +42,15 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string", "minLength": 1, "maxLength": 30 },
-        "type": { "type": "string" },
-        "points": { "type": "number" },
+        "type": { "enum": ["climb", "pull"] },
+        "points": { "type": "integer", "minimum": 0, "maximum": 5 },
         "date": { "$ref": "#/$defs/date" },
         "createdAt": { "type": "string" },
-        "note": { "type": "string", "maxLength": 120 },
-        "durationBand": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "bountyId": { "type": "string" },
-        "bountyTitle": { "type": "string" }
-      }
-    },
-    "benchmark": {
-      "type": "object",
-      "required": ["name", "phase", "gym", "gradeScale", "grades", "createdAt"],
-      "properties": {
-        "name": { "type": "string" },
-        "phase": { "enum": ["baseline", "final"] },
-        "gym": { "type": "string" },
-        "gradeScale": { "type": "string" },
-        "grades": {
-          "type": "array",
-          "minItems": 5,
-          "maxItems": 5,
-          "items": { "type": "integer" }
-        },
-        "createdAt": { "type": "string" }
-      }
+        "hardestGrade": { "enum": ["", "V0", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16", "V17"] },
+        "pullUps": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "string", "maxLength": 0 }] },
+        "pullCategory": { "enum": ["", "men", "women"] }
+      },
+      "additionalProperties": false
     },
     "errorDetail": {
       "type": "object",
@@ -91,27 +58,8 @@
       "properties": {
         "field": { "type": "string" },
         "reason": { "type": "string" },
-        "cell": { "type": "string" }
-      }
-    },
-    "errorResponse": {
-      "type": "object",
-      "required": ["version", "ok", "error"],
-      "properties": {
-        "version": { "const": 6 },
-        "ok": { "const": false },
-        "error": {
-          "type": "object",
-          "required": ["code", "message"],
-          "properties": {
-            "code": { "type": "string" },
-            "message": { "type": "string" },
-            "details": {
-              "type": "array",
-              "items": { "$ref": "#/$defs/errorDetail" }
-            }
-          }
-        }
+        "cell": { "type": "string" },
+        "value": { "type": "string" }
       }
     }
   }
