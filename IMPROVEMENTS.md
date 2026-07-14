@@ -12,20 +12,20 @@ The interface describes a ten-week challenge, but the data model only has a trip
 - Add unit tests for the first and last valid day, Sunday/Monday week boundaries, daylight-saving transitions, and entries logged after the trip.
 - Derive “ten-week” and “November” copy from settings instead of hard-coding it.
 
-## P1 — Make bingo genuinely shared
+## P1 — Strengthen bounty and benchmark integrity
 
-Bingo state currently lives in one browser even though the copy describes crew progress.
+Bounties and send pyramids intentionally use an honor system, but organizers still need enough context to resolve mistakes or obvious abuse.
 
-- Store tile completion centrally with the participant, completion time, and an optional note.
-- Define whether a tile can be reversed and whether organizer approval is needed.
-- Show who completed each tile and announce remote updates accessibly.
-- Preserve an explicit local-only mode for demos and offline use.
+- Add organizer review and correction controls for bounty claims and benchmark check-ins.
+- Show the reference grade or circuit band used for relative bounty claims.
+- Add an audit trail when a baseline or final check-in is replaced.
+- Preserve explicit local-only behavior for demos and offline use.
 
 ## P1 — Add security and organizer controls
 
 Anyone holding the Apps Script URL can currently submit activities or alter setup.
 
-API version 4 now allowlists activity types, derives points server-side, validates participant/date/text fields, and returns structured errors. The remaining work is authorization and abuse recovery:
+API version 5 now allowlists activity types and tags, derives duration-based points server-side, validates participant/date/text fields, and returns structured errors. The remaining work is authorization and abuse recovery:
 
 - Separate participant logging permissions from organizer settings and deletion permissions.
 - Add rate limiting or another abuse-control strategy appropriate for Apps Script.
@@ -40,7 +40,7 @@ The application, styles, and embedded Apps Script currently live in one compact 
 - Split browser code, styles, and Apps Script source into formatted files while preserving a simple deploy artifact.
 - Define one versioned schema for settings, participants, activities, and error responses.
 - Centralize scoring constants so browser and backend cannot drift.
-- Add unit tests for settings validation, scoring caps, balanced-week bonuses, malformed rows, and local-calendar date formatting.
+- Keep unit coverage for settings validation, duration boundaries, scoring caps, balanced-week bonuses, bounties, benchmarks, malformed rows, and local-calendar date formatting current.
 - Add contract fixtures for current, legacy, malformed, and partial Apps Script responses.
 - Add an end-to-end smoke test covering connection, settings save, activity add, sync, and deletion.
 - Run the static UX checks and future behavioral tests in continuous integration.
