@@ -49,6 +49,25 @@ assert.equal(localDate(new Date(2026, 10, 15, 12)), '2026-11-15');
 assert.equal(parseDateOnly('2026-02-30'), null);
 assert.equal(weekKey('2026-11-16'), '2026-11-16');
 assert.equal(weekKey('2026-11-15'), '2026-11-09');
+assert.equal(BOUNTIES.length,24,'catalog contains 24 bounties');
+const bountyWeek=['2026-11-16','2026-11-17','2026-11-18','2026-11-19','2026-11-20','2026-11-21','2026-11-22'].map(d=>dailyBounties(d));
+assert.equal(new Set(bountyWeek.flatMap(day=>day.map(x=>x.id))).size,21,'no bounty repeats within a week');
+assert.ok(bountyWeek.every(day=>day.length===3&&new Set(day.map(x=>x.category)).size===3),'each day has three categories');
+assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07','timezone date works across DST boundary');
+const scored=[
+{id:'c1',name:'Maya',type:'climb',points:3,date:'2026-11-16',createdAt:'1'},
+{id:'p1',name:'Maya',type:'pull',points:2,date:'2026-11-16',createdAt:'2'},
+{id:'r1',name:'Maya',type:'prehab',points:2,date:'2026-11-16',createdAt:'3'},
+{id:'c2',name:'Maya',type:'climb',points:3,date:'2026-11-17',createdAt:'4'},
+{id:'c3',name:'Maya',type:'climb',points:3,date:'2026-11-18',createdAt:'5'},
+{id:'m1',name:'Maya',type:'mobility',points:1,date:'2026-11-19',createdAt:'6'},
+...['2026-11-16','2026-11-17','2026-11-18'].map((date,i)=>{const b=dailyBounties(date)[0];return{id:'b'+i,name:'Maya',type:'bounty',points:2,date,createdAt:'9'+i,bountyId:b.id,bountyTitle:b.title}})
+];
+const scoredWeek=computeCredits(scored).weeks.get('maya|2026-11-16');
+assert.equal(scoredWeek.credited,14);
+assert.equal(scoredWeek.bonus,2);
+assert.equal(scoredWeek.bounty,6);
+assert.equal(scoredWeek.credited+scoredWeek.bonus+scoredWeek.bounty,22);
 assert.deepEqual(parseRemoteConfig({tripDate:'2026-11-15',goal:750,crew:['Alex','alex',' Maya ']},{}).value,{tripDate:'2026-11-15',goal:750,crew:['Alex','Maya']});
 assert.match(parseRemoteConfig({tripDate:'11/15/2026',goal:'1,000',crew:[]},{}).errors.tripDate,/YYYY-MM-DD/);
 assert.match(parseRemoteConfig({tripDate:'11/15/2026',goal:'1,000',crew:[]},{}).errors.groupGoal,/whole number/);
@@ -57,6 +76,7 @@ assert.match(parseRemoteConfig({tripDate:'2026-11-15',goal:750,crew:['x'.repeat(
 assert.equal(unpackRemote({version:4,activities:[null,{id:'ok'}],config:null}).activities.length,1,'malformed remote rows are ignored');
 assert.throws(()=>unpackRemote({version:99,activities:[]}),/version/);
 assert.equal(unpackRemote({version:3,activities:[],config:null}).version,3);
+assert.equal(unpackRemote({version:4,features:['bounties'],activities:[],config:null,serverDate:'2026-11-16',timeZone:'America/Los_Angeles'}).features[0],'bounties');
 const beforeConfig=JSON.stringify(config),beforeEndpoint=endpoint;
 document.querySelector('#endpoint').value='https://script.google.com/macros/s/test/exec';
 fetch=async()=>({ok:true,json:async()=>({version:3,activities:[],config:{tripDate:'2026-11-15',goal:750,crew:['Alex']}})});
