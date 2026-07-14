@@ -183,7 +183,7 @@ test('bounty claims require evidence and a credited same-day climb', () => {
   );
 });
 
-test('bounty validation enforces daily and weekly claim limits', () => {
+test('bounty validation logs extra distinct claims while preventing duplicate bounty claims', () => {
   const context = loadScript();
   context.participantNames = () => ['Maya'];
   context.readConfig = () => ({config: null, errors: []});
@@ -195,14 +195,12 @@ test('bounty validation enforces daily and weekly claim limits', () => {
   const prior = ['2027-11-15', '2027-11-16'].map((date, i) => ({
     id: `b${i}`, name: 'Maya', type: 'bounty', points: 2, date, createdAt: String(i), bountyId: 'historical', bountyTitle: 'Historical',
   }));
-  assert.throws(
-    () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, climbs.concat(prior)),
-    error => error.code === 'weekly_bounty_limit',
-  );
-  const todayClaim = {id: 'today', name: 'Maya', type: 'bounty', points: 2, date: '2027-11-18'};
+  const extraClaim = context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, climbs.concat(prior));
+  assert.equal(extraClaim.bountyId, bounty.id, 'claims after the weekly point limit are still logged');
+  const todayClaim = {id: 'today', name: 'Maya', type: 'bounty', points: 2, date: '2027-11-18', bountyId: bounty.id};
   assert.throws(
     () => context.validateBountyClaim({name: 'Maya', bountyId: bounty.id, note: 'Done'}, climbs.concat(todayClaim)),
-    error => error.code === 'daily_bounty_limit',
+    error => error.code === 'duplicate_bounty',
   );
 });
 

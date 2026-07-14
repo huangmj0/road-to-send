@@ -32,8 +32,11 @@ assert.match(html, /aria-label="Close benchmark check-in"/, 'benchmark dialog cl
 assert.match(html, /id="bountyStatus"[^>]+role="status"[^>]+aria-live="polite"/, 'bounty status is announced');
 assert.match(html, /id="bountyNote"[^>]+required[^>]+maxlength="120"/, 'bounty evidence is required and bounded');
 assert.match(script, /data-bounty="\$\{esc\(b\.id\)\}"/, 'daily bounty cards expose claim controls');
+assert.match(html, /id="bountyHunter"/, 'Bounty Hunter status is shown');
+assert.match(script, /bounty-category-\$\{bountyBadgeClass\(b\.category\)\}/, 'bounties expose category badges');
 assert.match(script, /features\.includes\('bounties'\)/, 'shared claims require the bounty capability');
 assert.doesNotMatch(html, /circuit/i, 'bounty copy avoids circuit-board references');
+assert.doesNotMatch(html, /weakness-style/i, 'bounty copy uses anti-style terminology');
 assert.match(script, /features\.includes\('benchmarks'\)/, 'shared check-ins require the benchmark capability');
 assert.deepEqual(
   [scoring.weekCap, scoring.balancedBonus, scoring.bountyWeekLimit],

@@ -95,8 +95,15 @@ assert.equal(scoredWeek.credited,16);
 assert.equal(scoredWeek.bonus,2);
 assert.equal(scoredWeek.bounty,expectedBountyPoints,'bounty credit is derived from catalog difficulty, not submitted points');
 assert.equal(scoredWeek.bountyClaims,2);
+assert.equal(scoredWeek.bountyLogged,2);
 assert.equal(scoredWeek.credited+scoredWeek.bonus+scoredWeek.bounty,18+expectedBountyPoints);
 assert.equal(computeCredits(scored.slice().reverse(),fixtureWindow).weeks.get('maya|2026-11-16').credited,16,'entry order cannot change weekly base points');
+const extraBounty=dailyBounties('2026-11-17')[1];
+const bountyLog=computeCredits(scored.concat({id:'b-extra',name:'Maya',type:'bounty',date:'2026-11-17',createdAt:'99',bountyId:extraBounty.id,bountyTitle:extraBounty.title}),fixtureWindow);
+assert.equal(bountyLog.info.get('b-extra').credit,0,'a completed bounty after the daily point claim remains logged without points');
+assert.equal(bountyLog.info.get('b-extra').reason,'daily bounty limit');
+assert.equal(bountyLog.weeks.get('maya|2026-11-16').bountyLogged,3,'all completed bounties are counted for Bounty Hunter');
+assert.equal(bountyHunter([{name:'Maya',type:'bounty',bountyId:'one'},{name:'Maya',type:'bounty',bountyId:'two'},{name:'Alex',type:'bounty',bountyId:'one'}]),'Maya · 2 bounties logged');
 const lateBalance=[
   ...['2026-11-16','2026-11-17','2026-11-18','2026-11-19'].map((date,i)=>({id:'lc'+i,name:'Maya',type:'climb',durationBand:'180-plus',tags:i===0?['new-area','project-progress']:[],date})),
   {id:'late-pull',name:'Maya',type:'pull',date:'2026-11-20'},
