@@ -1,9 +1,24 @@
 {
-  "dailyCap": 5,
-  "climbPoints": 5,
-  "pullThresholds": {
-    "hard": [[10, 3], [15, 4], [20, 5]],
-    "super-hard": [[20, 3], [30, 4], [40, 5]]
-  },
-  "grades": ["V0", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16", "V17"]
+  "categories": { "climb": 3, "exercise": 2, "mobility": 1 },
+  "categoryLabels": { "climb": "Climbing", "exercise": "Exercise", "mobility": "Mobility" },
+  "categoryIcons": { "climb": "🧗", "exercise": "💪", "mobility": "🧘" },
+  "balancedDayBonus": 2,
+  "weeklyBountyCap": 6,
+  "grades": ["V0", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16", "V17"],
+  "bounties": [
+    { "id": "send-it", "category": "climb", "title": "Send It", "points": 3, "description": "Send a boulder at or above your project grade." },
+    { "id": "outdoor-send", "category": "climb", "title": "Outdoor Send", "points": 3, "description": "Send a problem outside." },
+    { "id": "flash-dance", "category": "climb", "title": "Flash Dance", "points": 2, "description": "Flash a climb that intimidated you." },
+    { "id": "slabmaster", "category": "climb", "title": "Slabmaster", "points": 2, "description": "Send a slab — everyone's nemesis." },
+    { "id": "marathon-session", "category": "climb", "title": "Marathon Session", "points": 2, "description": "Climb for 2+ hours in one session." },
+    { "id": "anti-style", "category": "climb", "title": "Anti-Style", "points": 2, "description": "Send something in your weakest style." },
+    { "id": "century-club", "category": "exercise", "title": "Century Club", "points": 3, "description": "100 total pull-ups in a day." },
+    { "id": "hangboard-hero", "category": "exercise", "title": "Hangboard Hero", "points": 2, "description": "Complete a full fingerboard or hangboard session." },
+    { "id": "cardio-engine", "category": "exercise", "title": "Cardio Engine", "points": 1, "description": "30+ minutes of running, biking, or swimming." },
+    { "id": "core-crusher", "category": "exercise", "title": "Core Crusher", "points": 1, "description": "15+ minutes of dedicated core work." },
+    { "id": "antagonist-day", "category": "exercise", "title": "Antagonist Day", "points": 1, "description": "Push workout — dips, presses, or push-ups." },
+    { "id": "prehab-pro", "category": "mobility", "title": "Prehab Pro", "points": 2, "description": "Complete a shoulder and finger prehab routine." },
+    { "id": "bendy", "category": "mobility", "title": "Bendy", "points": 1, "description": "20+ minutes of full mobility or stretching." },
+    { "id": "early-bird", "category": "mobility", "title": "Early Bird", "points": 1, "description": "Get a session in before 8am." }
+  ]
 }

@@ -23,72 +23,53 @@ function loadScript() {
   return context;
 }
 
-test('embedded v8 Apps Script is syntactically valid and exposes only simple capabilities', () => {
+test('embedded v9 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();
-  assert.equal(vm.runInContext('API_VERSION', context), 8);
-  assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['daily-cap-v1', 'participant-pull-mode', 'challenge-window', 'self-registration-v1']);
-  assert.doesNotMatch(context.__source, /claimBounty|saveBenchmark|balancedBonus/);
+  assert.equal(vm.runInContext('API_VERSION', context), 9);
+  assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v2', 'bounty-hunter', 'challenge-window', 'self-registration-v1']);
+  assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
 });
 
-test('pull-up scoring covers every threshold boundary', () => {
-  const {pullPoints} = loadScript();
-  const cases = [
-    ['super-hard', 0, 0], ['super-hard', 19, 0], ['super-hard', 20, 3], ['super-hard', 29, 3], ['super-hard', 30, 4], ['super-hard', 39, 4], ['super-hard', 40, 5], ['super-hard', 80, 5],
-    ['hard', 0, 0], ['hard', 9, 0], ['hard', 10, 3], ['hard', 14, 3], ['hard', 15, 4], ['hard', 19, 4], ['hard', 20, 5], ['hard', 80, 5],
-  ];
-  for (const [category, count, points] of cases) assert.equal(pullPoints(count, category), points, `${category} ${count}`);
-  assert.equal(pullPoints(-1, 'super-hard'), 0);
-  assert.equal(pullPoints(20.5, 'hard'), 0);
-});
-
-test('backend derives points and participant mode instead of trusting the request', () => {
+test('backend derives category and bounty points instead of trusting the request', () => {
   const context = loadScript();
-  context.participantRecords = () => [{name: 'Alex', pullMode: 'super-hard'}, {name: 'Maya', pullMode: 'hard'}];
-  const pull = context.validateActivity({name: 'alex', type: 'pull', pullUps: 30, pullMode: 'hard', points: 999, date: '2026-07-13'});
-  assert.equal(pull.name, 'Alex');
-  assert.equal(pull.pullMode, 'super-hard');
-  assert.equal(pull.points, 4);
-  const climb = context.validateActivity({name: 'Maya', type: 'climb', hardestGrade: 'V7', points: 0, date: '2026-07-13'});
-  assert.equal(climb.points, 5);
+  context.participantRecords = () => [{name: 'Alex'}, {name: 'Maya'}];
+  const climb = context.validateActivity({name: 'alex', type: 'climb', hardestGrade: 'V7', points: 999, date: '2026-07-13'});
+  assert.equal(climb.name, 'Alex');
+  assert.equal(climb.category, 'climb');
+  assert.equal(climb.points, 3);
   assert.equal(climb.hardestGrade, 'V7');
+  assert.equal(context.validateActivity({name: 'Maya', type: 'exercise', points: 0, date: '2026-07-13'}).points, 2);
+  assert.equal(context.validateActivity({name: 'Maya', type: 'mobility', date: '2026-07-13'}).points, 1);
+  assert.throws(() => context.validateActivity({name: 'Maya', type: 'run', date: '2026-07-13'}), error => error.code === 'invalid_activity');
   assert.throws(() => context.validateActivity({name: 'Maya', type: 'climb', hardestGrade: 'VB', date: '2026-07-13'}), error => error.code === 'invalid_activity');
-  assert.throws(() => context.validateActivity({name: 'Maya', type: 'pull', pullUps: -1, date: '2026-07-13'}), error => error.code === 'invalid_activity');
 });
 
-test('missing roster mode blocks pull-ups but not climbing', () => {
+test('a bounty claim must be one of that date rotating set', () => {
   const context = loadScript();
-  context.participantRecords = () => [{name: 'Taylor', pullMode: null}];
-  assert.equal(context.validateActivity({name: 'Taylor', type: 'climb', hardestGrade: 'V0', date: '2026-07-13'}).points, 5);
-  assert.throws(() => context.validateActivity({name: 'Taylor', type: 'pull', pullUps: 20, date: '2026-07-13'}), error => error.details.some(x => x.field === 'pullMode'));
+  context.participantRecords = () => [{name: 'Alex'}];
+  const date = '2026-07-13';
+  const offered = context.dailyBounties(date);
+  assert.equal(offered.length, 3);
+  const claim = context.validateActivity({name: 'Alex', type: 'bounty', bountyId: offered[0].id, points: 999, date});
+  assert.equal(claim.type, 'bounty');
+  assert.equal(claim.points, offered[0].points);
+  assert.equal(claim.category, offered[0].category);
+  assert.equal(claim.bountyTitle, offered[0].title);
+  const catalog = vm.runInContext('SCORING.bounties', context);
+  const sameCategoryOther = catalog.find(b => b.category === offered[0].category && b.id !== offered[0].id);
+  assert.throws(() => context.validateActivity({name: 'Alex', type: 'bounty', bountyId: sameCategoryOther.id, date}), error => error.details.some(x => x.field === 'bountyId'));
+  assert.throws(() => context.validateActivity({name: 'Alex', type: 'bounty', bountyId: 'not-a-bounty', date}), error => error.code === 'invalid_activity');
 });
 
-test('self-registration adds one opted-in participant and rejects duplicate names', () => {
+test('self-registration adds one name-only participant and rejects duplicate names', () => {
   const context = loadScript();
-  const current = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex', pullMode: 'hard'}]};
+  const current = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]};
   context.readConfig = () => ({config: current, errors: []});
   context.writeConfig = config => config;
-  const added = context.addParticipant('Maya', 'super-hard');
-  assert.equal(added.participant.pullMode, 'super-hard');
-  assert.deepEqual(Array.from(added.config.crew, person => ({...person})), [
-    {name: 'Alex', pullMode: 'hard'},
-    {name: 'Maya', pullMode: 'super-hard'},
-  ]);
-  assert.throws(() => context.addParticipant('alex', 'hard'), error => error.code === 'duplicate_participant');
-});
-
-test('daily credits follow creation order, cap at five, and recompute after deletion', () => {
-  const context = loadScript();
-  const entries = [
-    {id: 'later', name: 'Alex', type: 'climb', hardestGrade: 'V5', date: '2026-07-13', createdAt: '2'},
-    {id: 'first', name: 'Alex', type: 'pull', pullUps: 20, pullMode: 'super-hard', date: '2026-07-13', createdAt: '1'},
-    {id: 'other', name: 'Maya', type: 'climb', hardestGrade: 'V4', date: '2026-07-13', createdAt: '1'},
-  ];
-  const credit = context.dailyCreditInfo(entries);
-  assert.equal(credit.first.credit, 3);
-  assert.equal(credit.later.credit, 2);
-  assert.equal(credit.other.credit, 5);
-  const afterDelete = context.dailyCreditInfo(entries.filter(x => x.id !== 'first'));
-  assert.equal(afterDelete.later.credit, 5);
+  const added = context.addParticipant('Maya');
+  assert.equal(added.participant.name, 'Maya');
+  assert.deepEqual(Array.from(added.config.crew, person => ({...person})), [{name: 'Alex'}, {name: 'Maya'}]);
+  assert.throws(() => context.addParticipant('alex'), error => error.code === 'duplicate_participant');
 });
 
 test('challenge window remains inclusive', () => {
@@ -99,7 +80,7 @@ test('challenge window remains inclusive', () => {
   assert.throws(() => context.validateActivityWindow({date: '2026-08-01'}), error => error.code === 'outside_challenge_window');
 });
 
-test('v8 setup archives pre-v7 activity and benchmark sheets exactly once', () => {
+test('v9 setup archives prior activity and benchmark sheets exactly once and rewrites to name-only participants', () => {
   const context = loadScript();
   class Sheet {
     constructor(book, name, values = []) { this.book = book; this.name = name; this.values = values.map(row => [...row]); }
@@ -118,16 +99,16 @@ test('v8 setup archives pre-v7 activity and benchmark sheets exactly once', () =
   book.sheets.Benchmarks = new Sheet(book, 'Benchmarks', [['id'], ['old-benchmark']]);
   book.sheets.Settings = new Sheet(book, 'Settings', [['key', 'value']]);
   book.sheets.Participants = new Sheet(book, 'Participants', [['name'], ['Alex']]);
-  let schema = '6';
+  let schema = '8';
   context.SpreadsheetApp.getActive = () => book;
   context.PropertiesService = {getDocumentProperties: () => ({getProperty: () => schema, setProperty: (_, value) => { schema = value; }})};
   context.formatSheets = () => {};
   context.setup();
   context.setup();
-  assert.equal(schema, '8');
+  assert.equal(schema, '9');
   assert.equal(Object.keys(book.sheets).filter(name => name.startsWith('Activities Archive')).length, 1);
   assert.equal(Object.keys(book.sheets).filter(name => name.startsWith('Benchmarks Archive')).length, 1);
   assert.deepEqual(book.sheets.Activities.values[0], Array.from(vm.runInContext('ACTIVITY_HEADERS', context)));
-  assert.deepEqual(book.sheets.Participants.values[0], ['name', 'pullMode']);
+  assert.deepEqual(book.sheets.Participants.values[0], ['name']);
   assert.equal(book.sheets.Participants.values[1][0], 'Alex');
 });

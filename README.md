@@ -4,14 +4,17 @@ A self-contained, mobile-first climbing challenge. The app has three views: **Yo
 
 ## Scoring
 
-- Maximum **5 credited points per person per day**.
-- A climbing session is 5 points and records the hardest grade sent from V0 through V17.
-- Pull-ups use the mode each participant chooses when creating their profile:
-  - Hard mode: 10 / 15 / 20 pull-ups earn 3 / 4 / 5 points.
-  - Super hard mode: 20 / 30 / 40 pull-ups earn 3 / 4 / 5 points.
-- Below-threshold pull-ups may be logged for 0 points.
-- Same-day activities receive credit in creation order until the 5-point cap is reached. Deleting an earlier activity can free credit for a later entry.
-- Everyone appears together in one leaderboard regardless of mode. Weekly totals are informational; there are no weekly caps, bonuses, bounties, benchmarks, or activity-frequency limits.
+A **balanced** economy across three categories — you can't win by grinding one activity.
+
+- **Three categories, each scores once per person per day:**
+  - 🧗 **Climbing** — **3 points** (optionally record the hardest grade sent, V0–V17; flavor only).
+  - 💪 **Exercise** — **2 points** (any strength or cardio workout: pull-ups, gym, hangboard, run, bike).
+  - 🧘 **Mobility** — **1 point** (mobility, stretching, prehab, or intentional recovery).
+- Logging a category a second time the same day earns **0** more (it still shows in the feed). This diminishing return is what keeps the game balanced.
+- **Balanced Day bonus: +2** when you log all three categories in one day. A full balanced day is **8 points** (3 + 2 + 1 + 2).
+- **Rotating daily bounties:** each day surfaces **three** bounties (one per category), chosen deterministically from the date so everyone sees the same set. Each has a fun name, a one-line description, and **1–3 points** by difficulty. Claim from that day's offering.
+- **Weekly bounty cap:** the first **6 bounty points** each week (Monday–Sunday) count toward your score. You can keep claiming past the cap — those claims score **0** but still count toward the **🏹 Bounty Hunter** tag, awarded to whoever completes the most bounties that week (bragging rights, ties shared).
+- Everyone appears together in one leaderboard. Deleting an entry recomputes credit for the rest of that day/week.
 
 ## Shared setup
 
@@ -21,46 +24,43 @@ GitHub Pages hosts the interface, while a Google Sheet stores shared settings an
 2. Open the app’s settings, expand **Apps Script source**, copy it, and replace the editor contents.
 3. Choose **Deploy → New deployment → Web app**. Execute as yourself and allow access to anyone with the link.
 4. Paste the `/exec` deployment URL into the app.
-5. Set the challenge dates and group goal. Participants can join from the identity prompt and choose Hard or Super hard mode; organizers can also manage them in setup.
+5. Set the challenge dates and group goal. Participants can join from the identity prompt; organizers can also manage the roster in setup.
 6. Save setup and distribute the copied crew link.
 
-The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains `name` and `pullMode`; `Activities` contains raw activity details, while the app deterministically applies the daily cap.
+The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains a single `name` column; `Activities` contains raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time.
 
-### Upgrading to API v8
+### Upgrading to API v9
 
-Paste the v8 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
+Paste the v9 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
 
-- Existing `Activities` and `Benchmarks` tabs are renamed to timestamped archive tabs.
-- A fresh activity sheet is created only when upgrading from pre-v7 data.
-- Existing settings and participant names remain.
-- A `pullMode` column is added to `Participants`.
-
-Legacy Men values migrate to Super hard mode and Women values migrate to Hard mode so existing thresholds and activity scores remain unchanged. Climbing can still be recorded for a participant with a missing mode, but pull-ups are blocked until a mode is chosen. Older endpoints are rejected by the new client so incompatible profile writes cannot mix with API v8.
+- Any existing `Activities` (and leftover `Benchmarks`) tab is renamed to a timestamped archive tab exactly once, then a fresh v9 `Activities` tab is created. The redesigned scoring starts clean.
+- Existing `Settings` remain. The `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
+- Older endpoints are rejected by the new client, so incompatible writes cannot mix with API v9.
 
 Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
 
-## API v8
+## API v9
 
 Reads return:
 
 ```json
 {
-  "version": 8,
-  "features": ["daily-cap-v1", "participant-pull-mode", "challenge-window", "self-registration-v1"],
+  "version": 9,
+  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v2", "bounty-hunter", "challenge-window", "self-registration-v1"],
   "activities": [],
   "config": {
-    "startDate": "2026-07-01",
-    "tripDate": "2026-11-15",
-    "goal": 750,
-    "crew": [{"name": "Alex", "pullMode": "super-hard"}]
+    "startDate": "2026-07-16",
+    "tripDate": "2026-11-04",
+    "goal": 3000,
+    "crew": [{"name": "Alex"}]
   },
   "configErrors": [],
-  "serverDate": "2026-07-13",
+  "serverDate": "2026-07-16",
   "timeZone": "America/Los_Angeles"
 }
 ```
 
-Activity writes send `name`, `type`, `date`, and either `hardestGrade` or `pullUps`. The backend ignores submitted points and pull-up modes, looks up the participant centrally, and derives the raw score. New profiles use the `addParticipant` action with `name` and `pullMode`. Writes return `{ version: 8, ok, ... }`; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
+Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 9, ok, ... }`; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
 
 The app distinguishes **Save failed** from **Saved to the Sheet, but refresh failed**. In the latter case, do not submit again; use the Crew sync control.
 
