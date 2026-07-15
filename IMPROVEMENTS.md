@@ -39,8 +39,12 @@ Status: implemented with separated caches, retry-safe messaging, diagnostics, an
 
 ## P3 — Improve the available bounties
 
-Status: implemented with simplified 1–3 point quests.
+Status: resolved in API v9. Balanced three-category scoring (Climbing / Exercise / Mobility) with a
++2 balanced-day bonus, plus rotating daily bounties returned as a clear catalog in `src/scoring.json`.
 
-- Remove circuit board references
-- Consider improvements to the bounties, simplify
-- Each should have a fun name, then a simple description and how many points it is worth (adaptive to the difficulty)
+- Circuit-board references removed.
+- Bounties simplified to a curated catalog; three rotate per day (one per category), chosen
+  deterministically from the date so the whole crew sees the same set.
+- Each bounty has a fun name, a one-line description, and a 1–3 point value scaled to difficulty.
+- A weekly bounty-point cap keeps them a spice; over-cap claims still count toward the 🏹 Bounty
+  Hunter tag (most weekly completions) for bragging rights.
