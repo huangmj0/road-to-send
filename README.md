@@ -29,24 +29,24 @@ GitHub Pages hosts the interface, while a Google Sheet stores shared settings an
 
 The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains a single `name` column; `Activities` contains raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time.
 
-### Upgrading to API v9
+### Upgrading to API v10
 
-Paste the v9 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
+Paste the v10 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
 
-- Any existing `Activities` (and leftover `Benchmarks`) tab is renamed to a timestamped archive tab exactly once, then a fresh v9 `Activities` tab is created. The redesigned scoring starts clean.
-- Existing `Settings` remain. The `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
-- Older endpoints are rejected by the new client, so incompatible writes cannot mix with API v9.
+- Upgrading from v9 keeps every tab and its data; v10 only enlarges the rotating bounty catalog.
+- Upgrading from v8 or earlier renames any existing `Activities` (and leftover `Benchmarks`) tab to a timestamped archive tab exactly once, then a fresh `Activities` tab is created. The redesigned scoring starts clean. Existing `Settings` remain; the `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
+- Older endpoints are rejected by the new client, so incompatible writes cannot mix with API v10.
 
 Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
 
-## API v9
+## API v10
 
 Reads return:
 
 ```json
 {
-  "version": 9,
-  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v2", "bounty-hunter", "challenge-window", "self-registration-v1"],
+  "version": 10,
+  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1"],
   "activities": [],
   "config": {
     "startDate": "2026-07-16",
@@ -60,7 +60,7 @@ Reads return:
 }
 ```
 
-Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 9, ok, ... }`; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
+Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 10, ok, ... }`; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
 
 The app distinguishes **Save failed** from **Saved to the Sheet, but refresh failed**. In the latter case, do not submit again; use the Crew sync control.
 

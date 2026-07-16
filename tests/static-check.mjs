@@ -25,7 +25,9 @@ assert.deepEqual(Object.keys(scoring.categories),['climb','exercise','mobility']
 assert.equal(scoring.balancedDayBonus,2,'balanced-day bonus is configured');
 assert.equal(scoring.weeklyBountyCap,6,'weekly bounty cap is configured');
 assert.ok(Array.isArray(scoring.bounties)&&scoring.bounties.length>=6,'a bounty catalog is present');
-assert.ok(scoring.bounties.every(b=>b.id&&b.title&&b.description&&[1,2,3].includes(b.points)&&['climb','exercise','mobility'].includes(b.category)),'each bounty has a name, description, 1-3 points, and a category');
+assert.ok(scoring.bounties.every(b=>typeof b.id==='string'&&b.id&&typeof b.title==='string'&&b.title&&typeof b.description==='string'&&b.description&&Number.isInteger(b.points)&&b.points>=1&&b.points<=3&&['climb','exercise','mobility'].includes(b.category)),'each bounty has a name, description, integer 1-3 points, and a category');
+assert.equal(new Set(scoring.bounties.map(b=>b.id)).size,scoring.bounties.length,'bounty ids are unique across the catalog');
+for(const cat of Object.keys(scoring.categories))assert.ok(scoring.bounties.some(b=>b.category===cat),`the ${cat} bounty pool is not empty`);
 assert.deepEqual(scoring.grades,['V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12','V13','V14','V15','V16','V17']);
 const sharedConfig=(script.match(/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/g)||[]).length;
 assert.ok(sharedConfig>=2,'browser and Apps Script both read the shared scoring config');

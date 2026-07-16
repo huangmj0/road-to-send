@@ -1,6 +1,6 @@
 const SCORING=__SCORING_CONFIG__;
 const API_VERSION=__API_VERSION__;
-const FEATURES=['categories-v1','balanced-day-bonus','daily-bounties-v2','bounty-hunter','challenge-window','self-registration-v1'];
+const FEATURES=['categories-v1','balanced-day-bonus','daily-bounties-v3','bounty-hunter','challenge-window','self-registration-v1'];
 const TABS={activities:'Activities',settings:'Settings',participants:'Participants',benchmarks:'Benchmarks'};
 const ACTIVITY_HEADERS=['id','name','type','category','points','date','createdAt','hardestGrade','bountyId','bountyTitle','note'];
 const PARTICIPANT_HEADERS=['name'];

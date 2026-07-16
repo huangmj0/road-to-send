@@ -88,7 +88,8 @@ const checks = `(()=>{
   assert.equal(parsed.value.crew.map(x=>x.name).join(','),'Alex,Maya');
   assert.equal(parsed.value.crew[0].pullMode,undefined,'participants are name-only');
   assert.throws(()=>unpackRemote({version:8,features:[],activities:[],config:null}),/version/,'v8 requires redeployment');
-  assert.equal(unpackRemote({version:9,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1);
+  assert.throws(()=>unpackRemote({version:9,features:[],activities:[],config:null}),/version/,'v9 requires redeployment');
+  assert.equal(unpackRemote({version:10,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1);
 
   // Local upgrade: v8 config migrates (pull mode dropped); logs start fresh; identity persists.
   localStorage.setItem('roadToSendConfigV8',JSON.stringify({startDate:'2026-07-01',tripDate:'2026-07-31',goal:600,crew:[{name:'Alex',pullMode:'super-hard'}]}));
