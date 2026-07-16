@@ -69,6 +69,16 @@ const checks = `(()=>{
   assert.equal(dailyBounties('2026-07-16').map(b=>b.id).join(','),today.map(b=>b.id).join(','),'same date yields the same bounties');
   assert.notEqual(dailyBounties('2026-07-17').map(b=>b.id).join(','),today.map(b=>b.id).join(','),'a different day rotates the set');
 
+  // dailyBounties is a pure function of the date string across a two-week span.
+  const spanSets=[];
+  for(let i=0;i<14;i++){
+    const key=localDate(new Date(2026,6,1+i)),ids=dailyBounties(key).map(b=>b.id).join(',');
+    assert.equal(dailyBounties(key).map(b=>b.id).join(','),ids,'repeated calls agree for '+key);
+    assert.equal(dailyBounties(key).map(b=>b.category).join(','),'climb,exercise,mobility','exactly one bounty per category on '+key);
+    spanSets.push(ids);
+  }
+  assert.ok(new Set(spanSets).size>=2,'at least two distinct daily sets appear over 14 days');
+
   assert.equal(weekKey('2026-07-13'),'2026-07-13');
   assert.equal(weekKey('2026-07-19'),'2026-07-13');
   assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07');
@@ -94,4 +104,91 @@ const checks = `(()=>{
 })()`;
 
 vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
+
+// DOM-backed harness: a minimal document stub so init()/render() run and the
+// Record tab's date/bounty behavior can be asserted alongside the You tab.
+function makeElement() {
+  const classes = new Set();
+  return {
+    value: '', textContent: '', innerHTML: '', disabled: false, style: {}, dataset: {},
+    classList: {
+      add: (...cs) => cs.forEach(c => classes.add(c)),
+      remove: (...cs) => cs.forEach(c => classes.delete(c)),
+      contains: c => classes.has(c),
+      toggle: (c, force) => {const on = force === undefined ? !classes.has(c) : Boolean(force); on ? classes.add(c) : classes.delete(c); return on},
+    },
+    setAttribute() {}, removeAttribute() {}, getAttribute() {return null},
+    addEventListener() {}, removeEventListener() {}, focus() {},
+    querySelectorAll() {return []},
+  };
+}
+const domElements = new Map();
+const documentListeners = new Map();
+const domValues = new Map();
+const documentStub = {
+  visibilityState: 'visible',
+  activeElement: null,
+  querySelector: selector => {if (!domElements.has(selector)) domElements.set(selector, makeElement()); return domElements.get(selector)},
+  querySelectorAll: () => [],
+  addEventListener: (type, handler) => documentListeners.set(type, handler),
+  removeEventListener: () => {},
+  createElement: () => makeElement(),
+};
+const domContext = {
+  assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Intl,
+  location: {search: '', href: 'https://example.test/', hash: ''},
+  history: {replaceState() {}},
+  window: {scrollTo() {}},
+  document: documentStub,
+  fireDocumentEvent: type => {const handler = documentListeners.get(type); if (handler) handler({})},
+  localStorage: {
+    getItem: key => domValues.has(key) ? domValues.get(key) : null,
+    setItem: (key, value) => domValues.set(key, String(value)),
+    removeItem: key => domValues.delete(key),
+  },
+  setTimeout() {}, clearTimeout() {},
+};
+
+const domChecks = `(()=>{
+  const todayStart=parseDateOnly(challengeToday());
+  const shift=n=>{const d=new Date(todayStart);d.setDate(d.getDate()+n);return localDate(d)};
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  const dateField=document.querySelector('#activityDate'),dateBox=document.querySelector('#dateFields'),label=document.querySelector('#bountySelectLabel');
+
+  // Closed picker: render() re-syncs the record date to the current challenge day,
+  // so the Record dropdown and the You card draw the same bounty set after a rollover.
+  dateBox.classList.add('hide');
+  dateField.value=shift(-1);
+  render();
+  assert.equal(recordDate(),challengeToday(),'closed picker snaps the record date back to today');
+  assert.equal(dailyBounties(recordDate()).map(b=>b.id).join(','),dailyBounties(challengeToday()).map(b=>b.id).join(','),'Record dropdown and You card agree on the bounty set');
+  populateBountySelect();
+  assert.equal(label.textContent,"Today's bounties",'label reads as today when the bounty day is today');
+
+  // Open picker: render() must not fight a manually chosen date, and the label is honest.
+  dateBox.classList.remove('hide');
+  dateField.value=shift(-1);
+  render();
+  assert.equal(recordDate(),shift(-1),'open picker keeps the manual date');
+  populateBountySelect();
+  assert.equal(label.textContent,'Bounties for Yesterday','label names the non-today bounty day');
+
+  // Day rollover: becoming visible re-renders when the rendered day is stale.
+  dateBox.classList.add('hide');
+  assert.equal(renderedDay,challengeToday(),'render records the day it drew');
+  renderedDay='2000-01-01';
+  dateField.value=shift(-1);
+  fireDocumentEvent('visibilitychange');
+  assert.equal(renderedDay,challengeToday(),'visibilitychange re-renders after a day rollover');
+  assert.equal(recordDate(),challengeToday(),'the record date follows the rollover');
+
+  // Outside the challenge window the record date clamps and the label says so.
+  config={startDate:shift(-20),tripDate:shift(-10),goal:500,crew:[{name:'Alex'}]};
+  render();
+  assert.equal(recordDate(),shift(-10),'record date clamps to the window end');
+  populateBountySelect();
+  assert.equal(label.textContent,'Bounties for '+fmtDay(shift(-10)),'label names the clamped bounty day');
+})()`;
+
+vm.runInNewContext(`${source}\n${domChecks}`, domContext, {filename: 'index.html'});
 console.log('Client state and scoring tests passed.');
