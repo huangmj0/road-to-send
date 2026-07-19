@@ -16,7 +16,7 @@ __INLINE_STYLES__
     <div class="page-head"><div><span class="eyebrow">Your challenge</span><h1 id="youGreeting">Hi there</h1></div><button id="changeMeBtn" class="text-btn" type="button" onclick="openIdentity(true)">Change me</button></div>
     <div id="configNotice" class="notice warn hide" role="status" aria-live="polite"></div>
     <article class="card today-card">
-      <div class="card-head"><div><span class="eyebrow">Today</span><h2><span id="youTodayPoints">0</span> / 8 points</h2></div><span id="todayStatus" class="status-pill">Ready</span></div>
+      <div class="card-head"><div><span class="eyebrow">Today</span><h2><span id="youTodayPoints">0</span> / <span id="youDailyMax">8</span> points</h2></div><span id="todayStatus" class="status-pill">Ready</span></div>
       <div id="youMeter" class="point-meter" role="img" aria-label="0 of 8 points today"></div>
       <button class="btn primary wide" type="button" data-tab="record">Record activity</button>
     </article>
@@ -42,7 +42,7 @@ __INLINE_STYLES__
 
   <section id="crew" class="tab-panel" data-panel="crew" aria-labelledby="navCrew">
     <div class="page-head"><div><span class="eyebrow">Together</span><h1>Crew</h1></div><button id="syncStatus" class="sync" type="button" title="Refresh from the shared Sheet now"></button></div>
-    <article class="card group-card"><div class="card-head"><div><span class="eyebrow">Group goal</span><h2><span id="totalPoints">0</span> / <span id="groupGoal">500</span></h2></div><strong id="groupPercent">0%</strong></div><div class="progress"><i id="groupProgress"></i></div><div id="syncDiagnostics" class="diagnostics" role="status" aria-live="polite"><strong id="diagnosticTitle">Local mode</strong><span id="diagnosticDetail">Entries stay in this browser.</span><button id="diagnosticCode" class="text-btn hide" type="button" title="Copy sanitized error code"></button></div></article>
+    <article class="card group-card"><div class="card-head"><div><span class="eyebrow">Group goal</span><h2><span id="totalPoints">0</span> / <span id="groupGoal">500</span></h2></div><strong id="groupPercent">0%</strong></div><div class="progress"><i id="groupProgress"></i></div><p id="goalPace" class="hint pace hide" role="status" aria-live="polite"></p><div id="syncDiagnostics" class="diagnostics" role="status" aria-live="polite"><strong id="diagnosticTitle">Local mode</strong><span id="diagnosticDetail">Entries stay in this browser.</span><button id="diagnosticCode" class="text-btn hide" type="button" title="Copy sanitized error code"></button></div></article>
     <article class="card hunter-card"><div class="card-head"><h2>Bounty Hunter</h2><span class="hint">This week</span></div><div id="bountyHunter" class="hunter-line" role="status" aria-live="polite"></div></article>
     <article class="card table-card"><div class="card-head"><h2>Leaderboard</h2><span class="hint">This week · Total</span></div><div class="table-scroll"><table><thead><tr><th>Rank</th><th>Climber</th><th>Week</th><th>Total</th></tr></thead><tbody id="leaderRows"></tbody></table></div></article>
     <article class="card"><div class="card-head"><h2>Activity</h2></div><div id="activityList" class="activity-list"></div></article>

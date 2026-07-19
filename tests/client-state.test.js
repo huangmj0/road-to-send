@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const {test} = require('node:test');
 
 const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -102,6 +103,33 @@ const checks = `(()=>{
   assert.equal(me,'Alex','remembered identity is restored');
   recordingFor='Maya';
   assert.equal(me,'Alex','temporary proxy target does not replace device owner');
+
+  // Pace toward the group goal: expected points scale linearly across the window.
+  const paceSettings={startDate:'2026-07-01',tripDate:'2026-07-10',goal:100};
+  assert.deepEqual(paceInfo(50,paceSettings,'2026-07-05'),{state:'on',diff:0,perDay:9},'exactly expected is on pace');
+  assert.deepEqual(paceInfo(52,paceSettings,'2026-07-05'),{state:'on',diff:2,perDay:8},'a small lead still reads as on pace');
+  assert.equal(paceInfo(53,paceSettings,'2026-07-05').state,'ahead');
+  assert.equal(paceInfo(53,paceSettings,'2026-07-05').diff,3);
+  assert.deepEqual(paceInfo(40,paceSettings,'2026-07-05'),{state:'behind',diff:-10,perDay:10},'behind reports the catch-up rate');
+  assert.deepEqual(paceInfo(100,paceSettings,'2026-07-05'),{state:'met'},'reaching the goal wins regardless of date');
+  assert.deepEqual(paceInfo(0,paceSettings,'2026-06-30'),{state:'before'},'before the window there is no pace yet');
+  assert.deepEqual(paceInfo(80,paceSettings,'2026-07-11'),{state:'ended',short:20},'after the window the shortfall is reported');
+  assert.equal(paceInfo(10,{tripDate:'2026-07-10',goal:100},'2026-07-05'),null,'missing start date hides the indicator');
+  assert.equal(paceInfo(10,{startDate:'2026-07-01',tripDate:'2026-07-10',goal:0},'2026-07-05'),null,'a zero goal hides the indicator');
+  assert.equal(paceInfo(10,{startDate:'2026-07-10',tripDate:'2026-07-01',goal:100},'2026-07-05'),null,'an inverted window hides the indicator');
+  assert.equal(paceInfo(10,paceSettings,'garbage'),null,'an unparseable today hides the indicator');
+
+  // challengeToday only trusts serverDate while the sync that produced it is from the current local day.
+  endpoint='https://sheet.example.test/exec';challengeTimeZone='Not/AZone';serverDate='2000-01-01';
+  lastSyncedAt=Date.now();
+  assert.equal(challengeToday(),'2000-01-01','a same-day sync may fall back to serverDate');
+  lastSyncedAt=Date.now()-2*86400000;
+  assert.equal(challengeToday(),localDate(),'a stale serverDate is ignored');
+  lastSyncedAt=0;
+  assert.equal(challengeToday(),localDate(),'never synced falls back to the local date');
+  challengeTimeZone='America/Los_Angeles';
+  assert.equal(challengeToday(),dateInTimeZone(new Date(),'America/Los_Angeles'),'a valid challenge timezone always wins');
+  endpoint='';challengeTimeZone='';serverDate='';lastSyncedAt=0;
 })()`;
 
 vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
@@ -162,6 +190,9 @@ const domChecks = `(()=>{
   dateField.value=shift(-1);
   render();
   assert.equal(recordDate(),challengeToday(),'closed picker snaps the record date back to today');
+  const paceEl=document.querySelector('#goalPace');
+  assert.equal(paceEl.classList.contains('hide'),false,'pace indicator shows inside the challenge window');
+  assert.ok(paceEl.textContent.startsWith('Behind pace'),'zero points partway through the window reads behind');
   assert.equal(dailyBounties(recordDate()).map(b=>b.id).join(','),dailyBounties(challengeToday()).map(b=>b.id).join(','),'Record dropdown and You card agree on the bounty set');
   populateBountySelect();
   assert.equal(label.textContent,"Today's bounties",'label reads as today when the bounty day is today');
@@ -187,9 +218,67 @@ const domChecks = `(()=>{
   config={startDate:shift(-20),tripDate:shift(-10),goal:500,crew:[{name:'Alex'}]};
   render();
   assert.equal(recordDate(),shift(-10),'record date clamps to the window end');
+  assert.ok(paceEl.textContent.startsWith('Challenge complete'),'a finished window reports the outcome');
   populateBountySelect();
   assert.equal(label.textContent,'Bounties for '+fmtDay(shift(-10)),'label names the clamped bounty day');
 })()`;
 
 vm.runInNewContext(`${source}\n${domChecks}`, domContext, {filename: 'index.html'});
+
+// Shared-mode harness with a stubbed fetch: a background sync (loadRemote) must
+// never overwrite a date the user picked in the open "Different day" field.
+test('background sync respects the open date picker and refreshes stale caches', async () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const store = new Map();
+  store.set('roadToSendEndpoint', 'https://sheet.example.test/exec');
+  store.set('roadToSendMe', 'Alex');
+  const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
+  const payload = {version: 10, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '', timeZone: ''};
+  let gets = 0;
+  const syncContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: () => [],
+      addEventListener: (type, handler) => listeners.set(type, handler),
+      removeEventListener() {}, createElement: () => makeElement(),
+    },
+    fireDocumentEvent: type => {const handler = listeners.get(type); if (handler) handler({})},
+    countGets: () => gets,
+    fetch: async (url, options = {}) => {if (!options.method) gets++; return {ok: true, json: async () => JSON.parse(JSON.stringify(payload))}},
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const syncChecks = `(async()=>{
+    await loadRemote();
+    const dateBox=document.querySelector('#dateFields'),dateField=document.querySelector('#activityDate');
+
+    // Closed picker: a sync still re-syncs the record date to today.
+    dateBox.classList.add('hide');
+    dateField.value='${dayShift(-1)}';
+    await loadRemote();
+    assert.equal(recordDate(),challengeToday(),'closed picker re-syncs to today after a sync');
+
+    // Open picker with a manually chosen day: the sync must not touch it.
+    dateBox.classList.remove('hide');
+    dateField.value='${dayShift(-1)}';
+    await loadRemote();
+    assert.equal(recordDate(),'${dayShift(-1)}','a background sync leaves the chosen date alone');
+
+    // Returning to the tab only refetches once the cache is older than five minutes.
+    const before=countGets();
+    fireDocumentEvent('visibilitychange');
+    assert.equal(countGets(),before,'a fresh cache is not refetched on tab return');
+    lastSyncedAt=Date.now()-6*60*1000;
+    fireDocumentEvent('visibilitychange');
+    assert.equal(countGets(),before+1,'a stale cache refreshes on tab return');
+  })()`;
+  await vm.runInNewContext(`${source}\n${syncChecks}`, syncContext, {filename: 'index.html'});
+});
+
 console.log('Client state and scoring tests passed.');

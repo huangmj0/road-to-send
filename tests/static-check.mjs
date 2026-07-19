@@ -36,6 +36,8 @@ assert.match(script,/Saved to the Sheet, but refresh failed\. Do not retry/,'con
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');
 assert.match(html,/id="bountyHunter"/,'the Bounty Hunter slot is present');
+assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
+assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring config');
 assert.equal((html.match(/<table>/g)||[]).length,1,'all crew share one leaderboard');
 assert.match(html,/env\(safe-area-inset-bottom\)/,'mobile navigation respects safe areas');
 console.log('Road to Send static accessibility and UX checks passed.');
