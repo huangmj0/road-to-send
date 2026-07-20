@@ -38,6 +38,7 @@ assert.match(html,/Today's bounties/,'the rotating bounty card is present');
 assert.match(html,/id="bountyHunter"/,'the Bounty Hunter slot is present');
 assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
 assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring config');
+assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="record"/,'the per-category breakdown card lives inside the You panel');
 assert.equal((html.match(/<table>/g)||[]).length,1,'all crew share one leaderboard');
 assert.match(html,/env\(safe-area-inset-bottom\)/,'mobile navigation respects safe areas');
 console.log('Road to Send static accessibility and UX checks passed.');
