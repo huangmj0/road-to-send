@@ -1,6 +1,6 @@
 # Road to Send improvement backlog
 
-This backlog records work that should follow the current sync-diagnostics, inline-validation, and accessibility pass. Priorities reflect risk to scoring integrity and organizer confidence.
+This backlog is the historical record of the v6–v10 passes; every priority below has shipped. New frontend enhancement work is tracked in `IMPROVEMENT_LOG.md`.
 
 ## P0 — Define and enforce the challenge window
 
@@ -23,9 +23,8 @@ The application, styles, and embedded Apps Script currently live in one compact 
 - Split browser code, styles, and Apps Script source into formatted files while preserving a simple deploy artifact.
 - Define one versioned schema for settings, participants, activities, and error responses.
 - Centralize scoring constants so browser and backend cannot drift.
-- Keep unit coverage for settings validation, duration boundaries, scoring caps, balanced-week bonuses, bounties, benchmarks, malformed rows, and local-calendar date formatting current.
+- Keep unit coverage for settings validation, scoring caps, the balanced-day bonus, the weekly bounty cap, challenge-window boundaries, bounties, malformed rows, and local-calendar date formatting current.
 - Add contract fixtures for current, legacy, malformed, and partial Apps Script responses.
-- Add browser-driven visual regression coverage for the You, Record, and Crew tabs at common mobile widths.
 - Run the static UX checks and future behavioral tests in continuous integration.
 
 ## P2 — Clarify recovery and data ownership

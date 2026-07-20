@@ -2,12 +2,13 @@
 
 ## Project Structure & Module Organization
 
-This is an intentionally self-contained static application. `index.html` contains the markup, compact CSS, browser JavaScript, and the Google Apps Script source shown during shared setup. Keep changes to those layers coordinated, especially scoring constants and API version checks. `tests/` contains Node-based behavioral and contract tests: `client-state.test.js` exercises browser state and scoring, `backend-script.test.js` validates the embedded Apps Script, and `static-check.mjs` checks syntax, accessibility, and required UI hooks. `README.md` documents setup and deployment; `IMPROVEMENTS.md` is the prioritized backlog.
+This is an intentionally self-contained static application. The editable sources live in `src/`: `index.template.html` (markup), `styles.css`, `app.js` (browser code), `apps-script.js` (the Google Apps Script source shown during shared setup), plus the shared `scoring.json` and `schema.json` contracts. `scripts/build.mjs` inlines them into the generated `index.html` at the repository root — never edit `index.html` by hand; `scripts/check-generated.mjs` fails if the committed artifact is stale. Keep changes to those layers coordinated, especially scoring constants and API version checks. `tests/` contains Node-based behavioral and contract tests: `client-state.test.js` exercises browser state and scoring, `backend-script.test.js` validates the embedded Apps Script, `protocol-fixtures.test.js` checks wire-format fixtures against `src/schema.json`, `smoke.test.js` covers the shared workflow end to end, and `static-check.mjs` checks syntax, accessibility, and required UI hooks. `README.md` documents setup and deployment; `IMPROVEMENTS.md` is the historical backlog and `IMPROVEMENT_LOG.md` tracks queued frontend enhancements.
 
 ## Build, Test, and Development Commands
 
-- `npm test` runs all behavioral, backend-contract, and static checks. Run it before every pull request.
-- `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to exercise browser behavior. There is no compilation or bundling step.
+- `npm run build` regenerates `index.html` from `src/`. Run it after any `src/` change and commit the regenerated artifact alongside the source edits.
+- `npm test` runs the generated-artifact check plus all behavioral, backend-contract, and static checks. Run it before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml` deploys the repository root to GitHub Pages on pushes to `main`.
+- `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to exercise browser behavior.
 
 Pushes to `main` are expected to deploy the static page through GitHub Pages. Shared-mode changes may also require copying and redeploying the embedded Apps Script as described in `README.md`.
 
@@ -21,4 +22,4 @@ Tests use `node:test` and `node:assert/strict`; no external framework or coverag
 
 ## Commit & Pull Request Guidelines
 
-Git history is unavailable in this checkout, so use short, imperative commit subjects such as `Fix weekly bounty eligibility`. Keep commits focused. Pull requests should explain user-visible behavior, identify scoring or API compatibility effects, link relevant issues, include screenshots for UI changes, and report `npm test` results. Never commit live Apps Script endpoints, shared crew URLs, or sensitive Sheet data.
+Use short, imperative commit subjects such as `Fix weekly bounty eligibility`. Keep commits focused. Pull requests should explain user-visible behavior, identify scoring or API compatibility effects, link relevant issues, include screenshots for UI changes, and report `npm test` results. Never commit live Apps Script endpoints, shared crew URLs, or sensitive Sheet data.
