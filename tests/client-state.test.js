@@ -63,6 +63,41 @@ const checks = `(()=>{
 
   assert.equal(computeCredits([{id:'before',name:'Alex',type:'climb',date:'2026-06-30'}]).info.get('before').reason,'outside challenge');
 
+  // categoryBreakdown sums CREDITED points per type from computeCredits().info, with the balanced-day bonus as its own row.
+  logs=[
+    {id:'k1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+    {id:'k2',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'2'},
+    {id:'k3',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'3'},
+    {id:'k4',name:'Alex',type:'mobility',date:'2026-07-13',createdAt:'4'},
+  ];
+  let bd=categoryBreakdown('alex');
+  const bdRow=t=>bd.rows.find(r=>r.type===t).points;
+  assert.equal(bdRow('climb'),3,'duplicate same-day climb credits once, not twice');
+  assert.equal(bdRow('exercise'),2);
+  assert.equal(bdRow('mobility'),1);
+  assert.equal(bdRow('bounty'),0);
+  assert.equal(bd.bonus,2,'the balanced-day bonus surfaces as its own row');
+  assert.equal(bd.total,8);
+  assert.equal(bd.rows.reduce((sum,r)=>sum+r.points,0),bd.total,'rows plus balanced bonus sum to the total');
+
+  // Bounties over the weekly cap contribute at most weeklyBountyCap to the bounty row.
+  logs=[
+    {id:'q1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+    {id:'q2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-14',createdAt:'1'},
+    {id:'q3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-15',createdAt:'1'},
+  ];
+  bd=categoryBreakdown('alex');
+  assert.equal(bdRow('bounty'),6,'bounty row is capped at the weekly bounty cap');
+  assert.equal(bd.bonus,0,'no balanced day means no bonus');
+  assert.equal(bd.total,6);
+  assert.equal(bd.rows.reduce((sum,r)=>sum+r.points,0),bd.total,'capped rows still sum to the total');
+
+  // No credited points means an empty breakdown (the render layer shows a single empty state, not zero rows).
+  logs=[];
+  bd=categoryBreakdown('alex');
+  assert.equal(bd.total,0);
+  assert.equal(bd.bonus,0);
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);
