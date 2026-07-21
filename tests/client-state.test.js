@@ -141,6 +141,45 @@ const checks = `(()=>{
   logs=[];
   assert.deepEqual(gradePyramid('alex'),[],'no graded climbs yields an empty pyramid');
 
+  // personalRecords: hardest grade compares by GRADES INDEX (never string), hardest this week filters by weekKey(today),
+  // best day/week come from computeCredits maxima; today is an ARGUMENT, never the clock.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[
+    {id:'pr1',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-06',createdAt:'1'},
+    {id:'pr2',name:'Alex',type:'climb',hardestGrade:'V10',date:'2026-07-13',createdAt:'2'},
+    {id:'pr3',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'3'},
+    {id:'pr4',name:'Alex',type:'mobility',date:'2026-07-13',createdAt:'4'},
+  ];
+  let rec=personalRecords('alex','2026-07-15');
+  assert.equal(rec.hasLog,true,'a person with logs shows the card');
+  assert.equal(rec.graded,true,'a graded climb enables the grade rows');
+  assert.equal(rec.hardest,'V10','V10 beats V2 by GRADES index, not lexicographically');
+  assert.equal(rec.hardestWeek,'V10','the week of 2026-07-15 (Mon 07-13) holds the V10 send');
+  assert.equal(rec.bestDay,8,'best single day is the dayMeter max — a balanced day tops out at 8');
+  assert.equal(rec.bestWeek,8,'best week is the weeks-map max');
+  rec=personalRecords('alex','2026-07-08');
+  assert.equal(rec.hardest,'V10','hardest ever ignores the week filter');
+  assert.equal(rec.hardestWeek,'V2','hardest this week follows weekKey(today) — the week of 07-08 (Mon 07-06) holds only V2');
+  logs=[{id:'ng1',name:'Maya',type:'exercise',date:'2026-07-13',createdAt:'1'}];
+  rec=personalRecords('maya','2026-07-15');
+  assert.equal(rec.hasLog,true);
+  assert.equal(rec.graded,false,'no graded climbs suppresses the grade rows');
+  assert.equal(rec.hardest,'','no hardest grade without a graded climb');
+  assert.equal(rec.hardestWeek,'');
+  assert.equal(rec.bestDay,2,'best day still reports once the person has any log');
+  assert.equal(rec.bestWeek,2,'best week still reports once the person has any log');
+  logs=[{id:'u1',name:'Uno',type:'climb',hardestGrade:'5.12a',date:'2026-07-13',createdAt:'1'}];
+  rec=personalRecords('uno','2026-07-15');
+  assert.equal(rec.graded,false,'an unknown grade string is not a graded climb');
+  assert.equal(rec.hardest,'','blank or unknown grades never surface as a record');
+  assert.equal(rec.bestDay,3,'the climb still credits points without a valid grade');
+  logs=[];
+  rec=personalRecords('alex','2026-07-15');
+  assert.equal(rec.hasLog,false,'no logs hides the whole card');
+  assert.equal(rec.graded,false);
+  assert.equal(rec.bestDay,0);
+  assert.equal(rec.bestWeek,0);
+
   // streakInfo counts consecutive days with >=1 credited point in dayMeter; today is an ARGUMENT, never the clock.
   logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:1,best:1},'a single active day is a one-day streak');
@@ -486,6 +525,23 @@ const domChecks = `(()=>{
   endpoint='https://sheet.example.test/exec';
   render();
   assert.equal(crewHint.classList.contains('hide'),true,'the crew local hint hides when an endpoint is connected');
+
+  // Entry 10: the Personal records card hides until the person logs something, and its grade rows track graded climbs.
+  endpoint='';me='Alex';recordingFor='Alex';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const recordsCard=document.querySelector('#recordsCard'),recordsList=document.querySelector('#recordsList');
+  assert.equal(recordsCard.classList.contains('hide'),true,'the records card hides when the person has no logs');
+  logs=[{id:'r1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(recordsCard.classList.contains('hide'),false,'the records card shows once the person has a log');
+  assert.ok(recordsList.innerHTML.includes('Hardest')&&recordsList.innerHTML.includes('V4'),'a graded climb surfaces the hardest-grade rows');
+  logs=[{id:'r2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(recordsCard.classList.contains('hide'),false,'a non-climb log still reveals the card');
+  assert.equal(recordsList.innerHTML.includes('Hardest'),false,'grade rows are suppressed without a graded climb');
+  assert.ok(recordsList.innerHTML.includes('Best single day'),'best day/week still render without graded climbs');
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 

@@ -45,6 +45,7 @@ assert.match(html,/data-panel="you"[\s\S]*class="stat-grid"[\s\S]*id="youTotal"[
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*id="gradePyramid"[\s\S]*id="bountyCapHint"/,'the grade pyramid card sits between the category breakdown and the bounty card on the You panel');
 assert.match(html,/id="gradePyramid"[^>]*role="img"[^>]*aria-label=/,'the grade pyramid is announced as a graphic');
 assert.match(html,/data-panel="you"[\s\S]*id="gradePyramidCard"[\s\S]*id="heatmapCard"[\s\S]*id="bountyCapHint"/,'the daily activity heatmap card sits after the grade pyramid on the You panel');
+assert.match(html,/data-panel="you"[\s\S]*id="gradePyramidCard"[\s\S]*id="recordsCard"[\s\S]*id="heatmapCard"/,'the personal records card sits between the grade pyramid and the heatmap on the You panel');
 assert.match(html,/id="youHeatmap"[^>]*role="img"[^>]*aria-label=/,'the daily activity heatmap is announced as a graphic');
 assert.match(html,/data-panel="crew"[\s\S]*class="card group-card"[\s\S]*id="weeklyTrendCard"[\s\S]*class="card hunter-card"/,'the weekly trend card sits between the group goal card and the Bounty Hunter card on the crew panel');
 assert.match(html,/id="weeklyTrend"[^>]*role="img"[^>]*aria-label=/,'the weekly trend chart is announced as a graphic');

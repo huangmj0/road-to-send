@@ -223,8 +223,8 @@ A fresh device in local mode shows bare zeros and "No activity yet." with no gui
 
 ## 10. Personal records card (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add personal records card to the You tab. Pure helper `personalRecords(nameLower,today)` returns `{hasLog,graded,hardest,hardestWeek,bestDay,bestWeek}` — hardest grade ever and hardest for `weekKey(today)` compared by `GRADES.indexOf` (blank/unknown grades skipped), best single day = max of that person's `computeCredits(logs).dayMeter`, best week = max of their `weeks`; `today` is a parameter, never the clock. `renderRecords()` (called from `render()`) writes labeled stat rows into `#recordsList`, toggles the `hide` class on `#recordsCard` until the person has ≥1 log, and omits the two grade rows when they have no graded climbs. Plain-text rows (no `role="img"`). Card sits between the grade pyramid and the heatmap. No deviations from the spec.
 
 ### Why
 Celebrates progress; pairs with the grade pyramid (#3).
