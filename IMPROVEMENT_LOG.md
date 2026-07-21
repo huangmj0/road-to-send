@@ -179,8 +179,8 @@ The group only sees one cumulative progress bar; week-by-week momentum is invisi
 
 ## 8. Leaderboard week-trend arrows
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add leaderboard week-trend arrows. Pure helpers `prevWeekKey(today)` (steps `weekKey(today)` back one Monday-aligned week via `parseDateOnly`/`localDate`; '' for unparseable input) and `weekTrend(nameLower,today)` (compares this-week vs previous-week points from `computeCredits(logs).weeks` → 'up' | 'down' | 'even', zero-previous → up when this week > 0, both zero → even; returns null during the challenge's first week when `weekKey(today)===weekKey(config.startDate)`; today is always an argument, never the clock). `render()` appends the arrow inside the existing Week `<td>` as a `<span class="week-trend up|down|even" role="img" aria-label="up vs last week|down vs last week|even with last week">` rendering ▲/▼/— colored via `--green`/`--orange-ink`/`--muted`; null suppresses the span. Works in both Weekly and Overall toggle views (metric-independent, keyed on name). No new column, no `<thead>` change, no sort change; single `<table>` preserved. Deviation from spec: first-week suppression lives in `weekTrend` (returns null) rather than only in `render()`, so it is directly unit-testable; `role="img"` added to the span (rule 7) alongside the specced `aria-label`.
 
 ### Why
 Cheap glanceable momentum on the leaderboard: is each climber up or down versus last week?

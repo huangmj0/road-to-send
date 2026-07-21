@@ -281,6 +281,31 @@ const checks = `(()=>{
   assert.equal(totalMedals.get('D'),'🥇','D is first overall');
   assert.notEqual([...weekMedals.keys()].sort().join(','),[...totalMedals.keys()].sort().join(','),'the weekly and overall podiums are different sets');
 
+  // Leaderboard week-trend arrows: prevWeekKey steps back one Monday-aligned week; today is an ARGUMENT.
+  assert.equal(prevWeekKey('2026-07-13'),'2026-07-06','a Monday resolves to the prior week key');
+  assert.equal(prevWeekKey('2026-07-19'),'2026-07-06','a Sunday shares its week, so the prior week matches the Monday');
+  assert.equal(prevWeekKey('2026-07-20'),'2026-07-13','crossing the Monday boundary advances the previous week too');
+  assert.equal(prevWeekKey('garbage'),'','an unparseable today yields no previous week');
+
+  // weekTrend classifies this week vs the previous week from computeCredits().weeks → up/down/even, null in the first week.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[
+    {id:'a1',name:'Alex',type:'climb',date:'2026-07-08',createdAt:'1'}, // prev week: 3
+    {id:'a2',name:'Alex',type:'climb',date:'2026-07-14',createdAt:'2'}, // this week: 3
+    {id:'a3',name:'Alex',type:'exercise',date:'2026-07-15',createdAt:'3'}, // this week: +2 => 5
+    {id:'d1',name:'Dana',type:'climb',date:'2026-07-08',createdAt:'4'}, // prev week: 3, this week: 0
+    {id:'e1',name:'Even',type:'climb',date:'2026-07-08',createdAt:'5'}, // prev week: 3
+    {id:'e2',name:'Even',type:'climb',date:'2026-07-15',createdAt:'6'}, // this week: 3
+    {id:'n1',name:'Newbie',type:'climb',date:'2026-07-14',createdAt:'7'}, // this week only: 3
+  ];
+  assert.equal(weekTrend('alex','2026-07-15'),'up','more points this week than last is up');
+  assert.equal(weekTrend('dana','2026-07-15'),'down','fewer points this week than last is down');
+  assert.equal(weekTrend('even','2026-07-15'),'even','matching the previous week is even');
+  assert.equal(weekTrend('newbie','2026-07-15'),'up','zero previous week with points this week is up');
+  assert.equal(weekTrend('ghost','2026-07-15'),'even','both weeks at zero is even');
+  assert.equal(weekTrend('alex','2026-07-03'),null,'the first challenge week is suppressed — no previous week to compare');
+  assert.equal(weekTrend('alex','2026-07-13'),'up','the second week compares against the first');
+
   assert.equal(weekKey('2026-07-13'),'2026-07-13');
   assert.equal(weekKey('2026-07-19'),'2026-07-13');
   assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07');
