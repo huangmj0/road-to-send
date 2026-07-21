@@ -245,8 +245,8 @@ Celebrates progress; pairs with the grade pyramid (#3).
 
 ## 11. Theme polish: theme-color meta + inline favicon
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add theme-color meta and inline SVG favicon. Added to the template `<head>`: `<meta name="theme-color" content="#f5eee3">` matching `--bg`, plus `<link rel="icon">` and `<link rel="apple-touch-icon">` both pointing at the same `data:image/svg+xml,...` URI — a `--green` (#174a3a) rounded square carrying the 🧗 brand emoji as a centered `<text>` element, fully URL-encoded (via `encodeURIComponent`, so no raw `#`/`<`/`>`/quotes/spaces break the attribute). No new files, no manifest, no service worker, no external URLs. static-check.mjs asserts both the `theme-color` meta and the `rel="icon"` `data:image/svg+xml` link. Deviation: also added the optional `apple-touch-icon` (as a data URI, per the entry's allowance).
 
 ### Why
 The page ships zero icons or theme metadata; browser chrome is default gray and the tab has no icon.

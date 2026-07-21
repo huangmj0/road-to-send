@@ -57,5 +57,7 @@ assert.match(html,/data-panel="you"[\s\S]*id="youEmptyState"[\s\S]*id="personalA
 assert.match(html,/id="youEmptyState"[\s\S]*data-tab="record"/,'the empty state offers a button that jumps to the Record tab');
 assert.match(html,/data-panel="crew"[\s\S]*id="crewLocalHint"/,'the crew local-mode hint lives in the Crew panel');
 assert.equal((html.match(/<table>/g)||[]).length,1,'all crew share one leaderboard');
+assert.match(html,/<meta[^>]+name="theme-color"[^>]+content="#f5eee3"/,'a theme-color meta tints the browser chrome to the brand background');
+assert.match(html,/<link[^>]+rel="icon"[^>]+href="data:image\/svg\+xml,/,'an inline SVG data-URI favicon is present');
 assert.match(html,/env\(safe-area-inset-bottom\)/,'mobile navigation respects safe areas');
 console.log('Road to Send static accessibility and UX checks passed.');
