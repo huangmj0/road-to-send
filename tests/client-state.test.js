@@ -115,6 +115,31 @@ const checks = `(()=>{
   }
   assert.ok(new Set(spanSets).size>=2,'at least two distinct daily sets appear over 14 days');
 
+  // podiumMedals: dense rank over DISTINCT positive values; ties share a medal; a 0 earns nothing.
+  const threeWay=podiumMedals([{name:'A',week:9,total:20},{name:'B',week:7,total:15},{name:'C',week:4,total:9}],'week');
+  assert.equal(threeWay.get('A'),'🥇');
+  assert.equal(threeWay.get('B'),'🥈');
+  assert.equal(threeWay.get('C'),'🥉');
+  const tied=podiumMedals([{name:'A',week:8},{name:'B',week:8},{name:'C',week:5},{name:'D',week:3}],'week');
+  assert.equal(tied.get('A'),'🥇','a tie for first shares gold');
+  assert.equal(tied.get('B'),'🥇','both eights are gold');
+  assert.equal(tied.get('C'),'🥈','the next distinct value takes silver');
+  assert.equal(tied.get('D'),'🥉','the third distinct value takes bronze');
+  const fewer=podiumMedals([{name:'A',total:5},{name:'B',total:2}],'total');
+  assert.equal(fewer.size,2,'fewer than three climbers only award the medals earned');
+  assert.equal(fewer.get('A'),'🥇');
+  assert.equal(fewer.get('B'),'🥈');
+  assert.equal(podiumMedals([{name:'A',week:0},{name:'B',week:0}],'week').size,0,'all-zero scores yield an empty map');
+  // A crafted roster where Weekly and Overall orderings differ yields different top-3 sets.
+  const roster=[{name:'A',week:1,total:30},{name:'B',week:2,total:20},{name:'C',week:9,total:5},{name:'D',week:0,total:40}];
+  const weekRanked=rankLeaders(roster,'week'),totalRanked=rankLeaders(roster,'total');
+  assert.equal(weekRanked[0].name,'C','weekly ranking leads with the highest week');
+  assert.equal(totalRanked[0].name,'D','overall ranking leads with the highest total');
+  const weekMedals=podiumMedals(weekRanked,'week'),totalMedals=podiumMedals(totalRanked,'total');
+  assert.equal(weekMedals.get('C'),'🥇','C is first this week');
+  assert.equal(totalMedals.get('D'),'🥇','D is first overall');
+  assert.notEqual([...weekMedals.keys()].sort().join(','),[...totalMedals.keys()].sort().join(','),'the weekly and overall podiums are different sets');
+
   assert.equal(weekKey('2026-07-13'),'2026-07-13');
   assert.equal(weekKey('2026-07-19'),'2026-07-13');
   assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07');
