@@ -46,8 +46,8 @@ The whole premise of the scoring economy is balance across Climbing/Exercise/Mob
 
 ## 2. Weekly bounty-cap progress (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Show weekly bounty-cap progress on the You tab. Pure helper `bountyWeekProgress(nameLower,today)` sums credited bounty points for `weekKey(today)` from `computeCredits(logs).info` (caller passes `challengeToday()`; no clock reads inside). `renderBounties()` (called from `render()`) writes "X / N bounty points this week" into `#bountyCapHint` in the bounty card head (N from `SCORING.weeklyBountyCap`), appending the 🏹 Bounty Hunter note at/over the cap. The new hint span replaces the static "Rotates daily" hint at render time (the spec allows replacement); "Rotates daily" remains only as the pre-render fallback text. No other deviations.
 
 ### Why
 The 6-point weekly bounty cap silently zeroes credit; users currently discover it only in the record-form preview at save time.
@@ -68,8 +68,8 @@ The 6-point weekly bounty cap silently zeroes credit; users currently discover i
 
 ## 3. Grade pyramid (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add grade pyramid card to the You tab. Pure helper `gradePyramid(nameLower)` counts the person's `type==='climb'` logs per `hardestGrade` (all graded sends, including zero-credit same-day duplicates and outside-window entries; blank/unknown grades skipped), ordered hardest-first by `GRADES` index. `renderPyramid()` (called from `render()`) draws CSS-grid rows (grade label, proportional bar with `aria-hidden`, count) into `#gradePyramid` (`role="img"` with a per-grade send-count `aria-label` summary; no transitions on bars) and toggles the `hide` class on the wrapping card `#gradePyramidCard` when there are no graded climbs. Deviations: none — the card wrapper got its own id (`#gradePyramidCard`) so the whole card, head included, hides.
 
 ### Why
 `hardestGrade` is captured on every climb entry and stored, but never aggregated — it only appears as flavor text in feeds.
@@ -90,8 +90,8 @@ Notes: —
 
 ## 4. Streak tracking (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add current and best streak cards to the You tab. Pure helper `streakInfo(nameLower,today)` collects the person's ≥1-point days from `computeCredits(logs).dayMeter` (in-window days only, so pre-start days never count), anchors the current streak at `today` or, failing that, `yesterday` (a zero-point today keeps yesterday's streak alive), and takes the longest run as best; all date stepping goes through `parseDateOnly`/`localDate` and the helper never reads the clock. Two new `.stat` cards (`#youStreak`/`#youBestStreak`, values "N days"/"1 day", "—" when none) join the existing `.stat-grid`, rendered from `render()`. No deviations from the spec.
 
 ### Why
 Streaks are a strong daily motivator and `computeCredits().dayMeter` already contains per-person daily points.
@@ -112,8 +112,8 @@ Streaks are a strong daily motivator and `computeCredits().dayMeter` already con
 
 ## 5. Calendar heatmap of daily points (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add daily activity heatmap card to the You tab. Pure helpers `heatmapDays(nameLower,today)` (enumerates `config.startDate` through `min(config.tripDate,today)` via `parseDateOnly`/`localDate`, returning `{date,points}` from `computeCredits(logs).dayMeter`; empty array for invalid windows or a today before the start — caller passes `challengeToday()`, no clock reads inside) and `heatLevel(points)` (intensity buckets 0 / 1–2 / 3–5 / 6–7 / max with thresholds derived from `DAILY_MAX`). `renderHeatmap()` (called from `render()`) draws a 7-column CSS grid into `#youHeatmap` (`role="img"` with an "Active X of N days, P points" summary; cells `aria-hidden` with `fmtDay` titles like "Jul 14 · 5 pts"; no transitions), pads the first row with blank placeholders so day one lands on its Monday-start weekday column, and fills the rest of the current week (capped at `tripDate`) with dashed "upcoming" cells visually distinct from zero-point past days; the whole card `#heatmapCard` hides via the `hide` class when the helper returns nothing. Cell colors ramp `--sand` → `--orange` via `color-mix()` steps in styles.css; the grid uses `repeat(7,minmax(0,1fr))` so cells shrink cleanly at 320px. No deviations from the spec.
 
 ### Why
 Per-day effort (`dayMeter`) is invisible today; a heatmap shows consistency at a glance.
@@ -135,8 +135,8 @@ Per-day effort (`dayMeter`) is invisible today; a heatmap shows consistency at a
 
 ## 6. Projected finish on the Crew tab
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add projected group finish line to the Crew tab. Pure helper `projectedTotal(total,settings,today)` (separate from `paceInfo`, which is untouched) returns null for invalid windows/goals, before the start, after the end, or with fewer than 3 elapsed days; otherwise `{projected}` = round(total/elapsed × totalDays), plus `goalDate` (the day cumulative rate×days first reaches the goal, clamped to the window end) whenever rate > 0 and the goal ≤ projected. New `<p id="goalProjection" class="hint hide" role="status" aria-live="polite">` right after `#goalPace`; `render()` fills it as "On pace for ~X points by the end" or "On pace to hit the goal around <fmtDay date>" and hides it on null. Today is always passed in (`challengeToday()` at the call site); no clock reads inside the helper. No deviations from the spec. Post-review refinement: both the projection and the pre-existing pace line now take a through-today group total from the new `earnedThrough(today)` helper (credited points for entries dated on or before today) instead of `model.total`, so future-dated entries — which the record form permits through the challenge end — no longer inflate the elapsed-days rate. `paceInfo`/`projectedTotal` signatures and their tests are unchanged; only the value passed at the render call site changed. Cumulative displays (group total, progress bar, leaderboard) still count all in-window entries.
 
 ### Why
 `paceInfo()` already computes needed per-day rate; the natural next sentence is "at this rate the crew lands at ~X points".
@@ -157,8 +157,8 @@ Notes: —
 
 ## 7. Weekly trend bars (Crew tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add weekly trend bar chart to the Crew tab. Pure helper `weeklyTrend(today)` sums `computeCredits(logs).weeks` across all names into per-week group totals for consecutive week keys from `weekKey(config.startDate)` through `weekKey(today)` (stepping +7 days via `parseDateOnly`/`localDate`), labeled "W1"…"Wn" with empty weeks at 0; returns [] for invalid windows or a today before the start — caller passes `challengeToday()`, no clock reads inside. `renderTrend()` (called from `render()`) draws div-based columns into `#weeklyTrend` (`role="img"` with a "Weekly points: W1 30, W2 42, …" summary; per-column `title` like "W3 · 42 pts"; bars/labels `aria-hidden`; no transitions) inside a `.trend-scroll{overflow-x:auto}` wrapper so >12 weeks scroll; the max week maps to a 96px bar and zero weeks keep a 3px sliver. The card `#weeklyTrendCard` sits between the group-goal and Bounty Hunter cards and hides via the `hide` class when the helper returns [] or every week is zero. No deviations from the spec.
 
 ### Why
 The group only sees one cumulative progress bar; week-by-week momentum is invisible.
@@ -179,8 +179,8 @@ The group only sees one cumulative progress bar; week-by-week momentum is invisi
 
 ## 8. Leaderboard week-trend arrows
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add leaderboard week-trend arrows. Pure helpers `prevWeekKey(today)` (steps `weekKey(today)` back one Monday-aligned week via `parseDateOnly`/`localDate`; '' for unparseable input) and `weekTrend(nameLower,today)` (compares this-week vs previous-week points from `computeCredits(logs).weeks` → 'up' | 'down' | 'even', zero-previous → up when this week > 0, both zero → even; returns null during the challenge's first week when `weekKey(today)===weekKey(config.startDate)`; today is always an argument, never the clock). `render()` appends the arrow inside the existing Week `<td>` as a `<span class="week-trend up|down|even" role="img" aria-label="up vs last week|down vs last week|even with last week">` rendering ▲/▼/— colored via `--green`/`--orange-ink`/`--muted`; null suppresses the span. Works in both Weekly and Overall toggle views (metric-independent, keyed on name). No new column, no `<thead>` change, no sort change; single `<table>` preserved. Deviation from spec: first-week suppression lives in `weekTrend` (returns null) rather than only in `render()`, so it is directly unit-testable; `role="img"` added to the span (rule 7) alongside the specced `aria-label`.
 
 ### Why
 Cheap glanceable momentum on the leaderboard: is each climber up or down versus last week?
@@ -201,8 +201,8 @@ Cheap glanceable momentum on the leaderboard: is each climber up or down versus 
 
 ## 9. Empty-state and onboarding polish
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add onboarding empty state and crew local-mode hint. New `#youEmptyState` block in the You-tab "Recent activity" card (paragraph `#youEmptyCopy` plus a `.btn` with `data-tab="record"`); `render()` builds the copy via the pure helper `youEmptyStateCopy()` — Climbing/Exercise/Mobility values and the balanced-day bonus derived from `SCORING.categories`/`SCORING.balancedDayBonus`, never hard-coded — shows the block and hides `#personalActivity` only when the selected person has no logs, and swaps back to the feed once a log exists. New `#crewLocalHint` line in the Leaderboard card head, toggled by the `hide` class on `endpoint` truthiness in `render()` (visible in local mode, hidden once a Sheet is connected). Copy avoids the banned strings. Deviation: the empty-state button lives statically in the template (so the existing `[data-tab]` init listener binds it) while only its copy paragraph is set from SCORING in JS.
 
 ### Why
 A fresh device in local mode shows bare zeros and "No activity yet." with no guidance.
@@ -223,8 +223,8 @@ A fresh device in local mode shows bare zeros and "No activity yet." with no gui
 
 ## 10. Personal records card (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add personal records card to the You tab. Pure helper `personalRecords(nameLower,today)` returns `{hasLog,graded,hardest,hardestWeek,bestDay,bestWeek}` — hardest grade ever and hardest for `weekKey(today)` compared by `GRADES.indexOf` (blank/unknown grades skipped), best single day = max of that person's `computeCredits(logs).dayMeter`, best week = max of their `weeks`; `today` is a parameter, never the clock. `renderRecords()` (called from `render()`) writes labeled stat rows into `#recordsList`, toggles the `hide` class on `#recordsCard` until the person has ≥1 log, and omits the two grade rows when they have no graded climbs. Plain-text rows (no `role="img"`). Card sits between the grade pyramid and the heatmap. No deviations from the spec.
 
 ### Why
 Celebrates progress; pairs with the grade pyramid (#3).
@@ -245,8 +245,8 @@ Celebrates progress; pairs with the grade pyramid (#3).
 
 ## 11. Theme polish: theme-color meta + inline favicon
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add theme-color meta and inline SVG favicon. Added to the template `<head>`: `<meta name="theme-color" content="#f5eee3">` matching `--bg`, plus `<link rel="icon">` and `<link rel="apple-touch-icon">` both pointing at the same `data:image/svg+xml,...` URI — a `--green` (#174a3a) rounded square carrying the 🧗 brand emoji as a centered `<text>` element, fully URL-encoded (via `encodeURIComponent`, so no raw `#`/`<`/`>`/quotes/spaces break the attribute). No new files, no manifest, no service worker, no external URLs. static-check.mjs asserts both the `theme-color` meta and the `rel="icon"` `data:image/svg+xml` link. Deviation: also added the optional `apple-touch-icon` (as a data URI, per the entry's allowance).
 
 ### Why
 The page ships zero icons or theme metadata; browser chrome is default gray and the tab has no icon.
@@ -265,8 +265,8 @@ The page ships zero icons or theme metadata; browser chrome is default gray and 
 
 ## 12. Dark mode via prefers-color-scheme
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add dark mode via prefers-color-scheme. Step (a) hoisted every theme-relevant color literal in styles.css into new `:root` variables (surfaces, text, borders/washes, scrims/shadows, tint overlays) with zero light-mode value change. Step (b) added one `@media(prefers-color-scheme:dark){:root{...}}` override block (variables only), a `<meta name="color-scheme" content="light dark">`, and light/dark media-attributed `theme-color` metas (#f5eee3 / #1a1613). Deviation from the strict "variables only" note: two extra decoupling variables were introduced in step (a) — `--green-solid` and `--accent-solid` — because `--green` and `--orange-ink` are dual-use (foreground text that must lighten in dark mode AND solid backgrounds under white text on `.toast`/`.btn.primary`/pressed `.seg-btn` that must stay dark). In light mode both equal the originals (`#174a3a`/`#c0481f`), so light rendering is byte-for-byte identical; in dark mode the solids stay dark for white-text legibility while the text vars lighten. Dark-palette AA notes: `--muted` (#a6ad9f) ≈7:1, `--orange-ink` text (#ff9166) ≈7:1, `--green` text (#5fb896) ≈6:1, white on `--green-solid`/`--accent-solid` ≈7:1 — all on the dark card (#241f1a). Alpha borders/washes flipped to low-alpha white so they read on dark surfaces.
 
 ### Why
 Evening gym use; the app is currently light-only. Done last because it has the widest blast radius.

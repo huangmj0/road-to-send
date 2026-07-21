@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Beasts for Bishop: Part 2</title>
   <meta name="description" content="A balanced climbing, exercise, and mobility challenge with daily bounties for your crew." />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f5eee3" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1a1613" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2212%22%20fill%3D%22%23174a3a%22%2F%3E%3Ctext%20x%3D%2232%22%20y%3D%2234%22%20font-size%3D%2240%22%20text-anchor%3D%22middle%22%20dominant-baseline%3D%22central%22%3E%F0%9F%A7%97%3C%2Ftext%3E%3C%2Fsvg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2212%22%20fill%3D%22%23174a3a%22%2F%3E%3Ctext%20x%3D%2232%22%20y%3D%2234%22%20font-size%3D%2240%22%20text-anchor%3D%22middle%22%20dominant-baseline%3D%22central%22%3E%F0%9F%A7%97%3C%2Ftext%3E%3C%2Fsvg%3E" />
   <style>
 __INLINE_STYLES__
   </style>
@@ -20,10 +25,13 @@ __INLINE_STYLES__
       <div id="youMeter" class="point-meter" role="img" aria-label="0 of 8 points today"></div>
       <button class="btn primary wide" type="button" data-tab="record">Record activity</button>
     </article>
-    <div class="stat-grid"><article class="card stat"><span>Total points</span><strong id="youTotal">0</strong></article><article class="card stat"><span>Crew rank</span><strong id="youRank">—</strong></article></div>
+    <div class="stat-grid"><article class="card stat"><span>Total points</span><strong id="youTotal">0</strong></article><article class="card stat"><span>Crew rank</span><strong id="youRank">—</strong></article><article class="card stat"><span>Current streak</span><strong id="youStreak">—</strong></article><article class="card stat"><span>Best streak</span><strong id="youBestStreak">—</strong></article></div>
     <article class="card"><div class="card-head"><h2>Points by category</h2></div><div id="youBreakdown" class="breakdown"></div></article>
-    <article class="card"><div class="card-head"><h2>Today's bounties</h2><span class="hint">Rotates daily</span></div><div id="todayBounties" class="bounty-list"></div></article>
-    <article class="card"><div class="card-head"><h2>Recent activity</h2></div><div id="personalActivity" class="activity-list"></div></article>
+    <article id="gradePyramidCard" class="card hide"><div class="card-head"><h2>Grade pyramid</h2><span class="hint">Every graded send</span></div><div id="gradePyramid" class="pyramid" role="img" aria-label="Grade pyramid"></div></article>
+    <article id="recordsCard" class="card hide"><div class="card-head"><h2>Personal records</h2><span class="hint">Your bests</span></div><div id="recordsList" class="records"></div></article>
+    <article id="heatmapCard" class="card hide"><div class="card-head"><h2>Daily activity</h2><span class="hint">Points per day</span></div><div id="youHeatmap" class="heatmap" role="img" aria-label="Daily activity"></div></article>
+    <article class="card"><div class="card-head"><h2>Today's bounties</h2><span id="bountyCapHint" class="hint">Rotates daily</span></div><div id="todayBounties" class="bounty-list"></div></article>
+    <article class="card"><div class="card-head"><h2>Recent activity</h2></div><div id="youEmptyState" class="empty-state hide"><p id="youEmptyCopy" class="hint"></p><button class="btn primary" type="button" data-tab="record">Record your first activity</button></div><div id="personalActivity" class="activity-list"></div></article>
   </section>
 
   <section id="record" class="tab-panel" data-panel="record" aria-labelledby="navRecord">
@@ -43,9 +51,10 @@ __INLINE_STYLES__
 
   <section id="crew" class="tab-panel" data-panel="crew" aria-labelledby="navCrew">
     <div class="page-head"><div><span class="eyebrow">Together</span><h1>Crew</h1></div><button id="syncStatus" class="sync" type="button" title="Refresh from the shared Sheet now"></button></div>
-    <article class="card group-card"><div class="card-head"><div><span class="eyebrow">Group goal</span><h2><span id="totalPoints">0</span> / <span id="groupGoal">500</span></h2></div><strong id="groupPercent">0%</strong></div><div class="progress"><i id="groupProgress"></i></div><p id="goalPace" class="hint pace hide" role="status" aria-live="polite"></p><div id="syncDiagnostics" class="diagnostics" role="status" aria-live="polite"><strong id="diagnosticTitle">Local mode</strong><span id="diagnosticDetail">Entries stay in this browser.</span><button id="diagnosticCode" class="text-btn hide" type="button" title="Copy sanitized error code"></button></div></article>
+    <article class="card group-card"><div class="card-head"><div><span class="eyebrow">Group goal</span><h2><span id="totalPoints">0</span> / <span id="groupGoal">500</span></h2></div><strong id="groupPercent">0%</strong></div><div class="progress"><i id="groupProgress"></i></div><p id="goalPace" class="hint pace hide" role="status" aria-live="polite"></p><p id="goalProjection" class="hint hide" role="status" aria-live="polite"></p><div id="syncDiagnostics" class="diagnostics" role="status" aria-live="polite"><strong id="diagnosticTitle">Local mode</strong><span id="diagnosticDetail">Entries stay in this browser.</span><button id="diagnosticCode" class="text-btn hide" type="button" title="Copy sanitized error code"></button></div></article>
+    <article id="weeklyTrendCard" class="card hide"><div class="card-head"><h2>Weekly points</h2><span class="hint">Crew total per week</span></div><div class="trend-scroll"><div id="weeklyTrend" class="trend" role="img" aria-label="Weekly points"></div></div></article>
     <article class="card hunter-card"><div class="card-head"><h2>Bounty Hunter</h2><span class="hint">This week</span></div><div id="bountyHunter" class="hunter-line" role="status" aria-live="polite"></div></article>
-    <article class="card table-card"><div class="card-head"><h2>Leaderboard</h2><div id="leaderToggle" class="seg-toggle" role="group" aria-label="Leaderboard ranking"><button id="leaderWeekBtn" class="seg-btn active" type="button" aria-pressed="true">Weekly</button><button id="leaderOverallBtn" class="seg-btn" type="button" aria-pressed="false">Overall</button></div></div><div class="table-scroll"><table><thead><tr><th>Rank</th><th>Climber</th><th>Week</th><th>Total</th></tr></thead><tbody id="leaderRows"></tbody></table></div></article>
+    <article class="card table-card"><div class="card-head"><h2>Leaderboard</h2><div id="leaderToggle" class="seg-toggle" role="group" aria-label="Leaderboard ranking"><button id="leaderWeekBtn" class="seg-btn active" type="button" aria-pressed="true">Weekly</button><button id="leaderOverallBtn" class="seg-btn" type="button" aria-pressed="false">Overall</button></div></div><p id="crewLocalHint" class="hint hide" role="status" aria-live="polite">Scores stay on this device until you connect a shared crew Sheet.</p><div class="table-scroll"><table><thead><tr><th>Rank</th><th>Climber</th><th>Week</th><th>Total</th></tr></thead><tbody id="leaderRows"></tbody></table></div></article>
     <article class="card"><div class="card-head"><h2>Activity</h2></div><div id="activityList" class="activity-list"></div></article>
   </section>
 </main>

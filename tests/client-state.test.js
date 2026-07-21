@@ -98,6 +98,188 @@ const checks = `(()=>{
   assert.equal(bd.total,0);
   assert.equal(bd.bonus,0);
 
+  // bountyWeekProgress sums CREDITED bounty points for the week of the day passed in.
+  logs=[{id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(bountyWeekProgress('alex','2026-07-15'),3,'under the cap reports the credited sum');
+  logs=[
+    {id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+    {id:'w2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-14',createdAt:'1'},
+  ];
+  assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'exactly at the cap reports the full cap');
+  logs=[
+    {id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+    {id:'w2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-14',createdAt:'1'},
+    {id:'w3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-15',createdAt:'1'},
+  ];
+  assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'over-cap claims add nothing to the credited sum');
+  assert.equal(bountyWeekProgress('alex','2026-07-20'),0,'a new week starts back at zero');
+  logs.push({id:'w4',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},{id:'w5',name:'Maya',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'});
+  assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'non-bounty entries and other people are ignored');
+  logs=[];
+
+  // gradePyramid counts ALL of the person's graded climb logs, hardest-first by GRADES index.
+  logs=[
+    {id:'g1',name:'Alex',type:'climb',hardestGrade:'V9',date:'2026-07-13',createdAt:'1'},
+    {id:'g2',name:'Alex',type:'climb',hardestGrade:'V10',date:'2026-07-14',createdAt:'1'},
+    {id:'g3',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-14',createdAt:'2'},
+  ];
+  let pyramid=gradePyramid('alex');
+  assert.deepEqual(pyramid.map(r=>r.grade),['V10','V9','V2'],'V10 sorts above V9 by GRADES index, not string comparison');
+  logs=[
+    {id:'g1',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-13',createdAt:'1'},
+    {id:'g2',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-13',createdAt:'2'},
+    {id:'g3',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-06-01',createdAt:'1'},
+    {id:'g4',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'3'},
+    {id:'g5',name:'Alex',type:'climb',hardestGrade:'',date:'2026-07-14',createdAt:'1'},
+    {id:'g6',name:'Alex',type:'climb',hardestGrade:'5.12a',date:'2026-07-14',createdAt:'2'},
+    {id:'g7',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'4'},
+    {id:'g8',name:'Maya',type:'climb',hardestGrade:'V4',date:'2026-07-13',createdAt:'1'},
+    {id:'g9',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-15',createdAt:'1'},
+  ];
+  pyramid=gradePyramid('alex');
+  assert.deepEqual(pyramid,[{grade:'V5',count:3},{grade:'V4',count:1}],'zero-credit same-day duplicates and outside-window sends count; blank or unknown grades, other types, and other people are ignored');
+  logs=[];
+  assert.deepEqual(gradePyramid('alex'),[],'no graded climbs yields an empty pyramid');
+
+  // personalRecords: hardest grade compares by GRADES INDEX (never string), hardest this week filters by weekKey(today),
+  // best day/week come from computeCredits maxima; today is an ARGUMENT, never the clock.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[
+    {id:'pr1',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-06',createdAt:'1'},
+    {id:'pr2',name:'Alex',type:'climb',hardestGrade:'V10',date:'2026-07-13',createdAt:'2'},
+    {id:'pr3',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'3'},
+    {id:'pr4',name:'Alex',type:'mobility',date:'2026-07-13',createdAt:'4'},
+  ];
+  let rec=personalRecords('alex','2026-07-15');
+  assert.equal(rec.hasLog,true,'a person with logs shows the card');
+  assert.equal(rec.graded,true,'a graded climb enables the grade rows');
+  assert.equal(rec.hardest,'V10','V10 beats V2 by GRADES index, not lexicographically');
+  assert.equal(rec.hardestWeek,'V10','the week of 2026-07-15 (Mon 07-13) holds the V10 send');
+  assert.equal(rec.bestDay,8,'best single day is the dayMeter max — a balanced day tops out at 8');
+  assert.equal(rec.bestWeek,8,'best week is the weeks-map max');
+  rec=personalRecords('alex','2026-07-08');
+  assert.equal(rec.hardest,'V10','hardest ever ignores the week filter');
+  assert.equal(rec.hardestWeek,'V2','hardest this week follows weekKey(today) — the week of 07-08 (Mon 07-06) holds only V2');
+  logs=[{id:'ng1',name:'Maya',type:'exercise',date:'2026-07-13',createdAt:'1'}];
+  rec=personalRecords('maya','2026-07-15');
+  assert.equal(rec.hasLog,true);
+  assert.equal(rec.graded,false,'no graded climbs suppresses the grade rows');
+  assert.equal(rec.hardest,'','no hardest grade without a graded climb');
+  assert.equal(rec.hardestWeek,'');
+  assert.equal(rec.bestDay,2,'best day still reports once the person has any log');
+  assert.equal(rec.bestWeek,2,'best week still reports once the person has any log');
+  logs=[{id:'u1',name:'Uno',type:'climb',hardestGrade:'5.12a',date:'2026-07-13',createdAt:'1'}];
+  rec=personalRecords('uno','2026-07-15');
+  assert.equal(rec.graded,false,'an unknown grade string is not a graded climb');
+  assert.equal(rec.hardest,'','blank or unknown grades never surface as a record');
+  assert.equal(rec.bestDay,3,'the climb still credits points without a valid grade');
+  logs=[];
+  rec=personalRecords('alex','2026-07-15');
+  assert.equal(rec.hasLog,false,'no logs hides the whole card');
+  assert.equal(rec.graded,false);
+  assert.equal(rec.bestDay,0);
+  assert.equal(rec.bestWeek,0);
+
+  // streakInfo counts consecutive days with >=1 credited point in dayMeter; today is an ARGUMENT, never the clock.
+  logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:1,best:1},'a single active day is a one-day streak');
+  logs=[
+    {id:'s1',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'climb',date:'2026-07-11',createdAt:'1'},
+    {id:'s3',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+  ];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:1,best:2},'a gap resets the current streak while best remembers the longer run');
+  logs=[
+    {id:'s1',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+  ];
+  assert.deepEqual(streakInfo('alex','2026-07-14'),{current:2,best:2},'a zero-point today keeps yesterday-anchored streaks alive until the day ends');
+  logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'1'}];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:0,best:1},'empty today AND yesterday means no current streak');
+  logs=[
+    {id:'s1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'exercise',date:'2026-07-06',createdAt:'1'},
+    {id:'s3',name:'Alex',type:'mobility',date:'2026-07-07',createdAt:'1'},
+    {id:'s4',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'1'},
+    {id:'s5',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+  ];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:2,best:3},'best streak takes the longer of two separate runs');
+  logs=[
+    {id:'s1',name:'Alex',type:'climb',date:'2026-06-30',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'climb',date:'2026-07-01',createdAt:'1'},
+    {id:'s3',name:'Maya',type:'climb',date:'2026-06-29',createdAt:'1'},
+  ];
+  assert.deepEqual(streakInfo('alex','2026-07-01'),{current:1,best:1},'days before the challenge start and other people never count');
+  logs=[];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:0,best:0},'no activity means no streaks');
+
+  // heatLevel buckets intensity relative to DAILY_MAX: 0 / 1-2 / 3-5 / 6-7 / max.
+  assert.equal(heatLevel(0),0,'zero points is the coldest bucket');
+  assert.equal(heatLevel(1),1);
+  assert.equal(heatLevel(2),1);
+  assert.equal(heatLevel(3),2);
+  assert.equal(heatLevel(5),2);
+  assert.equal(heatLevel(6),3);
+  assert.equal(heatLevel(7),3);
+  assert.equal(heatLevel(8),4,'a full balanced day hits the hottest bucket');
+
+  // heatmapDays enumerates config.startDate through min(tripDate, today); today is an ARGUMENT, never the clock.
+  config={startDate:'2026-07-13',tripDate:'2026-07-13',goal:500,crew:[]};
+  logs=[{id:'h1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
+  assert.deepEqual(heatmapDays('alex','2026-07-13'),[{date:'2026-07-13',points:3}],'a one-day window yields exactly one cell');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[
+    {id:'h1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'h2',name:'Alex',type:'exercise',date:'2026-07-10',createdAt:'1'},
+    {id:'h3',name:'Maya',type:'climb',date:'2026-07-03',createdAt:'1'},
+  ];
+  let heat=heatmapDays('alex','2026-07-15');
+  assert.equal(heat.length,15,'a multi-week span is capped at today, not the trip date');
+  assert.equal(heat[0].date,'2026-07-01','the span starts at the challenge start');
+  assert.equal(heat[14].date,'2026-07-15','the span ends at today');
+  assert.equal(heat[1].points,3,'points come from dayMeter');
+  assert.equal(heat[9].points,2);
+  assert.equal(heat[2].points,0,'other people never color your cells');
+  assert.equal(heatmapDays('alex','2026-08-15').length,31,'after the trip the span caps at the trip date');
+  assert.deepEqual(heatmapDays('alex','2026-06-30'),[],'before the start there is nothing to draw');
+  assert.deepEqual(heatmapDays('alex','garbage'),[],'an unparseable today yields no cells');
+  config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.deepEqual(heatmapDays('alex','2026-07-15'),[],'a missing start date yields no cells');
+  config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
+  assert.deepEqual(heatmapDays('alex','2026-07-15'),[],'an inverted window yields no cells');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[];
+
+  // weeklyTrend aggregates crew-wide weekly totals from weekKey(startDate) through weekKey(today); today is an ARGUMENT, never the clock.
+  logs=[
+    {id:'v1',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'1'},
+    {id:'v2',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'1'},
+    {id:'v3',name:'Maya',type:'climb',date:'2026-07-08',createdAt:'1'},
+  ];
+  let trend=weeklyTrend('2026-07-15');
+  assert.deepEqual(trend.map(r=>r.week),['2026-06-29','2026-07-06','2026-07-13'],'weeks run consecutively from weekKey(startDate) through weekKey(today)');
+  assert.deepEqual(trend.map(r=>r.label),['W1','W2','W3'],'weeks are labeled W1 through Wn in order');
+  assert.equal(trend[1].points,6,'a Sunday entry lands in its Monday-start week and multi-person weeks sum together');
+  assert.equal(trend[2].points,2,'a Monday entry opens the next week, matching weekKey bucketing');
+  assert.equal(trend[0].points,0,'a week with no entries appears with zero points');
+  logs=[{id:'p1',name:'Alex|Jr',type:'climb',date:'2026-07-01',createdAt:'1'}];
+  assert.equal(weeklyTrend('2026-07-01')[0].points,3,'a crew name containing a pipe still aggregates into its week (the week key is the final key segment)');
+  logs=[
+    {id:'v1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'v2',name:'Alex',type:'mobility',date:'2026-07-20',createdAt:'1'},
+  ];
+  trend=weeklyTrend('2026-07-21');
+  assert.deepEqual(trend.map(r=>r.points),[3,0,0,1],'empty middle weeks appear as zero bars between active weeks');
+  assert.equal(weeklyTrend('2026-07-07').length,2,'the window is capped at the week of today, not the trip date');
+  assert.deepEqual(weeklyTrend('2026-06-30'),[],'before the start there is nothing to chart');
+  assert.deepEqual(weeklyTrend('garbage'),[],'an unparseable today yields no bars');
+  config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.deepEqual(weeklyTrend('2026-07-15'),[],'a missing start date yields no bars');
+  config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
+  assert.deepEqual(weeklyTrend('2026-07-15'),[],'an inverted window yields no bars');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[];
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);
@@ -140,6 +322,31 @@ const checks = `(()=>{
   assert.equal(totalMedals.get('D'),'🥇','D is first overall');
   assert.notEqual([...weekMedals.keys()].sort().join(','),[...totalMedals.keys()].sort().join(','),'the weekly and overall podiums are different sets');
 
+  // Leaderboard week-trend arrows: prevWeekKey steps back one Monday-aligned week; today is an ARGUMENT.
+  assert.equal(prevWeekKey('2026-07-13'),'2026-07-06','a Monday resolves to the prior week key');
+  assert.equal(prevWeekKey('2026-07-19'),'2026-07-06','a Sunday shares its week, so the prior week matches the Monday');
+  assert.equal(prevWeekKey('2026-07-20'),'2026-07-13','crossing the Monday boundary advances the previous week too');
+  assert.equal(prevWeekKey('garbage'),'','an unparseable today yields no previous week');
+
+  // weekTrend classifies this week vs the previous week from computeCredits().weeks → up/down/even, null in the first week.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[
+    {id:'a1',name:'Alex',type:'climb',date:'2026-07-08',createdAt:'1'}, // prev week: 3
+    {id:'a2',name:'Alex',type:'climb',date:'2026-07-14',createdAt:'2'}, // this week: 3
+    {id:'a3',name:'Alex',type:'exercise',date:'2026-07-15',createdAt:'3'}, // this week: +2 => 5
+    {id:'d1',name:'Dana',type:'climb',date:'2026-07-08',createdAt:'4'}, // prev week: 3, this week: 0
+    {id:'e1',name:'Even',type:'climb',date:'2026-07-08',createdAt:'5'}, // prev week: 3
+    {id:'e2',name:'Even',type:'climb',date:'2026-07-15',createdAt:'6'}, // this week: 3
+    {id:'n1',name:'Newbie',type:'climb',date:'2026-07-14',createdAt:'7'}, // this week only: 3
+  ];
+  assert.equal(weekTrend('alex','2026-07-15'),'up','more points this week than last is up');
+  assert.equal(weekTrend('dana','2026-07-15'),'down','fewer points this week than last is down');
+  assert.equal(weekTrend('even','2026-07-15'),'even','matching the previous week is even');
+  assert.equal(weekTrend('newbie','2026-07-15'),'up','zero previous week with points this week is up');
+  assert.equal(weekTrend('ghost','2026-07-15'),'even','both weeks at zero is even');
+  assert.equal(weekTrend('alex','2026-07-03'),null,'the first challenge week is suppressed — no previous week to compare');
+  assert.equal(weekTrend('alex','2026-07-13'),'up','the second week compares against the first');
+
   assert.equal(weekKey('2026-07-13'),'2026-07-13');
   assert.equal(weekKey('2026-07-19'),'2026-07-13');
   assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07');
@@ -178,6 +385,31 @@ const checks = `(()=>{
   assert.equal(paceInfo(10,{startDate:'2026-07-01',tripDate:'2026-07-10',goal:0},'2026-07-05'),null,'a zero goal hides the indicator');
   assert.equal(paceInfo(10,{startDate:'2026-07-10',tripDate:'2026-07-01',goal:100},'2026-07-05'),null,'an inverted window hides the indicator');
   assert.equal(paceInfo(10,paceSettings,'garbage'),null,'an unparseable today hides the indicator');
+
+  // projectedTotal extrapolates the elapsed-days average rate to an end-of-challenge total; today is an ARGUMENT, never the clock.
+  const projSettings={startDate:'2026-07-01',tripDate:'2026-07-10',goal:100};
+  assert.equal(projectedTotal(0,projSettings,'2026-06-30'),null,'before the start there is no projection');
+  assert.equal(projectedTotal(10,projSettings,'2026-07-01'),null,'one elapsed day is too noisy to project');
+  assert.equal(projectedTotal(10,projSettings,'2026-07-02'),null,'two elapsed days are too noisy to project');
+  assert.deepEqual(projectedTotal(6,projSettings,'2026-07-03'),{projected:20},'day three is the first day with a projection');
+  assert.deepEqual(projectedTotal(15,projSettings,'2026-07-05'),{projected:30},'mid-challenge the elapsed average extends to the window end');
+  assert.deepEqual(projectedTotal(0,projSettings,'2026-07-05'),{projected:0},'a zero rate projects zero with no goal date');
+  assert.deepEqual(projectedTotal(60,projSettings,'2026-07-05'),{projected:120,goalDate:'2026-07-09'},'a rate that clears the goal early names the day it lands');
+  assert.deepEqual(projectedTotal(50,projSettings,'2026-07-05'),{projected:100,goalDate:'2026-07-10'},'an exactly on-goal rate lands on the final day');
+  assert.equal(projectedTotal(50,projSettings,'2026-07-11'),null,'after the end there is nothing left to project');
+  assert.equal(projectedTotal(50,{tripDate:'2026-07-10',goal:100},'2026-07-05'),null,'missing start date hides the projection');
+  assert.equal(projectedTotal(50,{startDate:'2026-07-01',tripDate:'2026-07-10',goal:0},'2026-07-05'),null,'a zero goal hides the projection');
+  assert.equal(projectedTotal(50,{startDate:'2026-07-10',tripDate:'2026-07-01',goal:100},'2026-07-05'),null,'an inverted window hides the projection');
+  assert.equal(projectedTotal(50,projSettings,'garbage'),null,'an unparseable today hides the projection');
+
+  // earnedThrough sums group points dated on or before today, so future-dated entries never inflate the pace/projection rate.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[
+    {id:'e1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
+    {id:'e2',name:'Alex',type:'exercise',date:'2026-07-20',createdAt:'1'},
+  ];
+  assert.equal(earnedThrough('2026-07-10'),3,'a future-dated entry is excluded from the through-today total');
+  assert.equal(earnedThrough('2026-07-25'),5,'once its date has arrived the entry counts toward the rate');
 
   // challengeToday only trusts serverDate while the sync that produced it is from the current local day.
   endpoint='https://sheet.example.test/exec';challengeTimeZone='Not/AZone';serverDate='2000-01-01';
@@ -253,6 +485,9 @@ const domChecks = `(()=>{
   const paceEl=document.querySelector('#goalPace');
   assert.equal(paceEl.classList.contains('hide'),false,'pace indicator shows inside the challenge window');
   assert.ok(paceEl.textContent.startsWith('Behind pace'),'zero points partway through the window reads behind');
+  const projEl=document.querySelector('#goalProjection');
+  assert.equal(projEl.classList.contains('hide'),false,'projection shows once three days have elapsed');
+  assert.ok(projEl.textContent.startsWith('On pace for'),'projection extends the current rate to the window end');
   assert.equal(dailyBounties(recordDate()).map(b=>b.id).join(','),dailyBounties(challengeToday()).map(b=>b.id).join(','),'Record dropdown and You card agree on the bounty set');
   populateBountySelect();
   assert.equal(label.textContent,"Today's bounties",'label reads as today when the bounty day is today');
@@ -279,8 +514,46 @@ const domChecks = `(()=>{
   render();
   assert.equal(recordDate(),shift(-10),'record date clamps to the window end');
   assert.ok(paceEl.textContent.startsWith('Challenge complete'),'a finished window reports the outcome');
+  assert.equal(projEl.classList.contains('hide'),true,'a finished window hides the projection');
   populateBountySelect();
   assert.equal(label.textContent,'Bounties for '+fmtDay(shift(-10)),'label names the clamped bounty day');
+
+  // Entry 9: the You onboarding empty state shows only when the person has no logs, and the Crew local hint tracks the endpoint.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const youEmpty=document.querySelector('#youEmptyState'),youEmptyCopy=document.querySelector('#youEmptyCopy'),personalFeed=document.querySelector('#personalActivity');
+  assert.equal(youEmpty.classList.contains('hide'),false,'the empty state is visible when the person has no logs');
+  assert.ok(youEmptyCopy.textContent.includes('+'+SCORING.categories.climb)&&youEmptyCopy.textContent.includes('+'+SCORING.balancedDayBonus),'the empty-state copy derives its numbers from SCORING, not hard-coded literals');
+  assert.equal(personalFeed.classList.contains('hide'),true,'the personal feed is hidden while the empty state shows');
+  const crewHint=document.querySelector('#crewLocalHint');
+  assert.equal(crewHint.classList.contains('hide'),false,'the crew local hint shows in local mode');
+  logs=[{id:'first',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(youEmpty.classList.contains('hide'),true,'the empty state hides once the person has a log');
+  assert.equal(personalFeed.classList.contains('hide'),false,'the personal feed shows once the person has a log');
+  endpoint='https://sheet.example.test/exec';
+  render();
+  assert.equal(crewHint.classList.contains('hide'),true,'the crew local hint hides when an endpoint is connected');
+
+  // Entry 10: the Personal records card hides until the person logs something, and its grade rows track graded climbs.
+  endpoint='';me='Alex';recordingFor='Alex';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const recordsCard=document.querySelector('#recordsCard'),recordsList=document.querySelector('#recordsList');
+  assert.equal(recordsCard.classList.contains('hide'),true,'the records card hides when the person has no logs');
+  logs=[{id:'r1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(recordsCard.classList.contains('hide'),false,'the records card shows once the person has a log');
+  assert.ok(recordsList.innerHTML.includes('Hardest')&&recordsList.innerHTML.includes('V4'),'a graded climb surfaces the hardest-grade rows');
+  logs=[{id:'r2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(recordsCard.classList.contains('hide'),false,'a non-climb log still reveals the card');
+  assert.equal(recordsList.innerHTML.includes('Hardest'),false,'grade rows are suppressed without a graded climb');
+  assert.ok(recordsList.innerHTML.includes('Best single day'),'best day/week still render without graded climbs');
+  endpoint='';logs=[];me='';recordingFor='';
 })()`;
 
 vm.runInNewContext(`${source}\n${domChecks}`, domContext, {filename: 'index.html'});
