@@ -68,8 +68,8 @@ The 6-point weekly bounty cap silently zeroes credit; users currently discover i
 
 ## 3. Grade pyramid (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add grade pyramid card to the You tab. Pure helper `gradePyramid(nameLower)` counts the person's `type==='climb'` logs per `hardestGrade` (all graded sends, including zero-credit same-day duplicates and outside-window entries; blank/unknown grades skipped), ordered hardest-first by `GRADES` index. `renderPyramid()` (called from `render()`) draws CSS-grid rows (grade label, proportional bar with `aria-hidden`, count) into `#gradePyramid` (`role="img"` with a per-grade send-count `aria-label` summary; no transitions on bars) and toggles the `hide` class on the wrapping card `#gradePyramidCard` when there are no graded climbs. Deviations: none — the card wrapper got its own id (`#gradePyramidCard`) so the whole card, head included, hides.
 
 ### Why
 `hardestGrade` is captured on every climb entry and stored, but never aggregated — it only appears as flavor text in feeds.

@@ -117,6 +117,30 @@ const checks = `(()=>{
   assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'non-bounty entries and other people are ignored');
   logs=[];
 
+  // gradePyramid counts ALL of the person's graded climb logs, hardest-first by GRADES index.
+  logs=[
+    {id:'g1',name:'Alex',type:'climb',hardestGrade:'V9',date:'2026-07-13',createdAt:'1'},
+    {id:'g2',name:'Alex',type:'climb',hardestGrade:'V10',date:'2026-07-14',createdAt:'1'},
+    {id:'g3',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-14',createdAt:'2'},
+  ];
+  let pyramid=gradePyramid('alex');
+  assert.deepEqual(pyramid.map(r=>r.grade),['V10','V9','V2'],'V10 sorts above V9 by GRADES index, not string comparison');
+  logs=[
+    {id:'g1',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-13',createdAt:'1'},
+    {id:'g2',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-13',createdAt:'2'},
+    {id:'g3',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-06-01',createdAt:'1'},
+    {id:'g4',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'3'},
+    {id:'g5',name:'Alex',type:'climb',hardestGrade:'',date:'2026-07-14',createdAt:'1'},
+    {id:'g6',name:'Alex',type:'climb',hardestGrade:'5.12a',date:'2026-07-14',createdAt:'2'},
+    {id:'g7',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'4'},
+    {id:'g8',name:'Maya',type:'climb',hardestGrade:'V4',date:'2026-07-13',createdAt:'1'},
+    {id:'g9',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-15',createdAt:'1'},
+  ];
+  pyramid=gradePyramid('alex');
+  assert.deepEqual(pyramid,[{grade:'V5',count:3},{grade:'V4',count:1}],'zero-credit same-day duplicates and outside-window sends count; blank or unknown grades, other types, and other people are ignored');
+  logs=[];
+  assert.deepEqual(gradePyramid('alex'),[],'no graded climbs yields an empty pyramid');
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);

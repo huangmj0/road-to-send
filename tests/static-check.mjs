@@ -40,6 +40,8 @@ assert.match(html,/id="bountyHunter"/,'the Bounty Hunter slot is present');
 assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
 assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring config');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="record"/,'the per-category breakdown card lives inside the You panel');
+assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*id="gradePyramid"[\s\S]*id="bountyCapHint"/,'the grade pyramid card sits between the category breakdown and the bounty card on the You panel');
+assert.match(html,/id="gradePyramid"[^>]*role="img"[^>]*aria-label=/,'the grade pyramid is announced as a graphic');
 assert.match(html,/data-panel="crew"[\s\S]*id="leaderToggle"[\s\S]*id="leaderRows"/,'the leaderboard view toggle lives inside the crew panel');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
