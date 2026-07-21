@@ -402,6 +402,15 @@ const checks = `(()=>{
   assert.equal(projectedTotal(50,{startDate:'2026-07-10',tripDate:'2026-07-01',goal:100},'2026-07-05'),null,'an inverted window hides the projection');
   assert.equal(projectedTotal(50,projSettings,'garbage'),null,'an unparseable today hides the projection');
 
+  // earnedThrough sums group points dated on or before today, so future-dated entries never inflate the pace/projection rate.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[
+    {id:'e1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
+    {id:'e2',name:'Alex',type:'exercise',date:'2026-07-20',createdAt:'1'},
+  ];
+  assert.equal(earnedThrough('2026-07-10'),3,'a future-dated entry is excluded from the through-today total');
+  assert.equal(earnedThrough('2026-07-25'),5,'once its date has arrived the entry counts toward the rate');
+
   // challengeToday only trusts serverDate while the sync that produced it is from the current local day.
   endpoint='https://sheet.example.test/exec';challengeTimeZone='Not/AZone';serverDate='2000-01-01';
   lastSyncedAt=Date.now();
