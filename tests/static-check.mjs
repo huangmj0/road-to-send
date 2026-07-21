@@ -43,6 +43,8 @@ assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="re
 assert.match(html,/data-panel="you"[\s\S]*class="stat-grid"[\s\S]*id="youTotal"[\s\S]*id="youRank"[\s\S]*id="youStreak"[\s\S]*id="youBestStreak"[\s\S]*data-panel="record"/,'the current and best streak stat cards join the stat grid on the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*id="gradePyramid"[\s\S]*id="bountyCapHint"/,'the grade pyramid card sits between the category breakdown and the bounty card on the You panel');
 assert.match(html,/id="gradePyramid"[^>]*role="img"[^>]*aria-label=/,'the grade pyramid is announced as a graphic');
+assert.match(html,/data-panel="you"[\s\S]*id="gradePyramidCard"[\s\S]*id="heatmapCard"[\s\S]*id="bountyCapHint"/,'the daily activity heatmap card sits after the grade pyramid on the You panel');
+assert.match(html,/id="youHeatmap"[^>]*role="img"[^>]*aria-label=/,'the daily activity heatmap is announced as a graphic');
 assert.match(html,/data-panel="crew"[\s\S]*id="leaderToggle"[\s\S]*id="leaderRows"/,'the leaderboard view toggle lives inside the crew panel');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');

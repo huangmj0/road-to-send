@@ -174,6 +174,43 @@ const checks = `(()=>{
   logs=[];
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:0,best:0},'no activity means no streaks');
 
+  // heatLevel buckets intensity relative to DAILY_MAX: 0 / 1-2 / 3-5 / 6-7 / max.
+  assert.equal(heatLevel(0),0,'zero points is the coldest bucket');
+  assert.equal(heatLevel(1),1);
+  assert.equal(heatLevel(2),1);
+  assert.equal(heatLevel(3),2);
+  assert.equal(heatLevel(5),2);
+  assert.equal(heatLevel(6),3);
+  assert.equal(heatLevel(7),3);
+  assert.equal(heatLevel(8),4,'a full balanced day hits the hottest bucket');
+
+  // heatmapDays enumerates config.startDate through min(tripDate, today); today is an ARGUMENT, never the clock.
+  config={startDate:'2026-07-13',tripDate:'2026-07-13',goal:500,crew:[]};
+  logs=[{id:'h1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
+  assert.deepEqual(heatmapDays('alex','2026-07-13'),[{date:'2026-07-13',points:3}],'a one-day window yields exactly one cell');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[
+    {id:'h1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'h2',name:'Alex',type:'exercise',date:'2026-07-10',createdAt:'1'},
+    {id:'h3',name:'Maya',type:'climb',date:'2026-07-03',createdAt:'1'},
+  ];
+  let heat=heatmapDays('alex','2026-07-15');
+  assert.equal(heat.length,15,'a multi-week span is capped at today, not the trip date');
+  assert.equal(heat[0].date,'2026-07-01','the span starts at the challenge start');
+  assert.equal(heat[14].date,'2026-07-15','the span ends at today');
+  assert.equal(heat[1].points,3,'points come from dayMeter');
+  assert.equal(heat[9].points,2);
+  assert.equal(heat[2].points,0,'other people never color your cells');
+  assert.equal(heatmapDays('alex','2026-08-15').length,31,'after the trip the span caps at the trip date');
+  assert.deepEqual(heatmapDays('alex','2026-06-30'),[],'before the start there is nothing to draw');
+  assert.deepEqual(heatmapDays('alex','garbage'),[],'an unparseable today yields no cells');
+  config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.deepEqual(heatmapDays('alex','2026-07-15'),[],'a missing start date yields no cells');
+  config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
+  assert.deepEqual(heatmapDays('alex','2026-07-15'),[],'an inverted window yields no cells');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[];
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);
