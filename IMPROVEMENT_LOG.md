@@ -157,8 +157,8 @@ Notes: Add projected group finish line to the Crew tab. Pure helper `projectedTo
 
 ## 7. Weekly trend bars (Crew tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add weekly trend bar chart to the Crew tab. Pure helper `weeklyTrend(today)` sums `computeCredits(logs).weeks` across all names into per-week group totals for consecutive week keys from `weekKey(config.startDate)` through `weekKey(today)` (stepping +7 days via `parseDateOnly`/`localDate`), labeled "W1"…"Wn" with empty weeks at 0; returns [] for invalid windows or a today before the start — caller passes `challengeToday()`, no clock reads inside. `renderTrend()` (called from `render()`) draws div-based columns into `#weeklyTrend` (`role="img"` with a "Weekly points: W1 30, W2 42, …" summary; per-column `title` like "W3 · 42 pts"; bars/labels `aria-hidden`; no transitions) inside a `.trend-scroll{overflow-x:auto}` wrapper so >12 weeks scroll; the max week maps to a 96px bar and zero weeks keep a 3px sliver. The card `#weeklyTrendCard` sits between the group-goal and Bounty Hunter cards and hides via the `hide` class when the helper returns [] or every week is zero. No deviations from the spec.
 
 ### Why
 The group only sees one cumulative progress bar; week-by-week momentum is invisible.

@@ -211,6 +211,34 @@ const checks = `(()=>{
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   logs=[];
 
+  // weeklyTrend aggregates crew-wide weekly totals from weekKey(startDate) through weekKey(today); today is an ARGUMENT, never the clock.
+  logs=[
+    {id:'v1',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'1'},
+    {id:'v2',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'1'},
+    {id:'v3',name:'Maya',type:'climb',date:'2026-07-08',createdAt:'1'},
+  ];
+  let trend=weeklyTrend('2026-07-15');
+  assert.deepEqual(trend.map(r=>r.week),['2026-06-29','2026-07-06','2026-07-13'],'weeks run consecutively from weekKey(startDate) through weekKey(today)');
+  assert.deepEqual(trend.map(r=>r.label),['W1','W2','W3'],'weeks are labeled W1 through Wn in order');
+  assert.equal(trend[1].points,6,'a Sunday entry lands in its Monday-start week and multi-person weeks sum together');
+  assert.equal(trend[2].points,2,'a Monday entry opens the next week, matching weekKey bucketing');
+  assert.equal(trend[0].points,0,'a week with no entries appears with zero points');
+  logs=[
+    {id:'v1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'v2',name:'Alex',type:'mobility',date:'2026-07-20',createdAt:'1'},
+  ];
+  trend=weeklyTrend('2026-07-21');
+  assert.deepEqual(trend.map(r=>r.points),[3,0,0,1],'empty middle weeks appear as zero bars between active weeks');
+  assert.equal(weeklyTrend('2026-07-07').length,2,'the window is capped at the week of today, not the trip date');
+  assert.deepEqual(weeklyTrend('2026-06-30'),[],'before the start there is nothing to chart');
+  assert.deepEqual(weeklyTrend('garbage'),[],'an unparseable today yields no bars');
+  config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.deepEqual(weeklyTrend('2026-07-15'),[],'a missing start date yields no bars');
+  config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
+  assert.deepEqual(weeklyTrend('2026-07-15'),[],'an inverted window yields no bars');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[];
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);

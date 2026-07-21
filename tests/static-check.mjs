@@ -46,7 +46,10 @@ assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*id="gradePyram
 assert.match(html,/id="gradePyramid"[^>]*role="img"[^>]*aria-label=/,'the grade pyramid is announced as a graphic');
 assert.match(html,/data-panel="you"[\s\S]*id="gradePyramidCard"[\s\S]*id="heatmapCard"[\s\S]*id="bountyCapHint"/,'the daily activity heatmap card sits after the grade pyramid on the You panel');
 assert.match(html,/id="youHeatmap"[^>]*role="img"[^>]*aria-label=/,'the daily activity heatmap is announced as a graphic');
-assert.match(html,/data-panel="crew"[\s\S]*id="leaderToggle"[\s\S]*id="leaderRows"/,'the leaderboard view toggle lives inside the crew panel');
+assert.match(html,/data-panel="crew"[\s\S]*class="card group-card"[\s\S]*id="weeklyTrendCard"[\s\S]*class="card hunter-card"/,'the weekly trend card sits between the group goal card and the Bounty Hunter card on the crew panel');
+assert.match(html,/id="weeklyTrend"[^>]*role="img"[^>]*aria-label=/,'the weekly trend chart is announced as a graphic');
+assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="weeklyTrend"/,'the weekly trend chart sits inside a horizontally scrollable wrapper');
+assert.match(html,/\.trend-scroll\{overflow-x:auto\}/,'the trend wrapper scrolls horizontally instead of squeezing');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
 assert.equal((html.match(/<table>/g)||[]).length,1,'all crew share one leaderboard');
