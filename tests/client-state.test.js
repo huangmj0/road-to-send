@@ -141,6 +141,39 @@ const checks = `(()=>{
   logs=[];
   assert.deepEqual(gradePyramid('alex'),[],'no graded climbs yields an empty pyramid');
 
+  // streakInfo counts consecutive days with >=1 credited point in dayMeter; today is an ARGUMENT, never the clock.
+  logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:1,best:1},'a single active day is a one-day streak');
+  logs=[
+    {id:'s1',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'climb',date:'2026-07-11',createdAt:'1'},
+    {id:'s3',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+  ];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:1,best:2},'a gap resets the current streak while best remembers the longer run');
+  logs=[
+    {id:'s1',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+  ];
+  assert.deepEqual(streakInfo('alex','2026-07-14'),{current:2,best:2},'a zero-point today keeps yesterday-anchored streaks alive until the day ends');
+  logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'1'}];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:0,best:1},'empty today AND yesterday means no current streak');
+  logs=[
+    {id:'s1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'exercise',date:'2026-07-06',createdAt:'1'},
+    {id:'s3',name:'Alex',type:'mobility',date:'2026-07-07',createdAt:'1'},
+    {id:'s4',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'1'},
+    {id:'s5',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+  ];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:2,best:3},'best streak takes the longer of two separate runs');
+  logs=[
+    {id:'s1',name:'Alex',type:'climb',date:'2026-06-30',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'climb',date:'2026-07-01',createdAt:'1'},
+    {id:'s3',name:'Maya',type:'climb',date:'2026-06-29',createdAt:'1'},
+  ];
+  assert.deepEqual(streakInfo('alex','2026-07-01'),{current:1,best:1},'days before the challenge start and other people never count');
+  logs=[];
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:0,best:0},'no activity means no streaks');
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);

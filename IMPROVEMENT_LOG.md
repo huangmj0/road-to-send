@@ -90,8 +90,8 @@ Notes: Add grade pyramid card to the You tab. Pure helper `gradePyramid(nameLowe
 
 ## 4. Streak tracking (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add current and best streak cards to the You tab. Pure helper `streakInfo(nameLower,today)` collects the person's ≥1-point days from `computeCredits(logs).dayMeter` (in-window days only, so pre-start days never count), anchors the current streak at `today` or, failing that, `yesterday` (a zero-point today keeps yesterday's streak alive), and takes the longest run as best; all date stepping goes through `parseDateOnly`/`localDate` and the helper never reads the clock. Two new `.stat` cards (`#youStreak`/`#youBestStreak`, values "N days"/"1 day", "—" when none) join the existing `.stat-grid`, rendered from `render()`. No deviations from the spec.
 
 ### Why
 Streaks are a strong daily motivator and `computeCredits().dayMeter` already contains per-person daily points.
