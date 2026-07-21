@@ -347,6 +347,52 @@ const checks = `(()=>{
   assert.equal(weekTrend('alex','2026-07-03'),null,'the first challenge week is suppressed — no previous week to compare');
   assert.equal(weekTrend('alex','2026-07-13'),'up','the second week compares against the first');
 
+  // weeksUntilDone counts inclusive days from today through tripDate, rounded up to whole weeks; today is an ARGUMENT.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.deepEqual(weeksUntilDone('2026-07-15'),{days:17,weeks:3},'mid-challenge counts inclusive days and rounds up');
+  assert.deepEqual(weeksUntilDone('2026-07-28'),{days:4,weeks:1},'the closing days collapse to a single final week');
+  assert.deepEqual(weeksUntilDone('2026-07-31'),{days:1,weeks:1},'the final day still reads as one week left');
+  assert.deepEqual(weeksUntilDone('2026-08-05'),{done:true},'a date past the end marks the challenge complete');
+  assert.equal(weeksUntilDone('garbage'),null,'an unparseable today yields no countdown');
+
+  // weekReviewModel summarizes the PREVIOUS week: crew top-3 by points, bounty hunter by bounty count, and the viewer's own recap.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bob'},{name:'Cara'}]};
+  logs=[
+    {id:'x1',name:'Alex',type:'climb',hardestGrade:'V3',date:'2026-07-07',createdAt:'1'}, // prev wk
+    {id:'x2',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-08',createdAt:'2'},
+    {id:'x3',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-09',createdAt:'3'}, // Alex prev wk: 9 pts, 3 days, hardest V5
+    {id:'x4',name:'Alex',type:'climb',hardestGrade:'V6',date:'2026-07-15',createdAt:'4'}, // THIS week — must be ignored
+    {id:'y1',name:'Bob',type:'climb',date:'2026-07-07',createdAt:'5'},
+    {id:'y2',name:'Bob',type:'exercise',date:'2026-07-07',createdAt:'6'},
+    {id:'y3',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'7'},
+    {id:'y4',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-08',createdAt:'8'}, // Bob prev wk: 5 + 6 (cap) = 11, 2 bounties
+    {id:'z1',name:'Cara',type:'mobility',date:'2026-07-07',createdAt:'9'},
+    {id:'z2',name:'Cara',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'10'}, // Cara prev wk: 4, 1 bounty
+  ];
+  me='Alex';
+  const wr=weekReviewModel('2026-07-15');
+  assert.equal(wr.prevWk,'2026-07-06','the review targets the Monday-aligned previous week');
+  assert.deepEqual(wr.leaders.map(x=>x.name+':'+x.points),['Bob:11','Alex:9','Cara:4'],'top-3 point earners are ranked by previous-week points');
+  assert.deepEqual(wr.hunters,['Bob'],'the bounty hunter is whoever claimed the most bounties last week');
+  assert.equal(wr.huntCount,2,'the hunter count reflects bounty claims, not capped points');
+  assert.equal(wr.mine.points,9,'the viewer recap excludes this-week activity');
+  assert.equal(wr.mine.activeDays,3,'active days count distinct scoring days last week');
+  assert.equal(wr.mine.hardest,'V5','the hardest grade compares by GRADES index, not string');
+  assert.deepEqual(wr.weeksLeft,{days:17,weeks:3},'the review carries the countdown');
+
+  // A brand-new viewer with no history still gets the crew highlights and a zeroed personal recap.
+  me='Ghost';
+  const wrNew=weekReviewModel('2026-07-15');
+  assert.equal(wrNew.mine.points,0,'a viewer with no previous-week activity recaps zero points');
+  assert.equal(wrNew.mine.hardest,'','no climbs means no hardest grade');
+  assert.deepEqual(wrNew.leaders.map(x=>x.name),['Bob','Alex','Cara'],'crew highlights still appear for a brand-new viewer');
+
+  // The challenge's opening week has no prior week of data — highlights fall back to empty, not error.
+  const wrFirst=weekReviewModel('2026-07-02');
+  assert.deepEqual(wrFirst.leaders,[],'the first week shows no previous leaders');
+  assert.deepEqual(wrFirst.hunters,[],'the first week shows no previous bounty hunter');
+  me='';
+
   assert.equal(weekKey('2026-07-13'),'2026-07-13');
   assert.equal(weekKey('2026-07-19'),'2026-07-13');
   assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07');
