@@ -38,6 +38,7 @@ assert.match(html,/Today's bounties/,'the rotating bounty card is present');
 assert.match(html,/data-panel="you"[\s\S]*id="bountyCapHint"[\s\S]*id="todayBounties"/,'the weekly bounty-cap progress hint sits in the bounty card head on the You panel');
 assert.match(html,/id="bountyHunter"/,'the Bounty Hunter slot is present');
 assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
+assert.match(html,/data-panel="crew"[\s\S]*id="goalPace"[\s\S]*?id="goalProjection"[^>]*role="status"[^>]*aria-live="polite"/,'the goal projection line follows the pace line in the crew panel and is announced');
 assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring config');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="record"/,'the per-category breakdown card lives inside the You panel');
 assert.match(html,/data-panel="you"[\s\S]*class="stat-grid"[\s\S]*id="youTotal"[\s\S]*id="youRank"[\s\S]*id="youStreak"[\s\S]*id="youBestStreak"[\s\S]*data-panel="record"/,'the current and best streak stat cards join the stat grid on the You panel');

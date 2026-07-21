@@ -292,6 +292,22 @@ const checks = `(()=>{
   assert.equal(paceInfo(10,{startDate:'2026-07-10',tripDate:'2026-07-01',goal:100},'2026-07-05'),null,'an inverted window hides the indicator');
   assert.equal(paceInfo(10,paceSettings,'garbage'),null,'an unparseable today hides the indicator');
 
+  // projectedTotal extrapolates the elapsed-days average rate to an end-of-challenge total; today is an ARGUMENT, never the clock.
+  const projSettings={startDate:'2026-07-01',tripDate:'2026-07-10',goal:100};
+  assert.equal(projectedTotal(0,projSettings,'2026-06-30'),null,'before the start there is no projection');
+  assert.equal(projectedTotal(10,projSettings,'2026-07-01'),null,'one elapsed day is too noisy to project');
+  assert.equal(projectedTotal(10,projSettings,'2026-07-02'),null,'two elapsed days are too noisy to project');
+  assert.deepEqual(projectedTotal(6,projSettings,'2026-07-03'),{projected:20},'day three is the first day with a projection');
+  assert.deepEqual(projectedTotal(15,projSettings,'2026-07-05'),{projected:30},'mid-challenge the elapsed average extends to the window end');
+  assert.deepEqual(projectedTotal(0,projSettings,'2026-07-05'),{projected:0},'a zero rate projects zero with no goal date');
+  assert.deepEqual(projectedTotal(60,projSettings,'2026-07-05'),{projected:120,goalDate:'2026-07-09'},'a rate that clears the goal early names the day it lands');
+  assert.deepEqual(projectedTotal(50,projSettings,'2026-07-05'),{projected:100,goalDate:'2026-07-10'},'an exactly on-goal rate lands on the final day');
+  assert.equal(projectedTotal(50,projSettings,'2026-07-11'),null,'after the end there is nothing left to project');
+  assert.equal(projectedTotal(50,{tripDate:'2026-07-10',goal:100},'2026-07-05'),null,'missing start date hides the projection');
+  assert.equal(projectedTotal(50,{startDate:'2026-07-01',tripDate:'2026-07-10',goal:0},'2026-07-05'),null,'a zero goal hides the projection');
+  assert.equal(projectedTotal(50,{startDate:'2026-07-10',tripDate:'2026-07-01',goal:100},'2026-07-05'),null,'an inverted window hides the projection');
+  assert.equal(projectedTotal(50,projSettings,'garbage'),null,'an unparseable today hides the projection');
+
   // challengeToday only trusts serverDate while the sync that produced it is from the current local day.
   endpoint='https://sheet.example.test/exec';challengeTimeZone='Not/AZone';serverDate='2000-01-01';
   lastSyncedAt=Date.now();
@@ -366,6 +382,9 @@ const domChecks = `(()=>{
   const paceEl=document.querySelector('#goalPace');
   assert.equal(paceEl.classList.contains('hide'),false,'pace indicator shows inside the challenge window');
   assert.ok(paceEl.textContent.startsWith('Behind pace'),'zero points partway through the window reads behind');
+  const projEl=document.querySelector('#goalProjection');
+  assert.equal(projEl.classList.contains('hide'),false,'projection shows once three days have elapsed');
+  assert.ok(projEl.textContent.startsWith('On pace for'),'projection extends the current rate to the window end');
   assert.equal(dailyBounties(recordDate()).map(b=>b.id).join(','),dailyBounties(challengeToday()).map(b=>b.id).join(','),'Record dropdown and You card agree on the bounty set');
   populateBountySelect();
   assert.equal(label.textContent,"Today's bounties",'label reads as today when the bounty day is today');
@@ -392,6 +411,7 @@ const domChecks = `(()=>{
   render();
   assert.equal(recordDate(),shift(-10),'record date clamps to the window end');
   assert.ok(paceEl.textContent.startsWith('Challenge complete'),'a finished window reports the outcome');
+  assert.equal(projEl.classList.contains('hide'),true,'a finished window hides the projection');
   populateBountySelect();
   assert.equal(label.textContent,'Bounties for '+fmtDay(shift(-10)),'label names the clamped bounty day');
 })()`;
