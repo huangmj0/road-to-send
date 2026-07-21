@@ -46,8 +46,8 @@ The whole premise of the scoring economy is balance across Climbing/Exercise/Mob
 
 ## 2. Weekly bounty-cap progress (You tab)
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Show weekly bounty-cap progress on the You tab. Pure helper `bountyWeekProgress(nameLower,today)` sums credited bounty points for `weekKey(today)` from `computeCredits(logs).info` (caller passes `challengeToday()`; no clock reads inside). `renderBounties()` (called from `render()`) writes "X / N bounty points this week" into `#bountyCapHint` in the bounty card head (N from `SCORING.weeklyBountyCap`), appending the 🏹 Bounty Hunter note at/over the cap. The new hint span replaces the static "Rotates daily" hint at render time (the spec allows replacement); "Rotates daily" remains only as the pre-render fallback text. No other deviations.
 
 ### Why
 The 6-point weekly bounty cap silently zeroes credit; users currently discover it only in the record-form preview at save time.

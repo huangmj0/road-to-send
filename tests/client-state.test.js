@@ -98,6 +98,25 @@ const checks = `(()=>{
   assert.equal(bd.total,0);
   assert.equal(bd.bonus,0);
 
+  // bountyWeekProgress sums CREDITED bounty points for the week of the day passed in.
+  logs=[{id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(bountyWeekProgress('alex','2026-07-15'),3,'under the cap reports the credited sum');
+  logs=[
+    {id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+    {id:'w2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-14',createdAt:'1'},
+  ];
+  assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'exactly at the cap reports the full cap');
+  logs=[
+    {id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+    {id:'w2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-14',createdAt:'1'},
+    {id:'w3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-15',createdAt:'1'},
+  ];
+  assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'over-cap claims add nothing to the credited sum');
+  assert.equal(bountyWeekProgress('alex','2026-07-20'),0,'a new week starts back at zero');
+  logs.push({id:'w4',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},{id:'w5',name:'Maya',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'});
+  assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'non-bounty entries and other people are ignored');
+  logs=[];
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);

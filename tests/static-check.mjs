@@ -35,6 +35,7 @@ assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyr
 assert.match(script,/Saved to the Sheet, but refresh failed\. Do not retry/,'confirmed saves are distinguished from refresh failures');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');
+assert.match(html,/data-panel="you"[\s\S]*id="bountyCapHint"[\s\S]*id="todayBounties"/,'the weekly bounty-cap progress hint sits in the bounty card head on the You panel');
 assert.match(html,/id="bountyHunter"/,'the Bounty Hunter slot is present');
 assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
 assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring config');
