@@ -467,6 +467,26 @@ const domChecks = `(()=>{
   assert.equal(projEl.classList.contains('hide'),true,'a finished window hides the projection');
   populateBountySelect();
   assert.equal(label.textContent,'Bounties for '+fmtDay(shift(-10)),'label names the clamped bounty day');
+
+  // Entry 9: the You onboarding empty state shows only when the person has no logs, and the Crew local hint tracks the endpoint.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const youEmpty=document.querySelector('#youEmptyState'),youEmptyCopy=document.querySelector('#youEmptyCopy'),personalFeed=document.querySelector('#personalActivity');
+  assert.equal(youEmpty.classList.contains('hide'),false,'the empty state is visible when the person has no logs');
+  assert.ok(youEmptyCopy.textContent.includes('+'+SCORING.categories.climb)&&youEmptyCopy.textContent.includes('+'+SCORING.balancedDayBonus),'the empty-state copy derives its numbers from SCORING, not hard-coded literals');
+  assert.equal(personalFeed.classList.contains('hide'),true,'the personal feed is hidden while the empty state shows');
+  const crewHint=document.querySelector('#crewLocalHint');
+  assert.equal(crewHint.classList.contains('hide'),false,'the crew local hint shows in local mode');
+  logs=[{id:'first',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(youEmpty.classList.contains('hide'),true,'the empty state hides once the person has a log');
+  assert.equal(personalFeed.classList.contains('hide'),false,'the personal feed shows once the person has a log');
+  endpoint='https://sheet.example.test/exec';
+  render();
+  assert.equal(crewHint.classList.contains('hide'),true,'the crew local hint hides when an endpoint is connected');
+  endpoint='';logs=[];me='';recordingFor='';
 })()`;
 
 vm.runInNewContext(`${source}\n${domChecks}`, domContext, {filename: 'index.html'});

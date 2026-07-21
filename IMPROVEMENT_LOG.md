@@ -201,8 +201,8 @@ Cheap glanceable momentum on the leaderboard: is each climber up or down versus 
 
 ## 9. Empty-state and onboarding polish
 
-Status: Todo
-Notes: —
+Status: Done — 2026-07-21
+Notes: Add onboarding empty state and crew local-mode hint. New `#youEmptyState` block in the You-tab "Recent activity" card (paragraph `#youEmptyCopy` plus a `.btn` with `data-tab="record"`); `render()` builds the copy via the pure helper `youEmptyStateCopy()` — Climbing/Exercise/Mobility values and the balanced-day bonus derived from `SCORING.categories`/`SCORING.balancedDayBonus`, never hard-coded — shows the block and hides `#personalActivity` only when the selected person has no logs, and swaps back to the feed once a log exists. New `#crewLocalHint` line in the Leaderboard card head, toggled by the `hide` class on `endpoint` truthiness in `render()` (visible in local mode, hidden once a Sheet is connected). Copy avoids the banned strings. Deviation: the empty-state button lives statically in the template (so the existing `[data-tab]` init listener binds it) while only its copy paragraph is set from SCORING in JS.
 
 ### Why
 A fresh device in local mode shows bare zeros and "No activity yet." with no guidance.
