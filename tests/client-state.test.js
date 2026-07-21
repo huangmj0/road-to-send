@@ -262,6 +262,8 @@ const checks = `(()=>{
   assert.equal(trend[1].points,6,'a Sunday entry lands in its Monday-start week and multi-person weeks sum together');
   assert.equal(trend[2].points,2,'a Monday entry opens the next week, matching weekKey bucketing');
   assert.equal(trend[0].points,0,'a week with no entries appears with zero points');
+  logs=[{id:'p1',name:'Alex|Jr',type:'climb',date:'2026-07-01',createdAt:'1'}];
+  assert.equal(weeklyTrend('2026-07-01')[0].points,3,'a crew name containing a pipe still aggregates into its week (the week key is the final key segment)');
   logs=[
     {id:'v1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
     {id:'v2',name:'Alex',type:'mobility',date:'2026-07-20',createdAt:'1'},
