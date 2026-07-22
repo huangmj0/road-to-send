@@ -23,9 +23,9 @@ function loadScript() {
   return context;
 }
 
-test('embedded v10 Apps Script is syntactically valid and exposes only simple capabilities', () => {
+test('embedded v11 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();
-  assert.equal(vm.runInContext('API_VERSION', context), 10);
+  assert.equal(vm.runInContext('API_VERSION', context), 11);
   assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1']);
   assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
 });
