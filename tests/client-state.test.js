@@ -403,7 +403,8 @@ const checks = `(()=>{
   assert.equal(parsed.value.crew[0].pullMode,undefined,'participants are name-only');
   assert.throws(()=>unpackRemote({version:8,features:[],activities:[],config:null}),/version/,'v8 requires redeployment');
   assert.throws(()=>unpackRemote({version:9,features:[],activities:[],config:null}),/version/,'v9 requires redeployment');
-  assert.equal(unpackRemote({version:10,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1);
+  assert.throws(()=>unpackRemote({version:10,features:[],activities:[],config:null}),/version/,'v10 requires redeployment: its catalog predates the current bounty rotation');
+  assert.equal(unpackRemote({version:11,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1);
 
   // Local upgrade: v8 config migrates (pull mode dropped); logs start fresh; identity persists.
   localStorage.setItem('roadToSendConfigV8',JSON.stringify({startDate:'2026-07-01',tripDate:'2026-07-31',goal:600,crew:[{name:'Alex',pullMode:'super-hard'}]}));
@@ -613,7 +614,7 @@ test('background sync respects the open date picker and refreshes stale caches',
   store.set('roadToSendEndpoint', 'https://sheet.example.test/exec');
   store.set('roadToSendMe', 'Alex');
   const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
-  const payload = {version: 10, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '', timeZone: ''};
+  const payload = {version: 11, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '', timeZone: ''};
   let gets = 0;
   const syncContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,

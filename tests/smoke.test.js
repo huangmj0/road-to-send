@@ -14,23 +14,23 @@ test('shared workflow connects, saves a name-only roster, adds, syncs, and delet
     config: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Old Crew'}]},
     activities: [],
   };
-  const remote = () => ({version: 10, features, activities: server.activities.map(x => ({...x})), config: {...server.config, crew: server.config.crew.map(x => ({...x}))}, configErrors: [], serverDate: '2026-07-13', timeZone: 'America/Los_Angeles'});
+  const remote = () => ({version: 11, features, activities: server.activities.map(x => ({...x})), config: {...server.config, crew: server.config.crew.map(x => ({...x}))}, configErrors: [], serverDate: '2026-07-13', timeZone: 'America/Los_Angeles'});
   const response = body => ({ok: true, json: async () => body});
   const fetch = async (url, options = {}) => {
     if (!options.method || options.method === 'GET') { requests.push({method: 'GET'}); return response(remote()); }
     const body = JSON.parse(options.body); requests.push({method: 'POST', body});
-    if (body.action === 'saveConfig') { server.config = body.config; return response({version: 10, ok: true, config: server.config, configErrors: []}); }
-    if (body.action === 'addParticipant') { const participant = {name: body.name}; server.config.crew.push(participant); return response({version: 10, ok: true, participant, config: server.config, configErrors: []}); }
-    if (body.action === 'delete') { server.activities = server.activities.filter(x => x.id !== body.id); return response({version: 10, ok: true, deleted: body.id}); }
+    if (body.action === 'saveConfig') { server.config = body.config; return response({version: 11, ok: true, config: server.config, configErrors: []}); }
+    if (body.action === 'addParticipant') { const participant = {name: body.name}; server.config.crew.push(participant); return response({version: 11, ok: true, participant, config: server.config, configErrors: []}); }
+    if (body.action === 'delete') { server.activities = server.activities.filter(x => x.id !== body.id); return response({version: 11, ok: true, deleted: body.id}); }
     const saved = {...body, id: 'activity-1', createdAt: '2026-07-13T12:00:00Z', category: body.type, points: points[body.type] || 0, hardestGrade: body.type === 'climb' ? body.hardestGrade : '', bountyId: '', bountyTitle: '', note: body.note || ''};
-    server.activities.push(saved); return response({version: 10, ok: true, ...saved});
+    server.activities.push(saved); return response({version: 11, ok: true, ...saved});
   };
   const context = {assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Promise, Intl, fetch, location: {search: '', href: 'https://example.test/'}, localStorage: {getItem: key => values.has(key) ? values.get(key) : null, setItem: (key, value) => values.set(key, String(value)), removeItem: key => values.delete(key)}, setTimeout() {}, clearTimeout() {}};
   const checks = `(async()=>{
     render=()=>{};renderSync=()=>{};setDefaultRecordDate=()=>{};
     endpoint='https://script.google.com/macros/s/smoke/exec';
     const probe=unpackRemote(await (await fetchShared(endpoint)).json());
-    assert.equal(probe.version,10);
+    assert.equal(probe.version,11);
     assert.equal(probe.config.crew[0].name,'Old Crew');
     assert.equal(probe.config.crew[0].pullMode,undefined);
     const next={startDate:'2026-07-01',tripDate:'2026-07-31',goal:3000,crew:[{name:'Alex'}]};

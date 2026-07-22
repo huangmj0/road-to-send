@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://huangmj0.github.io/road-to-send/schema/v10.json",
-  "title": "Road to Send protocol v10",
+  "$id": "https://huangmj0.github.io/road-to-send/schema/v11.json",
+  "title": "Road to Send protocol v11",
   "type": "object",
   "required": ["version", "features", "activities", "config"],
   "properties": {
-    "version": { "const": 10 },
+    "version": { "const": 11 },
     "features": { "type": "array", "items": { "type": "string" } },
     "activities": { "type": "array", "items": { "$ref": "#/$defs/activity" } },
     "config": { "anyOf": [{ "$ref": "#/$defs/settings" }, { "type": "null" }] },
