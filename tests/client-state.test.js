@@ -59,7 +59,20 @@ const checks = `(()=>{
   assert.equal(scored.info.get('b3').credit,0,'over-cap bounty earns nothing');
   assert.equal(scored.info.get('b3').reason,'weekly cap');
   assert.equal(scored.bountyWeekCount.get('alex|2026-07-13'),3,'every completion counts toward Bounty Hunter');
+  assert.equal(scored.bountyTotal.get('alex'),3,'every completion counts toward the all-time bounty tally, even past the weekly cap');
   assert.equal(scored.totals.get('alex'),6);
+
+  // totalsModel exposes an all-time bounty count per climber, spanning weeks, for the Bounties leaderboard view.
+  const savedLogs=logs;
+  logs=[
+    {id:'t1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+    {id:'t2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-20',createdAt:'2'},
+    {id:'t3',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+  ];
+  const tm=totalsModel(),tmAlex=tm.sorted.find(r=>r.name==='Alex'),tmBob=tm.sorted.find(r=>r.name==='Bob');
+  assert.equal(tmAlex.bountiesTotal,2,'all-time bounty tally spans weeks');
+  assert.equal(tmBob.bountiesTotal,1,'each climber gets their own all-time bounty count');
+  logs=savedLogs;
 
   assert.equal(computeCredits([{id:'before',name:'Alex',type:'climb',date:'2026-06-30'}]).info.get('before').reason,'outside challenge');
 
