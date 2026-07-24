@@ -53,6 +53,7 @@ assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="weeklyTrend"/,'the week
 assert.match(html,/\.trend-scroll\{overflow-x:auto\}/,'the trend wrapper scrolls horizontally instead of squeezing');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
+assert.match(html,/id="leaderBountyBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Bounties toggle is a real button with aria-pressed');
 assert.match(html,/data-panel="you"[\s\S]*id="youEmptyState"[\s\S]*id="personalActivity"[\s\S]*data-panel="record"/,'the You onboarding empty state sits in the recent-activity area of the You panel');
 assert.match(html,/id="youEmptyState"[\s\S]*data-tab="record"/,'the empty state offers a button that jumps to the Record tab');
 assert.match(html,/data-panel="crew"[\s\S]*id="crewLocalHint"/,'the crew local-mode hint lives in the Crew panel');
