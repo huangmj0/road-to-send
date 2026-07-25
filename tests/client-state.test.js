@@ -612,6 +612,12 @@ const checks = `(()=>{
   assert.equal(personalPaceInfo('alex','2026-07-15',{startDate:'2026-07-31',tripDate:'2026-07-01',goal:100}).pace,null,'an inverted window has no pace');
   assert.equal(personalPaceInfo('alex','2026-06-15').pace.state,'before','today is honoured as an argument: a pre-window day reads before');
   assert.equal(personalPaceInfo('alex','2026-08-15').pace.state,'ended','today is honoured as an argument: a post-window day reads ended');
+
+  // Entry 19: after a delete, focus lands on the row that took the deleted row's place.
+  assert.equal(nextFocusIndex(0,0),-1,'an emptied feed has no row left to focus');
+  assert.equal(nextFocusIndex(0,3),0,'deleting the first row focuses the new first row');
+  assert.equal(nextFocusIndex(2,2),1,'a deleted last row hands focus to the new last row');
+  assert.equal(nextFocusIndex(5,3),2,'a position past the end clamps to the last row');
   logs=[];
 })()`;
 
@@ -810,6 +816,33 @@ const domChecks = `(()=>{
   assert.equal(youPace.classList.contains('hide'),true,'a finished window hides the personal pace line');
   assert.equal(countdown.textContent.indexOf('Challenge complete'),0,'a finished window reads as complete');
   assert.ok(countdown.textContent.indexOf(fmtDay(shift(-10)))>=0,'the finished countdown names the end date');
+
+  // Entry 19: the You feed deletes your own entries behind the in-app confirm dialog.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'d1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-1),createdAt:'1'},{id:'d2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'d3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
+  render();
+  const ownFeed=document.querySelector('#personalActivity'),crewFeed=document.querySelector('#activityList');
+  assert.ok(ownFeed.innerHTML.indexOf('data-del=')>=0,'the You feed offers delete buttons for your own entries');
+  assert.ok(ownFeed.innerHTML.indexOf('aria-label="Delete ')>=0,'each You-feed delete button names the entry it removes');
+  assert.ok(crewFeed.innerHTML.indexOf('data-del=')>=0,'the Crew feed keeps its delete buttons');
+  assert.ok(crewFeed.innerHTML.indexOf('aria-label="Delete ')>=0,'the Crew feed keeps its delete labels');
+  const confirmDialog=document.querySelector('#confirmModal'),confirmBody=document.querySelector('#confirmBody');
+  requestDelete(0,'d1','personal');
+  assert.equal(confirmDialog.classList.contains('open'),true,'requesting a delete opens the in-app dialog instead of a native prompt');
+  assert.ok(confirmBody.textContent.indexOf(CAT_LABELS.climb)>=0,'the confirm copy names the activity');
+  assert.ok(confirmBody.textContent.indexOf('V5')>=0,'the confirm copy names the grade the way the old prompt did');
+  assert.ok(confirmBody.textContent.indexOf('Alex')>=0,'the confirm copy names the person');
+  const beforeCount=logs.length;
+  performDelete();
+  assert.equal(logs.length,beforeCount-1,'confirming removes exactly one entry in local mode');
+  assert.equal(logs.some(x=>x.id==='d1'),false,'the confirmed entry is the one that goes');
+  assert.equal(confirmDialog.classList.contains('open'),false,'confirming closes the dialog');
+  performDelete();
+  assert.equal(logs.length,beforeCount-1,'a second confirm with nothing pending deletes nothing');
+  // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
+  // so it stays with the fetch-stubbed harness pattern below.
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 

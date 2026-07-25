@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 23 — Raise the bundle budget to cover the rest of the queue — Todo
-- 19 — Delete your own entries from the You feed, with a real confirm dialog and focus restoration — Todo
+- 19 — Delete your own entries from the You feed, with a real confirm dialog and focus restoration — Done — 2026-07-25
 - 20 — Tap a leaderboard row for a per-person card (Crew tab) — Todo
 - 21 — Record tab: show the bounty's description, and make the submit guard real — Todo
 - 22 — Share my progress: one clipboard helper, and stop a denied copy failing setup — Todo
@@ -31,36 +30,10 @@ Entries 1–14 shipped and now live in `IMPROVEMENTS.md` under "v11 pass — fro
 
 ---
 
-## 23. Raise the bundle budget to cover the rest of the queue
-
-Status: Done — 2026-07-25
-Notes: Raise the bundle budget to 156,000 bytes. `BUDGET` in `tests/size-check.mjs` goes from `132000` to `156000`, with the projection it derives from recorded in a comment beside the constant so the next person can check the arithmetic instead of re-guessing it. Placed above entry 19 in the queue while keeping the number 23 — the selection rule is positional, not numeric, so this is the next entry worked, which it has to be because 19 and 20 are the two entries that would otherwise breach the cap. `src/` and `index.html` are untouched, so `npm run build` is a no-op and the artifact stays byte-identical at 125,420 bytes. No deviations from the requirements below.
-
-### Why
-`tests/size-check.mjs` caps `index.html` at 132,000 bytes. Entry 18 took the artifact to 125,420 bytes — **95.0% of budget** — leaving roughly 6.5KB for the four remaining entries (19–22). Measured across the fourteen feature commits that changed `index.html`, growth runs a median of 1,835 bytes and a mean of 2,268, but modal-class features are far heavier: the first-open Week in Review recap cost 5,973 bytes and entry 17 cost 4,569. Entries 19 and 20 are both modal-class — a confirm dialog with focus restoration, and a per-person card — so the queue as written cannot fit under the current budget. Entry 16 requires the budget to move only in a log entry that explains the growth, never as a side effect of another change. This is that entry.
-
-### Requirements
-- **Rule carve-out (rule 2):** this entry is documentation-and-tests only and is explicitly permitted to edit `tests/size-check.mjs`. It must not touch `src/`, so `index.html` stays byte-identical and `npm run build` is a no-op. Do **not** go `Blocked` on rule 2 for this entry.
-- Raise `BUDGET` from `132000` to `156000`, and record the projection beside the constant:
-  - 125,420 bytes today (after entry 18)
-  - +18,000 projected for entries 19–22 (19 ≈ 6,000; 20 ≈ 6,000; 21 ≈ 2,500; 22 ≈ 3,000), giving ≈ 143,500 when the queue is drained
-  - 156,000 leaves ≈ 12,500 bytes (8%) of headroom on top of that
-- Leave the failure message's "raise `BUDGET` deliberately in a log entry that explains the growth" wording exactly as it stands — this entry follows that rule, it does not relax it. Rule 3 keeps the same sentence for the same reason.
-- Do not change the always-printed size/percent line. Visible growth on every run is the point of the guard, and a looser cap makes that reporting more important, not less.
-
-### Tests
-- `tests/size-check.mjs` passes and prints the new percentage against the raised budget.
-- No other suite changes: `index.html` is untouched, so all five suites must pass exactly as they stand.
-
-### Do not
-Touch `src/` or rebuild `index.html`; weaken or delete the budget assertion itself; remove the size/percent reporting line; renumber any entry; treat the raised number as licence to stop noticing growth — if the queue lands under 143,500 bytes, a later entry should lower `BUDGET` back toward the real figure. A budget that only ever ratchets upward is not a guard.
-
----
-
 ## 19. Delete your own entries from the You feed, with a real confirm dialog and focus restoration
 
-Status: Todo
-Notes:
+Status: Done — 2026-07-25
+Notes: Delete your own entries from the You feed via a confirm dialog. `render()` now passes `activityMarkup(myLogs,5,true)` (own-entries-only by construction, `data-del` still the global `logs.indexOf(x)`), and `init()` gains a `#personalActivity` click listener mirroring the `#activityList` one, which now passes the feed key. `deleteEntry` is split into `requestDelete(index,id,feed)` — stashes `{index,id,feed,position}`, where `position` is the row's place among that feed's `[data-del]` buttons (0 when the feed cannot be queried) — and `async performDelete()`, the old body minus `confirm()`, with the shared branch's `action:'delete'` request body, toasts and `loadRemote(true)` untouched, then `closeModal('confirmModal')` and `restoreFeedFocus(feedSelector(feed),position)`. `nextFocusIndex(position,count)` is `-1` for an empty feed and `Math.min(position,count-1)` otherwise; `restoreFeedFocus(feedSelector,position)` is null-safe (the stub's `querySelectorAll` returns `[]`) and falls back to the You card's `data-tab="record"` button or `#syncStatus`. `#confirmModal` sits after `#weekReviewModal` and before `#setupModal`, outside every `data-panel`, reusing `.modal`/`.dialog`/`.dialog-head`/`.btn` and the existing `openModal`/`closeModal` trap — no second modal or focus-trap implementation. `src/styles.css` gains one fragment: `.confirm-actions{display:flex;gap:12px}.confirm-actions .btn{flex:1}.btn.danger{border-color:var(--danger);color:var(--danger)}`. Tests: harness-1 covers `nextFocusIndex` (0/0, 0/3, 2/2, 5/3); harness-2 asserts both feeds render `data-del=` and `aria-label="Delete `, then calls `requestDelete(0,'d1','personal')` and `performDelete()` directly (the stub cannot fire delegated handlers) and checks the dialog opens, names the activity/grade/person, drops exactly one log, and closes — the shared branch is left to the fetch-stubbed harness, as noted in a comment. `static-check.mjs` adds `confirmTitle` to the existing dialog array, the `Close delete confirmation` label, `#confirmOk`/`#confirmCancel` as `type="button"`, `function requestDelete(`, and `assert.doesNotMatch(script,/[^.\w]confirm\(/)`; no assertion was relaxed or retargeted. index.html 125,420 → 128,114 bytes (+2,694; 82.1% of the 156,000-byte budget, well inside the ~6,000 this entry was projected to cost); `BUDGET` unchanged. Deviations: (1) `disconnect()` carried a **second** native `confirm()`, so the entry's premise that the delete prompt is "the only such prompt" is wrong and the required `doesNotMatch` assertion could not pass while it stood; `disconnect()` now opens the same dialog and its old body moved verbatim (same copy) to `performDisconnect()`. To serve both callers, `#confirmOk` is wired to `confirmProceed()`, a one-line dispatcher that runs the action stashed by `askConfirm(title,message,action,okLabel)` — for a delete that action is `performDelete`, and `askConfirm` also sets `#confirmTitle` and the confirm button's label so the shared dialog stays honest ("Delete" vs "Use local mode"). (2) `#confirmBody` is filled with `textContent`, not `esc()` into `innerHTML`: the entry's own test bullet asserts `#confirmBody.textContent`, and `textContent` is escape-safe by construction, where escaping into it would print `&amp;` in a name. (3) One extra helper, `feedSelector(feed)`, maps the feed key to `#personalActivity`/`#activityList` so the listener, the stash and the focus restore cannot drift apart. (4) Rule 10 archiving: entry 23 moved verbatim into `IMPROVEMENTS.md` and its index line dropped — but the previous iteration's archive of entry 18 had been pasted **into the middle of entry 15's `Notes:` line** (split at "sit under `"), leaving entry 15 truncated and entry 18 nested inside it. Entry 18's block was lifted out verbatim to its proper place after entry 17, entry 15's `Notes:` line rejoined byte-for-byte, and entry 23 appended after entry 18.
 
 ### Why
 `deleteEntry` is wired only to the Crew feed (`#activityList`), and the You feed renders with `activityMarkup(myLogs, 5, false)` — so removing your own mistyped entry means switching to the Crew tab and hunting for it among the newest 20 crew entries. The confirm is a native `window.confirm()`, the only such prompt in an app that already has four custom modals, and because it cannot be stubbed, `deleteEntry` is untestable today. After a local-mode delete, `render()` replaces `#activityList.innerHTML`, destroying the focused `.del` button so focus falls to `<body>`.
