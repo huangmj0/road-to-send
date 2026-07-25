@@ -6,7 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 18 — Personal countdown and personal pace (You tab) — Done — 2026-07-25
+- 23 — Raise the bundle budget to cover the rest of the queue — Todo
 - 19 — Delete your own entries from the You feed, with a real confirm dialog and focus restoration — Todo
 - 20 — Tap a leaderboard row for a per-person card (Crew tab) — Todo
 - 21 — Record tab: show the bounty's description, and make the submit guard real — Todo
@@ -31,29 +31,29 @@ Entries 1–14 shipped and now live in `IMPROVEMENTS.md` under "v11 pass — fro
 
 ---
 
-## 18. Personal countdown and personal pace (You tab)
+## 23. Raise the bundle budget to cover the rest of the queue
 
 Status: Done — 2026-07-25
-Notes: Add a personal countdown and personal pace line to the You card. Pure helper `challengeProgress(today,settings)` derives `{state,day,totalDays,daysLeft,weeksLeft,pct}` from `parseDateOnly` plus `weeksUntilDone()` for `daysLeft`/`weeksLeft` (never re-deriving them), returning `null` for an unparseable or inverted window; `personalPaceInfo(nameLower,today,settings,model)` computes `share = ceil(goal / crewSize)` from `totalsModel().sorted.length` (falling back to `config.crew.length`, floor 1) and calls `paceInfo()` unchanged on a shallow settings copy with `goal: share`. `renderYouPace(model)` writes `#youCountdown` and `#youPace` (reusing the Crew card's existing `.pace`/`.ahead`/`.behind` classes, so no new colour CSS) and is called from `render()` beside entry 17's `renderTodayStatus()`, consuming the `model` already in scope. Neither element takes `aria-live` — a code comment records that `#todayRemaining` is the today-card's single polite live region so a later pass does not "fix" it. `weeksUntilDone()`, `paceInfo()` and `projectedTotal()` return shapes are untouched, and a test asserts `challengeProgress(d).daysLeft === weeksUntilDone(d).days` so the two can never drift. index.html 122,963 → 125,420 bytes (+2,457; 95.0% of the 132,000-byte budget). Deviations: (1) `personalPaceInfo` takes an optional fourth argument `model` (defaulting to `totalsModel()`) so `render()` can pass the model already in scope — the entry requires that reuse but lists a three-argument signature; the first three arguments are exactly as specified. (2) `#youPace` also renders a `before`-state line, `Your share of the goal is N pts`, which the entry does not enumerate — it only enumerates hiding for `null`/ended — because a person opening the app before the start would otherwise see a blank element where the countdown promises context.
+Notes: Raise the bundle budget to 156,000 bytes. `BUDGET` in `tests/size-check.mjs` goes from `132000` to `156000`, with the projection it derives from recorded in a comment beside the constant so the next person can check the arithmetic instead of re-guessing it. Placed above entry 19 in the queue while keeping the number 23 — the selection rule is positional, not numeric, so this is the next entry worked, which it has to be because 19 and 20 are the two entries that would otherwise breach the cap. `src/` and `index.html` are untouched, so `npm run build` is a no-op and the artifact stays byte-identical at 125,420 bytes. No deviations from the requirements below.
 
 ### Why
-`weeksUntilDone(today, settings)` already returns `{days, weeks}` but **`.days` is never rendered anywhere**, and the app's only countdown lives in `#weekReviewCountdown` inside a modal that opens once per ISO week — so the You tab has no date context at all: no "day N of M", no days remaining, no personal pace. `paceInfo()` and `projectedTotal()` exist but are Crew-tab-only and crew-wide (fed `earnedThrough(today)`), so a person can never see whether *they* are on track.
+`tests/size-check.mjs` caps `index.html` at 132,000 bytes. Entry 18 took the artifact to 125,420 bytes — **95.0% of budget** — leaving roughly 6.5KB for the four remaining entries (19–22). Measured across the fourteen feature commits that changed `index.html`, growth runs a median of 1,835 bytes and a mean of 2,268, but modal-class features are far heavier: the first-open Week in Review recap cost 5,973 bytes and entry 17 cost 4,569. Entries 19 and 20 are both modal-class — a confirm dialog with focus restoration, and a per-person card — so the queue as written cannot fit under the current budget. Entry 16 requires the budget to move only in a log entry that explains the growth, never as a side effect of another change. This is that entry.
 
 ### Requirements
-- `src/app.js` — new pure helper `challengeProgress(today = challengeToday(), settings = config)` → `{state:'before'|'active'|'ended', day, totalDays, daysLeft, weeksLeft, pct}`, or `null` for an unparseable or inverted window. It must **consume** `weeksUntilDone()` for `daysLeft`/`weeksLeft` rather than re-deriving them, and must not change that helper's return shape — `tests/client-state.test.js` `deepEqual`s both `{days, weeks}` and `{done:true}`. `today` is an argument; never `new Date()`.
-- New pure helper `personalPaceInfo(nameLower, today = challengeToday(), settings = config)` → `{share, total, pace}`, where `share = Math.ceil(goal / Math.max(1, crewSize))` (crew size from `totalsModel().sorted.length`, falling back to `config.crew.length`, floor 1) and `pace = paceInfo(total, {...settings, goal: share}, today)`. This **reuses `paceInfo` unchanged** on a shallow settings copy — do not fork or re-derive its math, and do not change its `{state, diff, perDay}` shape.
-- `src/index.template.html` — inside the existing `today-card`, **after `#todayRemaining` (entry 17) and before the `data-tab="record"` button**: `<p id="youCountdown" class="hint">` and `<p id="youPace" class="hint pace hide">`. Both are inside the today-card, so all existing You-panel order assertions still hold. Reuse the Crew card's existing `.pace`/`.ahead`/`.behind` classes so no new colour CSS is needed.
-- Neither element gets `aria-live`: `#youCountdown` changes once per day, and `#todayRemaining` (entry 17) is already the today-card's single polite live region — a second and third region in one card would triple-announce on every `render()`. State this in a code comment so a later pass does not "fix" it.
-- Copy, all derived: `#youCountdown` → `Day 12 of 31 · 19 days left` / `Starts Mon Jul 27 · 31 days` / `Challenge complete · ended Jul 31` (dates via `fmtDay()`); `#youPace` → `84 / 100 pts · 6 ahead of your share` / `84 / 100 pts · 16 behind · ~3 pts/day` / `Your share of the goal is done 🎉`, hidden when `pace` is `null` or the window has ended.
-- Render from `render()` in one `renderYouPace()` call beside entry 17's `renderTodayStatus()`; reuse the `model` already in scope for the person's total (`model.totals.get(meLower)`) — no extra `computeCredits` pass.
+- **Rule carve-out (rule 2):** this entry is documentation-and-tests only and is explicitly permitted to edit `tests/size-check.mjs`. It must not touch `src/`, so `index.html` stays byte-identical and `npm run build` is a no-op. Do **not** go `Blocked` on rule 2 for this entry.
+- Raise `BUDGET` from `132000` to `156000`, and record the projection beside the constant:
+  - 125,420 bytes today (after entry 18)
+  - +18,000 projected for entries 19–22 (19 ≈ 6,000; 20 ≈ 6,000; 21 ≈ 2,500; 22 ≈ 3,000), giving ≈ 143,500 when the queue is drained
+  - 156,000 leaves ≈ 12,500 bytes (8%) of headroom on top of that
+- Leave the failure message's "raise `BUDGET` deliberately in a log entry that explains the growth" wording exactly as it stands — this entry follows that rule, it does not relax it. Rule 3 keeps the same sentence for the same reason.
+- Do not change the always-printed size/percent line. Visible growth on every run is the point of the guard, and a looser cap makes that reporting more important, not less.
 
 ### Tests
-- `tests/client-state.test.js` harness-1 `checks` literal (no backticks, no `${`): `challengeProgress` over a `2026-07-01`–`2026-07-31` window — first day `{state:'active', day:1, totalDays:31, daysLeft:31}`, `2026-07-15` → `day:15, daysLeft:17`, final day → `day:31, daysLeft:1`, `2026-08-05` → `state:'ended'`, `2026-06-30` → `state:'before'`, `'garbage'` → `null`; and assert `challengeProgress(d).daysLeft === weeksUntilDone(d).days` so the two can never drift. `personalPaceInfo`: share math for 1-, 3- and 4-person crews; `pace.state === 'met'` once the person passes their share; `pace === null` for a zero goal or inverted window; and that `today` is honoured as an argument.
-- `tests/client-state.test.js` harness-2 `domChecks` literal: with `config={startDate:shift(-5), tripDate:shift(5)}` and zero logs, `render()` then assert `#youCountdown.textContent` contains `Day 6 of 11` and `6 days left`, and that `#youPace` is not hidden and its text starts with the behind-pace copy; then a past window (`shift(-20)`–`shift(-10)`) hides `#youPace` and `#youCountdown` reads as complete. textContent only — the stub's `getAttribute` returns `null`.
-- `tests/static-check.mjs` — **add**: `#youCountdown` and `#youPace` exist inside `data-panel="you"`; one **new** order assertion `data-panel="you"` → `id="todayCategories"` → `id="youCountdown"` → `id="youPace"` → `data-tab="record"` → `id="bountyCapHint"`. Do not retarget the existing today-card/bounty/stat-grid assertions.
+- `tests/size-check.mjs` passes and prints the new percentage against the raised budget.
+- No other suite changes: `index.html` is untouched, so all five suites must pass exactly as they stand.
 
 ### Do not
-Change the return shape of `weeksUntilDone()`, `paceInfo()` or `projectedTotal()` (all three are `deepEqual`-asserted); call `new Date()` for challenge dates; add a card, a nav tab or a hash route; add a third `aria-live` region to the today-card; duplicate the Crew tab's crew-wide pace line here — this one is the person's share; add a localStorage key.
+Touch `src/` or rebuild `index.html`; weaken or delete the budget assertion itself; remove the size/percent reporting line; renumber any entry; treat the raised number as licence to stop noticing growth — if the queue lands under 143,500 bytes, a later entry should lower `BUDGET` back toward the real figure. A budget that only ever ratchets upward is not a guard.
 
 ---
 
