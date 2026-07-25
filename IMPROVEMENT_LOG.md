@@ -329,3 +329,213 @@ Daily bounties are a core pillar of the scoring economy but are buried near the 
 
 ### Do not
 - Move the bounty list onto the Record tab (it belongs on the You landing view; the Record tab already has the Bounty radio + dropdown for entry); add a 4th nav tab / new hash route; add a localStorage key; fork scoring or touch `scoring.json`/the weekly cap.
+
+---
+
+## 15. Make the improvement loop safe: archive shipped work, add a selection rule, reconcile the rules
+
+Status: Todo
+Notes:
+
+### Why
+This log is 331 lines / 37,005 bytes and **all 14 entries are `Done`**, yet nothing in the file tells an implementer to skip them — line 3 says only "work entries top to bottom", so a looping agent reads 37KB (90% of it finished work, 12.9KB of it `Notes:` prose) before discovering the queue is empty, and the literal first entry it meets is Done. Three rules are also factually wrong or contradicted: rule 4 lists 5 frozen localStorage keys while `src/app.js` uses 7, rule 2 ("never touch `src/scoring.json`/`src/schema.json`/`src/apps-script.js`") contradicts `AGENTS.md` and was broken by commits `804cab0`, `3a7da67` and `0695742`, and entry 13's `Notes:` still describes a `#leaderToggle` that commit `21a2ee9` replaced with `#leaderMetricToggle`/`#leaderScopeToggle`.
+
+### Requirements
+- **Rule carve-out (rules 2 and 8):** this entry is documentation-and-tests only and is explicitly permitted to edit `IMPROVEMENT_LOG.md`, `AGENTS.md`, `IMPROVEMENTS.md`, a new `CLAUDE.md`, `package.json` (one added test invocation), and to add `tests/docs-check.mjs`. It must not touch `src/`, so `index.html` stays byte-identical and `npm run build` is a no-op. Do **not** go `Blocked` on rule 2 for this entry.
+- Move entries 1–14 out of this file and append them to `IMPROVEMENTS.md` under a new `## v11 pass — frontend enhancement queue (entries 1–14)` heading. Move them **verbatim**: heading, `Status:`, `Notes:`, `### Why`, `### Requirements`, `### Tests`, `### Do not`, separator. Do not reword, summarise, or renumber them — entry numbers never restart, and the archive is the audit trail. `IMPROVEMENTS.md` is already the repo's historical record, so also fix its line 3, which still claims the history ends at v10.
+- Backfill archive stubs in `IMPROVEMENTS.md` for the five feature commits that shipped with no entry, each as `Status: Done — shipped without a log entry (backfilled <date>)` plus a one-paragraph `Notes:` naming the commit: `cb77882` (first-open Week in Review, which also added the `roadToSendWeekReview` key), `f45e3a3` (all-time bounty view + champions callout), `21a2ee9` (split leaderboard toggle), `3a7da67` (new directional bounties, `scoring.json`), `0695742` (API v11 bump, `schema.json`). Label them so they cannot collide with this queue's integers.
+- Correct entry 13's archived `Notes:` by **appending** (never rewriting): `Superseded by 21a2ee9: the single #leaderToggle became #leaderMetricToggle (#leaderPointsBtn/#leaderBountyBtn) + #leaderScopeToggle (#leaderWeekBtn/#leaderOverallBtn); tests/static-check.mjs asserts the current ids.`
+- `IMPROVEMENT_LOG.md` after the move contains: the title, the preamble, a **queue index** (one line per live entry — number, title, status), the rules, then entries 15–22 only. Archive only `Done` work; leave every `Todo` entry in place.
+- Add a **selection rule** as an unnumbered "Before you start" paragraph at the top of the rules block — insert it *without* renumbering rules 1–10, which other entries cite by number: *implement the **first** entry whose `Status:` is `Todo`, top to bottom; skip `Done`, `Blocked`, and anyone else's `In progress`; if no entry is `Todo`, stop and report "queue empty — no Todo entries" without inventing, re-doing, or reopening work; never work from `IMPROVEMENTS.md`.*
+- Fix rule 4's frozen-key list to the real seven: `roadToSendEndpoint`, `roadToSendMe`, `roadToSendLogsV9`, `roadToSendConfigV9`, `roadToSendConfigV8` (read-only migration source — only the existing one-time migration writes `roadToSendConfigV9` from it), `roadToSendWeekReview`, and `roadToSendShared:{activities|config|meta}:{endpoint}`.
+- Reconcile the contradictions. In `AGENTS.md`, replace "Keep changes to those layers coordinated, especially scoring constants and API version checks" with an explicit statement that `src/scoring.json`, `src/schema.json` and `src/apps-script.js` are **out of scope for log-driven entries** and change only in an organizer-coordinated task that bumps the API version and gets its own entry; change "do not add dependencies without a clear maintenance benefit" to match rule 8's absolute "no dependencies — runtime or dev". Add to both rule 2 and rule 8: *an entry may carve itself out of these limits in its own `### Requirements`; absent an explicit carve-out they are hard limits and rule 10 applies.*
+- Add a repo-root `CLAUDE.md` (~25 lines, loaded automatically by agent sessions) stating: the app is live at `https://huangmj0.github.io/road-to-send/` and `index.html` stays at the repository root; the loop protocol (read `IMPROVEMENT_LOG.md`, take the first `Todo`, one entry per commit, update `Status:`/`Notes:` in the same commit); edit `src/`, never `index.html`; `npm run build` then `npm test`. It must **point at** the rules block and `AGENTS.md`, not duplicate them — a third copy is a third thing to drift.
+- Document the rebuild foot-gun in both `CLAUDE.md` and rule 3: *`npm run check:generated` shells out to `build.mjs`, which **overwrites `index.html` in place** before comparing — so a stale-artifact failure silently "passes" on the second run, leaving an unstaged `index.html`. After any test failure, run `git status` and commit the regenerated `index.html` alongside your `src/` changes.* Entry 16 removes this foot-gun and deletes the note when it does.
+
+### Tests
+- `tests/docs-check.mjs` (new; plain `node:assert/strict` script in the style of `static-check.mjs`): every `## N.` heading in `IMPROVEMENT_LOG.md` is followed by a `Status:` line whose value is one of the four documented states; **no `Status: Done` remains in `IMPROVEMENT_LOG.md`** (shipped work belongs in `IMPROVEMENTS.md`); every `roadToSend…` string literal appearing in `src/app.js` also appears in the rules' frozen-key list — this is the assertion that would have caught `roadToSendWeekReview`; `IMPROVEMENTS.md` contains the entry-1 heading; `CLAUDE.md` exists and links `IMPROVEMENT_LOG.md`.
+- `package.json`: append `&& node tests/docs-check.mjs` to the `test` script. Entry 16 folds it into the non-short-circuiting runner.
+- No `tests/client-state.test.js` and no `tests/static-check.mjs` changes — `index.html` is byte-identical, so both suites must pass untouched.
+
+### Do not
+Delete, reword, or summarise archived entries; renumber live entries; renumber rules 1–10; archive anything that is not `Done`; touch `src/`, `index.html`, or `.github/` in this entry (workflows belong to entry 16); add a localStorage key or a dependency while "reconciling" the rules.
+
+---
+
+## 16. Stop unverified deploys reaching the live URL, and stop `npm test` hiding failures
+
+Status: Todo
+Notes:
+
+### Why
+`.github/workflows/pages.yml` deploys on every push to `main` with **no dependency on the test workflow and no `npm test` step**, so a red or stale `index.html` merged to `main` goes straight to the live site the crew is using; it also uploads with `path: .`, publishing `src/`, `tests/` and every markdown file alongside the app. Meanwhile `npm test` is a single `&&` chain, so a `check:generated` failure short-circuits and hides the other four suites — and `check-generated.mjs` is not read-only: it rewrites `index.html` before comparing, so the same failure disappears on a re-run.
+
+### Requirements
+- **Rule carve-out (rules 2, 3 and 8):** this entry is explicitly permitted to edit `.github/workflows/pages.yml`, `package.json`, `scripts/build.mjs`, `scripts/check-generated.mjs`, and to add `scripts/run-tests.mjs`. It must not change `src/` or `index.html`, and it must not change the published URL. Do **not** go `Blocked` on rules 2/8 for this entry.
+- `pages.yml`: add a `verify` job (checkout, `actions/setup-node@v4` with `node-version: 22`, `npm test`) and give the `deploy` job `needs: verify`. GitHub Actions `needs:` cannot reference another workflow, so the gate must live inside `pages.yml`; leave `test.yml` alone — it still covers pull requests. Keep the `push: branches: ["main"]` trigger, `workflow_dispatch`, the `pages`/`id-token` permissions and the `concurrency` group exactly as they are. Accepted trade-off: a failing test now blocks deploys until it is fixed.
+- Narrow the artifact: before `upload-pages-artifact`, assemble a `_site/` directory containing **only `index.html`** (`mkdir -p _site && cp index.html _site/index.html`) and set `path: _site`. The published page stays at the artifact root, so `https://huangmj0.github.io/road-to-send/` is unchanged. Add a comment noting `index.html` is intentionally self-contained — if it ever gains a sibling asset, copy that here too.
+- Make the generated-artifact check read-only: refactor `scripts/build.mjs` to export a pure `buildHtml()` returning the rendered string, keeping the CLI path (`writeFileSync` + the console line) unchanged when the file is run directly. `scripts/check-generated.mjs` then imports `buildHtml()` and compares against the committed `index.html` in memory — no `execFileSync`, no writes. Its failure message tells the implementer to run `npm run build` and commit the result. Delete the foot-gun note entry 15 added to `CLAUDE.md` and rule 3, replacing it with: *`npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html`.*
+- Replace the `&&` chain with `scripts/run-tests.mjs`, invoked as `"test": "node scripts/run-tests.mjs"`. It runs each suite in sequence (`check:generated`, `node --test` over the four `tests/*.test.js` files, `tests/static-check.mjs`, `tests/docs-check.mjs`, `tests/size-check.mjs`), **never short-circuits**, prints a one-line PASS/FAIL summary per suite at the end, and exits `1` if any failed. Keep `build` and `check:generated` as separate scripts so `npm run build` and CI stay unchanged.
+- Add a bundle-size guard, `tests/size-check.mjs`: assert `index.html` is at most `BUDGET = 132000` bytes (it is 118,394 today — the artifact grew +30.9KB / +35% in 14 working days at roughly 1.5–2.5KB per feature commit), and always print the current size and percent of budget so growth is visible in every run. The failure message must read: *raise `BUDGET` deliberately in a log entry that explains the growth — never as a side effect of another change.* Add that sentence to rule 3 as well.
+
+### Tests
+- `tests/size-check.mjs` (new) as specified. `tests/docs-check.mjs` (from entry 15) gains repo-hygiene assertions: `pages.yml` contains `needs: verify` and an `npm test` step and does **not** contain `path: .`; `scripts/check-generated.mjs` contains neither `execFileSync` nor `writeFileSync`; `buildHtml()` imported from `scripts/build.mjs` returns a string equal to the committed `index.html`.
+- No `tests/client-state.test.js` and no `tests/static-check.mjs` changes: `index.html` is untouched, so both must pass byte-for-byte as they stand. Verify the new runner reports all six suites, and that forcing one failure still runs the rest and still exits non-zero.
+
+### Do not
+Move `index.html` out of the repository root, add a `_config.yml`, change the branch or base path, or otherwise touch the live URL; delete or weaken `test.yml`; make `npm test` tolerate a failure (the runner reports everything, then exits non-zero); add a dependency, a lint/format tool, or a git hook (out of scope — propose a separate entry); edit `src/` or rebuild `index.html` in this entry.
+
+---
+
+## 17. "What's left today": category status and balanced-bonus reachability (You tab)
+
+Status: Todo
+Notes:
+
+### Why
+Nothing in the app shows **which** of the three categories the person has already logged today, or whether the +2 balanced-day bonus is still reachable — `computeCredits()` tracks exactly this in its internal `daySeen` map but returns only `dayMeter`, a bare number per person-day. The `#todayStatus` pill is binary (`Balanced day` at or above the daily max, otherwise `Ready`), so a climb + exercise day worth 5 of 8 points reads "Ready", and `#youMeter`'s pips are identity-less, so a half-full meter says nothing about what is missing.
+
+### Requirements
+- `src/app.js` — new pure helper `todayProgress(nameLower, today)` returning `{inWindow, points, max, rows:[{type,label,icon,points,logged}], loggedCount, remainingPoints, bonusPoints, bonusEarned, bonusReachable, potential}`. Derive everything from `computeCredits(logs).info` — a category counts as logged when an in-window entry of that type exists for that person and day, **including** a duplicate whose `reason` is `already logged` — plus `dayMeter` for `points`. Category order, labels, icons and values come from `CATEGORIES`/`CAT_LABELS`/`CAT_ICONS`/`SCORING.categories`, the bonus from `SCORING.balancedDayBonus`. `today` is an **argument**, never `new Date()`; `inWindow` uses `dateInChallenge(today)`. Bounties never touch `dayMeter`, so this helper covers the three categories plus the bonus only — do not add bounty rows, entry 14's card owns those.
+- New pure helper `todayPillState(prog)` → `{text, cls}`, replacing the binary pill: `bonusEarned` → `Balanced day`; `loggedCount > 0` → `1 more for +2` / `2 more for +2`; nothing logged and in-window → `Ready`; outside the window → `Not started` / `Complete`. Keep toggling the existing `.max` class exactly when `points >= DAILY_MAX` so current CSS still applies.
+- New pure helper `meterSegments(prog)` → an array of `DAILY_MAX` descriptors `{cls, label}` — three climb pips, two exercise, one mobility, two bonus — each `filled` per what is earned, rendered through a new `setSegmentedMeter('#youMeter', segments, label)`. **Leave `meterMarkup()` and `setMeter()` untouched**: `#recordMeter` and the record preview keep the plain pips.
+- `src/index.template.html` — inside the existing `article.card.today-card`, **after `#youMeter` and before the `data-tab="record"` button**: a `<div id="todayCategories" role="list">` of `<span class="cat-chip done|todo" role="listitem">` (emoji `aria-hidden="true"`, visible label, `✓` or `+N`), and a `<p id="todayRemaining" class="hint" role="status" aria-live="polite">`. Both sit inside the today-card, i.e. **before** `#bountyCapHint`/`#todayBounties`/`.stat-grid`, so every existing You-panel order assertion still holds unchanged.
+- `#todayRemaining` copy is derived, never hard-coded: e.g. `Log Exercise and Mobility for +3 more and the +2 balanced-day bonus.` / `Balanced day complete — 8 of 8 points.` / `Challenge complete.` Keep `#youMeter`'s `role="img"` and update its `aria-label` to name both what is filled and what is missing.
+- Render from `render()` via one `renderTodayStatus()` call placed with the existing `renderBreakdown()`/`renderBounties()` cluster; idempotent and cheap — one `computeCredits` pass, reusing the `model` already in scope where convenient.
+- `src/styles.css` — `.cat-chip` (inline-flex, 44px minimum hit height on the row, existing `--sand`/`--green`/`--muted` tokens, `.done` vs `.todo` states) and the per-category pip classes next to the existing `.point-meter` rules. CSS-only transitions.
+
+### Tests
+- `tests/client-state.test.js` behaviour, inside the harness-1 `checks` **template literal** — no backticks and no `${` in added code, build strings with `+`. Cover: nothing logged (`loggedCount` 0, `potential` 8, `bonusReachable` true); climb+exercise (`points` 5, one row `logged:false`, `remainingPoints` 1, `bonusReachable` true); all three (`points` 8, `bonusEarned` true, `bonusReachable` false); a duplicate same-day climb still reads `logged:true` without double-counting; a bounty-only day leaves all three rows `logged:false` with `points` 0; a `today` outside the window gives `inWindow:false`; `meterSegments` filled count always equals `points`; `todayPillState` for each of the five states.
+- `tests/client-state.test.js` DOM, in the harness-2 `domChecks` literal (same backtick hazard): after `render()`, assert `#todayStatus.textContent`, `#todayCategories.innerHTML` and `#todayRemaining.textContent` in the nothing-logged, two-of-three and all-three states. Assert **textContent/innerHTML only** — the element stub's `setAttribute` is a no-op and `getAttribute` always returns `null`, so `aria-label` changes are not observable there; cover those in `static-check.mjs` against the static template.
+- `tests/static-check.mjs` — **add** assertions, never retarget an existing one: `#todayCategories` and `#todayRemaining` exist inside `data-panel="you"`; `#todayRemaining` carries `role="status"` and `aria-live="polite"`; `#youMeter` still has `role="img"` with an `aria-label`; plus one **new** order assertion `data-panel="you"` → `id="youMeter"` → `id="todayCategories"` → `id="todayRemaining"` → `data-tab="record"` → `id="bountyCapHint"`.
+
+### Do not
+Change `weeksUntilDone()`, `paceInfo()`, `meterMarkup()`, `setMeter()`, or `computeCredits()`'s return shape (`tests/client-state.test.js` `deepEqual`s several of them); make the chips interactive in this entry — a tap-to-preselect path duplicates entry 14's claim flow and the card's own Record CTA, so leave it for a later entry; add a card (this lives inside the existing today-card); write any banned string; hard-code 3/2/1/+2/8 anywhere; add a localStorage key.
+
+---
+
+## 18. Personal countdown and personal pace (You tab)
+
+Status: Todo
+Notes:
+
+### Why
+`weeksUntilDone(today, settings)` already returns `{days, weeks}` but **`.days` is never rendered anywhere**, and the app's only countdown lives in `#weekReviewCountdown` inside a modal that opens once per ISO week — so the You tab has no date context at all: no "day N of M", no days remaining, no personal pace. `paceInfo()` and `projectedTotal()` exist but are Crew-tab-only and crew-wide (fed `earnedThrough(today)`), so a person can never see whether *they* are on track.
+
+### Requirements
+- `src/app.js` — new pure helper `challengeProgress(today = challengeToday(), settings = config)` → `{state:'before'|'active'|'ended', day, totalDays, daysLeft, weeksLeft, pct}`, or `null` for an unparseable or inverted window. It must **consume** `weeksUntilDone()` for `daysLeft`/`weeksLeft` rather than re-deriving them, and must not change that helper's return shape — `tests/client-state.test.js` `deepEqual`s both `{days, weeks}` and `{done:true}`. `today` is an argument; never `new Date()`.
+- New pure helper `personalPaceInfo(nameLower, today = challengeToday(), settings = config)` → `{share, total, pace}`, where `share = Math.ceil(goal / Math.max(1, crewSize))` (crew size from `totalsModel().sorted.length`, falling back to `config.crew.length`, floor 1) and `pace = paceInfo(total, {...settings, goal: share}, today)`. This **reuses `paceInfo` unchanged** on a shallow settings copy — do not fork or re-derive its math, and do not change its `{state, diff, perDay}` shape.
+- `src/index.template.html` — inside the existing `today-card`, **after `#todayRemaining` (entry 17) and before the `data-tab="record"` button**: `<p id="youCountdown" class="hint">` and `<p id="youPace" class="hint pace hide">`. Both are inside the today-card, so all existing You-panel order assertions still hold. Reuse the Crew card's existing `.pace`/`.ahead`/`.behind` classes so no new colour CSS is needed.
+- Neither element gets `aria-live`: `#youCountdown` changes once per day, and `#todayRemaining` (entry 17) is already the today-card's single polite live region — a second and third region in one card would triple-announce on every `render()`. State this in a code comment so a later pass does not "fix" it.
+- Copy, all derived: `#youCountdown` → `Day 12 of 31 · 19 days left` / `Starts Mon Jul 27 · 31 days` / `Challenge complete · ended Jul 31` (dates via `fmtDay()`); `#youPace` → `84 / 100 pts · 6 ahead of your share` / `84 / 100 pts · 16 behind · ~3 pts/day` / `Your share of the goal is done 🎉`, hidden when `pace` is `null` or the window has ended.
+- Render from `render()` in one `renderYouPace()` call beside entry 17's `renderTodayStatus()`; reuse the `model` already in scope for the person's total (`model.totals.get(meLower)`) — no extra `computeCredits` pass.
+
+### Tests
+- `tests/client-state.test.js` harness-1 `checks` literal (no backticks, no `${`): `challengeProgress` over a `2026-07-01`–`2026-07-31` window — first day `{state:'active', day:1, totalDays:31, daysLeft:31}`, `2026-07-15` → `day:15, daysLeft:17`, final day → `day:31, daysLeft:1`, `2026-08-05` → `state:'ended'`, `2026-06-30` → `state:'before'`, `'garbage'` → `null`; and assert `challengeProgress(d).daysLeft === weeksUntilDone(d).days` so the two can never drift. `personalPaceInfo`: share math for 1-, 3- and 4-person crews; `pace.state === 'met'` once the person passes their share; `pace === null` for a zero goal or inverted window; and that `today` is honoured as an argument.
+- `tests/client-state.test.js` harness-2 `domChecks` literal: with `config={startDate:shift(-5), tripDate:shift(5)}` and zero logs, `render()` then assert `#youCountdown.textContent` contains `Day 6 of 11` and `6 days left`, and that `#youPace` is not hidden and its text starts with the behind-pace copy; then a past window (`shift(-20)`–`shift(-10)`) hides `#youPace` and `#youCountdown` reads as complete. textContent only — the stub's `getAttribute` returns `null`.
+- `tests/static-check.mjs` — **add**: `#youCountdown` and `#youPace` exist inside `data-panel="you"`; one **new** order assertion `data-panel="you"` → `id="todayCategories"` → `id="youCountdown"` → `id="youPace"` → `data-tab="record"` → `id="bountyCapHint"`. Do not retarget the existing today-card/bounty/stat-grid assertions.
+
+### Do not
+Change the return shape of `weeksUntilDone()`, `paceInfo()` or `projectedTotal()` (all three are `deepEqual`-asserted); call `new Date()` for challenge dates; add a card, a nav tab or a hash route; add a third `aria-live` region to the today-card; duplicate the Crew tab's crew-wide pace line here — this one is the person's share; add a localStorage key.
+
+---
+
+## 19. Delete your own entries from the You feed, with a real confirm dialog and focus restoration
+
+Status: Todo
+Notes:
+
+### Why
+`deleteEntry` is wired only to the Crew feed (`#activityList`), and the You feed renders with `activityMarkup(myLogs, 5, false)` — so removing your own mistyped entry means switching to the Crew tab and hunting for it among the newest 20 crew entries. The confirm is a native `window.confirm()`, the only such prompt in an app that already has four custom modals, and because it cannot be stubbed, `deleteEntry` is untestable today. After a local-mode delete, `render()` replaces `#activityList.innerHTML`, destroying the focused `.del` button so focus falls to `<body>`.
+
+### Requirements
+- `src/app.js` — pass `true` as `activityMarkup`'s `allowDelete` for the personal feed (`activityMarkup(myLogs, 5, true)`). `myLogs` is already filtered to `x.name.toLowerCase() === meLower`, so this is own-entries-only by construction, and the existing `data-del` index is `logs.indexOf(x)` (a global index) so it needs no change. Add one delegated `#personalActivity` click listener in `init()`, mirroring the existing `#activityList` listener exactly.
+- Split `deleteEntry(index, id)` into `requestDelete(index, id, feed)` and `async performDelete()`. `requestDelete` stashes `{index, id, feed, position}` in a module-level variable, fills the new confirm dialog and calls `openModal('confirmModal')`; `performDelete` is the current async body **minus `confirm()`** (shared and local branches unchanged, same toasts, same `loadRemote(true)`), then `closeModal('confirmModal')` and focus restoration. Dropping `confirm()` also removes the un-stubbed global that makes this path untestable.
+- Focus restoration: new pure helper `nextFocusIndex(position, count)` → `Math.min(position, count - 1)`, or `-1` when `count === 0`. Then `restoreFeedFocus(feedSelector, position)` queries `feedSelector + ' [data-del]'`, focuses the element at `nextFocusIndex(...)`, and falls back to the feed card's `data-tab="record"` button (You) or `#syncStatus` (Crew) when the feed is empty. Must be null-safe — the test stub's `querySelectorAll` returns `[]`.
+- `src/index.template.html` — new `#confirmModal` placed **after `#weekReviewModal` and before `#setupModal`**, i.e. outside every `data-panel` section, so no existing order assertion is affected: `<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">` with `#confirmTitle`, `#confirmBody`, `#confirmClose` (`aria-label="Close delete confirmation"`), and a `.confirm-actions` row of `#confirmCancel` (secondary) and `#confirmOk` (`class="btn danger"`), both real `type="button"` and at least 44px. Reuse `openModal`/`closeModal`, which already trap Tab and restore `lastFocused` — do not write a second modal implementation.
+- Wire `#confirmOk` → `performDelete`, and `#confirmCancel`/`#confirmClose` → `closeModal('confirmModal')`, in `init()`. `#confirmBody` names the entry the way the current `confirm()` string does (`Delete Climbing V5 for Alex?`), via `esc()`.
+- `src/styles.css` — reuse `.modal`/`.dialog`/`.dialog-head`/`.btn`; add only `.confirm-actions{display:flex;gap:12px}` plus a `.btn.danger` variant if none exists (the `.text-btn.danger` colour token can be reused).
+
+### Tests
+- `tests/client-state.test.js` harness-1 `checks` literal: `nextFocusIndex(0,0) === -1`, `(0,3) === 0`, `(2,2) === 1`, `(5,3) === 2`.
+- `tests/client-state.test.js` harness-2 `domChecks` literal (no backticks, no `${`): with three own logs and `endpoint=''`, `render()` then assert `#personalActivity.innerHTML` contains `data-del=` and `aria-label="Delete ` **and** that `#activityList.innerHTML` still does. Call `requestDelete(0,'first','personal')` → `#confirmModal` has the `open` class and `#confirmBody.textContent` names the activity and the person; call `performDelete()` → `logs.length` drops by one, the modal loses `open`, and nothing throws. Only the **local** branch is testable here (harness 2 has no `fetch` stub); leave the shared branch to harness 3's pattern or a comment.
+- `tests/static-check.mjs` — **strengthen** the existing dialog loop by adding `confirmTitle` to the `['identityTitle','proxyTitle','setupTitle']` array (it already asserts `role="dialog" aria-modal="true" aria-labelledby=…`); assert `aria-label="Close delete confirmation"`, that `#confirmOk`/`#confirmCancel` exist with `type="button"`, and `assert.match(script, /function requestDelete\(/)`. Add `assert.doesNotMatch(script, /[^.\w]confirm\(/)` to lock the native prompt out for good. The single-`<table>` count and unique-id assertions must still pass.
+
+### Do not
+Add an undo path in this entry — the toast is `pointer-events:none`, and re-POSTing a deleted row in shared mode would mint a new `id`/`createdAt` against the live Sheet; the custom confirm is the accidental-delete fix, and undo deserves its own entry (local-mode only, a real button, not the toast). Do not render delete buttons for other people's entries in the You feed; do not change `deleteEntry`'s shared-mode request body or its `action:'delete'` contract, or `activityMarkup`'s markup for the Crew feed; do not build a second modal or focus-trap implementation; do not add a localStorage key.
+
+---
+
+## 20. Tap a leaderboard row for a per-person card (Crew tab)
+
+Status: Todo
+Notes:
+
+### Why
+There is no per-person view on the Crew tab: leaderboard rows are built inline in `render()` as plain `<tr>` with no `data-*`, no click handler and no `tabindex`, yet `styles.css` gives `tbody tr:hover{background:var(--wash)}` — a hover affordance that does nothing. Everything a drill-down needs already exists, pure and per-person: `categoryBreakdown(nameLower)`, `streakInfo(nameLower, today)`, `personalRecords(nameLower, today)`, `gradePyramid(nameLower)`, `weekTrend(nameLower, today)`, plus each person's row in `totalsModel().sorted`.
+
+### Requirements
+- `src/app.js` — new pure helper `personSummary(name, today = challengeToday())` composing **only** existing helpers: `{name, rank, week, total, bounties, bountiesTotal, trend, streak, breakdown, records, pyramid}` from `totalsModel().sorted` (rank = index + 1 in the all-time ordering, matching `#youRank`), `weekTrend`, `streakInfo`, `categoryBreakdown`, `personalRecords`, `gradePyramid`. Returns `null` for an unknown or blank name. No new scoring math whatsoever.
+- In the leaderboard row markup, wrap the climber name in a real control: `<button class="climber" type="button" data-person="{name}" aria-haspopup="dialog" aria-label="Open {name}'s details">{name}</button>`, keeping the existing medal `<span class="medal">` and hunter `<span class="hunter">` as siblings **after** it, and both the Week and Total cells unchanged. Add one delegated `#leaderRows` click listener in `init()` (mirroring `#activityList`/`#todayBounties`) that calls `openPersonCard(button.dataset.person)`.
+- `openPersonCard(name)` sets a module-level `personCardName`, calls `renderPersonCard()`, then `openModal('personModal')` — `openModal` already stores `lastFocused`, so `closeModal` returns focus to the tapped row button for free. At the end of `render()`, re-render the card **only** when the modal is open (`personCardName` set and `#personModal` has `open`), so live syncs keep it fresh; keep it idempotent and cheap.
+- `src/index.template.html` — new `#personModal` placed **after `#confirmModal` (entry 19) and before `#setupModal`**, outside every `data-panel`, so no existing order assertion is affected: `role="dialog" aria-modal="true" aria-labelledby="personTitle"`, `#personClose` with `aria-label="Close person details"` (distinct from the existing `Close person picker`), then `#personSummary` (rank, week and total points, bounties, trend, current and best streak), `#personBreakdown`, `#personRecords`, `#personPyramid`. Built from **divs only** — the page must still contain exactly one `<table>`. Any bar graphics get `role="img"` plus a meaningful `aria-label`, with decorative inner elements `aria-hidden="true"`; text values stay plain text.
+- `src/styles.css` — reuse `.breakdown-row`, `.records-row`, `.pyramid-row`, `.dialog`, `.hint`, `.week-trend`; add only `button.climber` (UA reset to inherit the cell's type, an underline-on-hover or dotted affordance, `:focus-visible`, ≥44px effective row hit height) and a small `.person-summary` grid. Keep the existing `tbody tr:hover` rule — it is now an honest affordance.
+
+### Tests
+- `tests/client-state.test.js` harness-1 `checks` literal (no backticks, no `${`): `personSummary('Alex','2026-07-13')` over a crafted multi-person roster — correct `rank`, `week`, `total`, `bounties`; `streak` matches `streakInfo('alex','2026-07-13')`; `breakdown` rows plus bonus sum to `total`; `pyramid` ordered hardest-first; a differently-cased name resolves to the same person; an unknown name returns `null`.
+- `tests/client-state.test.js` harness-2 `domChecks` literal: element listeners are no-ops in the stub and elements have no `closest`, so delegated handlers can never fire — call `openPersonCard('Alex')` **directly** (the precedent entry 14 set with `claimBounty`) and assert `#personModal` has `open`, `#personTitle.textContent` contains the name, and `#personBreakdown.innerHTML` is non-empty and contains a category label; then `closeModal('personModal')` clears `open`. Also assert `#leaderRows.innerHTML` contains `data-person="Alex"` after `render()`.
+- `tests/static-check.mjs` — **add** `personTitle` to the existing dialog-a11y array; assert `aria-label="Close person details"`, `assert.match(script, /data-person="/)` and `assert.match(script, /function openPersonCard\(/)`. The existing single-`<table>` and unique-id assertions must still pass untouched.
+
+### Do not
+Add a second `<table>`, a table column, a nav tab or a hash route; make the whole `<tr>` clickable or give it `tabindex` — use the real button, because a clickable row is neither keyboard- nor screen-reader-legible; re-derive any score inside the modal instead of consuming `totalsModel()` and the existing per-person helpers; change the 🏹 Bounty Hunter or medal logic; add a localStorage key; leave the modal re-rendering on every `render()` while it is closed.
+
+---
+
+## 21. Record tab: show the bounty's description, and make the submit guard real
+
+Status: Todo
+Notes:
+
+### Why
+`populateBountySelect()` renders each `<option>` as icon + title + points and **never** the `description` from `scoring.json` — descriptions appear only in the You-tab bounty cards — so on the Record tab you pick a bounty by name alone. Worse, double-submit protection is defeatable: `submitActivity()` disables `#saveActivityBtn`, but `updateRecordPreview()` ends by recomputing `disabled` from the draft alone, and it is bound to `change` on the type radios, `#hardestGrade`, `#bountySelect` and `#activityDate` — none of which are disabled during the save — so changing the grade mid-POST re-enables Save. There is no in-flight flag. Two smaller papercuts: with a date outside the challenge window the button is disabled while `#creditPreview` still reads "Counts in full · +N today", a dead button with no explanation; and after a successful save `#hardestGrade` keeps its previous value while every other field resets.
+
+### Requirements
+- `src/app.js` — add a module-level `let saving = false`. `submitActivity` returns immediately when `saving` is true, sets `saving = true` before its `try`, and clears it in `finally`. `updateRecordPreview` becomes `…disabled = saving || !target || !dateInChallenge(draft.date) || (type === 'bounty' && !draft.bountyId)`. That single added term is the fix — do **not** try to fix this by disabling more inputs.
+- New pure helper `creditPreviewCopy(opts)` → string, taking a plain object (`{type, hasTarget, inWindow, bountyId, base, credit, reason, startDate, tripDate, saving}`) so it is testable with no DOM. Extract today's message ladder into it and add the two missing states: `!inWindow` → `Outside the challenge window (Jul 1 – Jul 31) · pick a date in range` (dates via `fmtDay()`), and `!hasTarget` → `Choose who you are to save this.` Preserve every existing string exactly for the states that already work (full credit, `already logged`, bounty unchosen, weekly cap) so the harness-2 preview assertions keep passing.
+- Bounty description: add `<small id="bountyHint" class="hint"></small>` inside `#bountyFields`, **after** `#bountySelect`, and give the select `aria-describedby="bountyHint"`. `updateRecordPreview()` — which already runs on `#bountySelect` change — sets its text from the selected bounty's `description` via `esc()`, and empties it when nothing is selected. **Keep** the existing `<label id="bountySelectLabel" for="bountySelect">`: `static-check.mjs` asserts a `<label for="bountySelect">`, and the label already carries the day context.
+- After a successful save, reset `#hardestGrade` to `''` alongside the existing `#activityNote`/`#bountySelect` resets, inside the same success block — never in the `catch`, because a failed save must keep the draft intact.
+- `src/styles.css` — one rule for `#bountyHint` (block, `margin-top`, `--muted`, small line-height) reusing existing tokens. All edits live in the `record` panel, so no You/Crew order assertion is involved.
+
+### Tests
+- `tests/client-state.test.js` harness-1 `checks` literal (no backticks, no `${` — build expected strings with `+`): `creditPreviewCopy` for full credit, `already logged`, bounty-not-chosen, bounty over the weekly cap, no target, and out-of-window — the last asserting the message names **both** window dates.
+- `tests/client-state.test.js` harness-2 `domChecks` literal: with the date picker open and `#activityDate` set outside `config`'s window, `updateRecordPreview()` → `#creditPreview.textContent` starts with `Outside the challenge window` and `#saveActivityBtn.disabled === true`; back in range → enabled. Then `saving = true; updateRecordPreview()` → still disabled with an otherwise valid draft; `saving = false; updateRecordPreview()` → enabled. That pair is the in-flight regression test. Select the Bounty radio, call `populateBountySelect()`, set `#bountySelect.value` to `dailyBounties(challengeToday())[0].id`, `updateRecordPreview()` → `#bountyHint.textContent` equals that bounty's `description`; clear the value → `#bountyHint.textContent === ''`.
+- `tests/static-check.mjs` — **add**: `#bountyHint` exists; `#bountySelect` carries `aria-describedby="bountyHint"`; the existing `<label for="bountySelect">` assertion still passes; the bounty-catalog assertions over `scoring.json` are untouched.
+
+### Do not
+Put descriptions inside `<option>` text — unstyleable, verbose in the closed select, and it bloats the artifact; remove or replace the `<label for="bountySelect">` with `aria-describedby`; disable the type radios, date or grade inputs during a save (the `saving` flag is the guard); reset `#hardestGrade` on a failed save; touch `src/scoring.json` (the descriptions already exist there) or the weekly-cap math; add a localStorage key.
+
+---
+
+## 22. Share my progress: one clipboard helper, and stop a denied copy failing setup
+
+Status: Todo
+Notes:
+
+### Why
+There is no way to share or brag about progress — `exportData()` only downloads raw JSON — and there are three hand-rolled `navigator.clipboard.writeText` call sites with **no shared helper and no `try`/`catch`**: `copyCrewLink()`, `copyScript()`, and the inline `#diagnosticCode` handler. That missing catch is a real bug: `saveSetup()` `await`s `copyCrewLink()` **inside its `try`**, so a rejected clipboard write (insecure context, denied permission) lands in the `catch` and paints `#setupErrors` as though setup itself had failed — even though the config was saved to the Sheet and the endpoint persisted.
+
+### Requirements
+- `src/app.js` — new `async function copyText(text, okMessage)`: returns `false` and toasts `Copy failed — copy it manually.` when `navigator?.clipboard?.writeText` is missing or rejects; otherwise toasts `okMessage` and returns `true`. **It never throws.** Rewire all three call sites — `copyCrewLink()`, `copyScript()` and the `#diagnosticCode` handler in `init()` — through it, and have `copyCrewLink()` return `copyText`'s boolean.
+- Fix `saveSetup()`: keep the save and `loadRemote` work inside the `try`, and let the success toast reflect the copy result — `Shared setup saved. Crew link copied.` when `copyCrewLink()` returns true, `Shared setup saved. Copy the crew link from setup.` when it does not. `#setupErrors` must stay hidden in both cases.
+- New pure helper `publicUrl()` → `location.href` with the hash cleared and the `sheet` query param **removed**, so shared text never leaks the crew's Apps Script endpoint. `copyCrewLink()` keeps its own behaviour — it intentionally *includes* `sheet` — so factor out only the URL construction, not the semantics.
+- New pure helper `shareSummary(nameLower, today = challengeToday())` → a short multi-line string composed from existing helpers only: name, `challengeProgress()` (entry 18) for the `Day N of M` line, total and rank from `totalsModel().sorted`, the `categoryBreakdown()` rows as icon/number pairs, `streakInfo()` for the streak, `personalRecords().hardest` when graded, and `publicUrl()` on the last line. A person with no credited points gets a short "just getting started" variant; a blank or unknown `me` returns `''`. No new scoring math, no `new Date()`.
+- `src/index.template.html` — `<button id="shareBtn" class="text-btn" type="button">Share</button>` in the You panel's existing `.page-head`, next to `#changeMeBtn`. That is **above** every You-panel anchor (`today-card`, `#bountyCapHint`, `#todayBounties`, `#personalActivity`, `.stat-grid`), so no existing order assertion is affected. Wire it in `init()` to `copyText(shareSummary(String(me).toLowerCase()), 'Progress copied — paste it anywhere.')`, and hide or disable it when no profile is selected.
+- `src/styles.css` — no new rules if `.text-btn` suffices; add only spacing for the two-button `.page-head` group, keeping both at least 44px.
+
+### Tests
+- `tests/client-state.test.js` harness-1 `checks` literal (no backticks, no `${`; emoji are fine): `shareSummary` on a crafted roster contains the person's name, `Day ` plus the day number, the total, the rank and the streak, and does **not** contain `sheet=` or the endpoint host — that is the privacy assertion. A person with no logs yields the short variant; a blank name yields `''`. `publicUrl()` strips both the hash and the `sheet` param.
+- `tests/client-state.test.js` — a **new** async `test(...)` case modelled on the existing `test('background sync respects the open date picker…')` harness, whose context is the only one already carrying `Promise`, `fetch` and its own `makeElement()` map. Give it `navigator:{clipboard:{writeText:()=>Promise.reject(Error('denied'))}}` plus a `fetch` stub that accepts `saveConfig`, populate the setup fields, `await saveSetup()`, then assert `endpoint` is set, `#setupErrors` still has the `hide` class, and the toast reports a saved setup with an uncopied link. That is the regression lock for the false-failure bug. Add a second case with a resolving `writeText` asserting `copyText` returns `true` and toasts `okMessage`. Adding a `navigator` stub to a context object is additive, not a weakened assertion.
+- `tests/static-check.mjs` — **add**: `#shareBtn` exists inside `data-panel="you"` with `type="button"`; a new order assertion `data-panel="you"` → `id="shareBtn"` → `today-card`; and an architectural guard, `assert.equal((script.match(/navigator\.clipboard\.writeText/g)||[]).length, 1, 'clipboard writes funnel through one helper')`.
+
+### Do not
+Use `navigator.share` — a permission-gated async path that still needs the clipboard fallback and is not observable in the stub harness, so propose it separately; include the `sheet` param, the endpoint, or any other person's data in the shared text; make `copyText` throw or re-throw; change `exportData()`'s JSON shape or the `action:'saveConfig'` request body; add a network request, a dependency, or a localStorage key.
