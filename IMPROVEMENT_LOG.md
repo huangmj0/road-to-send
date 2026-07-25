@@ -307,3 +307,25 @@ The leaderboard always ranks by all-time total, so weekly standing is buried in 
 
 ### Do not
 - Add a second `<table>` or a new table column (medals go inside the Climber cell); add a localStorage key for the toggle; change the 🏹 Bounty Hunter logic; sort with string/lexical comparison of numeric scores; fork scoring math instead of reading `totalsModel().sorted`.
+
+---
+
+## 14. Surface daily bounties: move card up + one-tap claim (You tab)
+
+Status: Done — 2026-07-25
+Notes: Relocate "Today's bounties" card directly under the today-card (was 9th of 10 cards, below three conditional analytics cards) and lift "Recent activity" up beside it, so action/engagement content sits above the analytics cluster. Make each bounty row a real `<button class="bounty" data-claim-bounty=…>` with an `aria-label="Claim …"`; new pure-ish helper `claimBounty(id)` checks the Bounty radio, snaps the record date to today (closing the date picker so `submitActivity`'s date guard can't fire), `showTab('record')`, populates and preselects `#bountySelect`, then focuses it — reusing `showTab`/`populateBountySelect`/`updateRecordPreview`. A delegated click listener on `#todayBounties` in `init()` (mirroring the `#activityList` pattern) routes taps. Card ordering only — no scoring, `dailyBounties`, weekly-cap, or `scoring.json` changes. Deviations from spec: none.
+
+### Why
+Daily bounties are a core pillar of the scoring economy but are buried near the bottom of the You tab and are display-only — claiming one means leaving for the Record tab, flipping the Bounty radio, and hunting a dropdown. Moving the card above the fold and making rows one-tap claimable makes the daily bounties immediately visible and actionable without adding a route.
+
+### Requirements
+- `src/index.template.html`: move the Today's-bounties `<article>` to directly under the `today-card` article; move the Recent-activity `<article>` up to just below it (order: today-card → bounties → recent activity → stat-grid → breakdown → pyramid → records → heatmap). Keep `#bountyCapHint` before `#todayBounties` and all DOM ids unique.
+- `src/app.js`: in `renderBounties()`, render each bounty as `<button class="bounty" type="button" data-claim-bounty="{id}" aria-label="Claim {title} · {category} bounty · plus N point(s)">` with the category emoji + chevron `aria-hidden`; keep the empty-state string and `#bountyCapHint` block. Add `claimBounty(id)` reusing existing functions only; add one delegated `#todayBounties` click listener in `init()`.
+- `src/styles.css`: `button.bounty` UA reset + `:hover`/`:active`/`:focus-visible` states and a `.bounty-go` chevron, reusing existing tokens; rows stay ≥44px touch targets.
+
+### Tests
+- `tests/client-state.test.js`: after `render()`, `claimBounty(dailyBounties(challengeToday())[0].id)` selects the Bounty radio, preselects that id in `#bountySelect`, and closes `#dateFields` (`location.hash` not asserted — the DOM stub's `history.replaceState` is a no-op).
+- `tests/static-check.mjs`: bounty card sits under the today-card above the stat grid; recent activity sits above the stat grid; rows render as labelled claim buttons and `claimBounty` exists. Retarget the two pyramid/heatmap ordering assertions off the (now-moved) `#bountyCapHint` anchor.
+
+### Do not
+- Move the bounty list onto the Record tab (it belongs on the You landing view; the Record tab already has the Bounty radio + dropdown for entry); add a 4th nav tab / new hash route; add a localStorage key; fork scoring or touch `scoring.json`/the weekly cap.

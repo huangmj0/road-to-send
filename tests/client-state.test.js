@@ -613,6 +613,20 @@ const domChecks = `(()=>{
   assert.equal(recordsCard.classList.contains('hide'),false,'a non-climb log still reveals the card');
   assert.equal(recordsList.innerHTML.includes('Hardest'),false,'grade rows are suppressed without a graded climb');
   assert.ok(recordsList.innerHTML.includes('Best single day'),'best day/week still render without graded climbs');
+
+  // Entry 11: tapping a bounty on the You card preselects it on the Record form for a one-tap claim.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const claimId=dailyBounties(challengeToday())[0].id;
+  const bountyRadio=document.querySelector('input[name="activityType"][value="bounty"]');
+  const claimSelect=document.querySelector('#bountySelect'),claimDateBox=document.querySelector('#dateFields');
+  bountyRadio.checked=false;claimSelect.value='';claimDateBox.classList.remove('hide');
+  claimBounty(claimId);
+  assert.equal(bountyRadio.checked,true,'claiming a bounty selects the Bounty activity type');
+  assert.equal(claimSelect.value,claimId,'claiming a bounty preselects it in the Record dropdown');
+  assert.equal(claimDateBox.classList.contains('hide'),true,'claiming a bounty snaps to today and closes the date picker');
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 
