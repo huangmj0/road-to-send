@@ -482,6 +482,92 @@ const checks = `(()=>{
   challengeTimeZone='America/Los_Angeles';
   assert.equal(challengeToday(),dateInTimeZone(new Date(),'America/Los_Angeles'),'a valid challenge timezone always wins');
   endpoint='';challengeTimeZone='';serverDate='';lastSyncedAt=0;
+
+  // Entry 17: todayProgress reports which categories are already logged and whether the balanced-day bonus is still live.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  const climb17={id:'p1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'};
+  const climbAgain17={id:'p2',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'2'};
+  const exercise17={id:'p3',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'3'};
+  const mobility17={id:'p4',name:'Alex',type:'mobility',date:'2026-07-13',createdAt:'4'};
+  logs=[];
+  let prog=todayProgress('alex','2026-07-13');
+  assert.equal(prog.inWindow,true,'a day inside the challenge window is in play');
+  assert.equal(prog.loggedCount,0,'nothing is logged on a clean day');
+  assert.equal(prog.points,0,'a clean day has scored nothing');
+  assert.equal(prog.max,DAILY_MAX,'the day is measured against the derived daily max');
+  assert.equal(prog.rows.length,CATEGORIES.length,'one row per scoring category');
+  assert.equal(prog.rows.every(r=>r.logged===false),true,'no category is logged yet');
+  assert.equal(prog.remainingPoints,DAILY_MAX-SCORING.balancedDayBonus,'every category is still open');
+  assert.equal(prog.bonusPoints,SCORING.balancedDayBonus,'the bonus comes from the scoring config');
+  assert.equal(prog.bonusEarned,false);
+  assert.equal(prog.bonusReachable,true,'a clean day can still earn the balanced-day bonus');
+  assert.equal(prog.potential,DAILY_MAX,'a clean day can still reach the daily max');
+
+  // Two of three categories, with a duplicate climb that must not double-count.
+  logs=[climb17,climbAgain17,exercise17];
+  prog=todayProgress('alex','2026-07-13');
+  assert.equal(prog.points,SCORING.categories.climb+SCORING.categories.exercise,'a duplicate same-day climb adds nothing');
+  assert.equal(prog.loggedCount,2,'the duplicate still reads as a single logged category');
+  assert.equal(prog.rows.find(r=>r.type==='climb').logged,true,'the duplicated category counts as logged');
+  assert.equal(prog.rows.filter(r=>r.logged===false).length,1,'exactly one category is still open');
+  assert.equal(prog.rows.find(r=>r.type==='mobility').logged,false,'the untouched category is the open one');
+  assert.equal(prog.remainingPoints,SCORING.categories.mobility,'the open category names the points left');
+  assert.equal(prog.bonusEarned,false);
+  assert.equal(prog.bonusReachable,true,'one category short still leaves the bonus reachable');
+  assert.equal(prog.potential,DAILY_MAX,'the daily max is still on the table');
+
+  // All three categories: the day is complete and the bonus is banked, not reachable.
+  logs=[climb17,climbAgain17,exercise17,mobility17];
+  prog=todayProgress('alex','2026-07-13');
+  assert.equal(prog.points,DAILY_MAX,'all three categories plus the bonus top the day out');
+  assert.equal(prog.loggedCount,CATEGORIES.length);
+  assert.equal(prog.bonusEarned,true,'a balanced day earns the bonus');
+  assert.equal(prog.bonusReachable,false,'an earned bonus is no longer reachable');
+  assert.equal(prog.remainingPoints,0,'nothing is left to log');
+  assert.equal(prog.potential,DAILY_MAX);
+
+  // Bounties never touch the daily meter, so a bounty-only day leaves every category open.
+  logs=[{id:'pb',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  prog=todayProgress('alex','2026-07-13');
+  assert.equal(prog.points,0,'a bounty adds no daily-meter points');
+  assert.equal(prog.loggedCount,0,'a bounty logs no category');
+  assert.equal(prog.rows.every(r=>r.logged===false),true,'all three category rows stay open on a bounty-only day');
+
+  // Outside the challenge window nothing is in play.
+  logs=[climb17,exercise17,mobility17];
+  prog=todayProgress('alex','2026-08-15');
+  assert.equal(prog.inWindow,false,'a day past the window is out of play');
+  assert.equal(prog.points,0,'an out-of-window day scores nothing');
+  assert.equal(prog.loggedCount,0,'out-of-window entries never read as logged');
+  assert.equal(prog.bonusReachable,false,'the bonus is unreachable outside the window');
+
+  // The segmented meter always has one pip per daily point, and its filled pips equal the points earned.
+  for(const set of [[],[climb17],[climb17,exercise17],[mobility17],[climb17,exercise17,mobility17],[climb17,climbAgain17]]){
+    logs=set;
+    const p=todayProgress('alex','2026-07-13'),segs=meterSegments(p);
+    assert.equal(segs.length,DAILY_MAX,'the segmented meter carries DAILY_MAX pips');
+    assert.equal(segs.filter(s=>s.cls.indexOf('filled')>=0).length,p.points,'filled pips always equal the points earned');
+  }
+  const segments17=meterSegments(todayProgress('alex','2026-07-13'));
+  assert.equal(segments17.filter(s=>s.cls.indexOf('seg-climb')>=0).length,SCORING.categories.climb,'climb owns its share of the pips');
+  assert.equal(segments17.filter(s=>s.cls.indexOf('seg-bonus')>=0).length,SCORING.balancedDayBonus,'the bonus owns the last pips');
+
+  // todayPillState replaces the binary Ready/Balanced day pill with five honest states.
+  logs=[];
+  assert.equal(todayPillState(todayProgress('alex','2026-07-13')).text,'Ready','an untouched day inside the window reads Ready');
+  assert.equal(todayPillState(todayProgress('alex','2026-07-13')).cls,'','an untouched day carries no max class');
+  logs=[climb17];
+  assert.equal(todayPillState(todayProgress('alex','2026-07-13')).text,'2 more for +'+SCORING.balancedDayBonus,'one category logged counts down two');
+  logs=[climb17,exercise17];
+  assert.equal(todayPillState(todayProgress('alex','2026-07-13')).text,'1 more for +'+SCORING.balancedDayBonus,'two categories logged counts down one');
+  logs=[climb17,exercise17,mobility17];
+  const balanced17=todayPillState(todayProgress('alex','2026-07-13'));
+  assert.equal(balanced17.text,'Balanced day','a balanced day still reads Balanced day');
+  assert.equal(balanced17.cls,'max','a day at the daily max keeps the max pill class');
+  logs=[];
+  assert.equal(todayPillState(todayProgress('alex','2026-06-15')).text,'Not started','before the window the pill reads Not started');
+  assert.equal(todayPillState(todayProgress('alex','2026-08-15')).text,'Complete','after the window the pill reads Complete');
+  logs=[];
 })()`;
 
 vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
@@ -627,6 +713,40 @@ const domChecks = `(()=>{
   assert.equal(bountyRadio.checked,true,'claiming a bounty selects the Bounty activity type');
   assert.equal(claimSelect.value,claimId,'claiming a bounty preselects it in the Record dropdown');
   assert.equal(claimDateBox.classList.contains('hide'),true,'claiming a bounty snaps to today and closes the date picker');
+
+  // Entry 17: the today card names which categories are done and whether the balanced-day bonus is still live.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const statusPill=document.querySelector('#todayStatus'),catRow=document.querySelector('#todayCategories'),remaining=document.querySelector('#todayRemaining');
+  assert.equal(statusPill.textContent,'Ready','an untouched day still reads Ready');
+  assert.equal(catRow.innerHTML.split('cat-chip').length-1,CATEGORIES.length,'one chip per scoring category');
+  assert.equal(catRow.innerHTML.indexOf('cat-chip done')>=0,false,'no chip is done before anything is logged');
+  assert.equal(catRow.innerHTML.indexOf('aria-hidden="true"')>=0,true,'the chip emoji are hidden from assistive tech');
+  assert.ok(remaining.textContent.indexOf(CAT_LABELS.climb)>=0&&remaining.textContent.indexOf(CAT_LABELS.exercise)>=0&&remaining.textContent.indexOf(CAT_LABELS.mobility)>=0,'the remaining line names every open category');
+  assert.ok(remaining.textContent.indexOf('+'+SCORING.balancedDayBonus)>=0,'the remaining line names the balanced-day bonus');
+  assert.ok(remaining.textContent.indexOf('+'+(DAILY_MAX-SCORING.balancedDayBonus)+' more')>=0,'the remaining line names the points still on the table');
+
+  logs=[{id:'tc1',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'},{id:'tc2',name:'Alex',type:'exercise',date:challengeToday(),createdAt:'2'}];
+  render();
+  assert.equal(statusPill.textContent,'1 more for +'+SCORING.balancedDayBonus,'two of three categories counts down to the bonus');
+  assert.equal(catRow.innerHTML.split('cat-chip done').length-1,2,'the two logged categories read as done');
+  assert.equal(catRow.innerHTML.split('cat-chip todo').length-1,1,'the missing category still reads as to-do');
+  assert.ok(remaining.textContent.indexOf(CAT_LABELS.mobility)>=0,'the remaining line names the missing category');
+  assert.equal(remaining.textContent.indexOf(CAT_LABELS.climb)>=0,false,'a logged category drops out of the remaining line');
+
+  logs=logs.concat([{id:'tc3',name:'Alex',type:'mobility',date:challengeToday(),createdAt:'3'}]);
+  render();
+  assert.equal(statusPill.textContent,'Balanced day','all three categories complete the day');
+  assert.equal(statusPill.classList.contains('max'),true,'a complete day keeps the max pill styling');
+  assert.equal(catRow.innerHTML.split('cat-chip todo').length-1,0,'no category is left to do');
+  assert.equal(remaining.textContent,'Balanced day complete — '+DAILY_MAX+' of '+DAILY_MAX+' points.','the remaining line reports the finished day');
+  const meterHtml=document.querySelector('#youMeter').innerHTML;
+  assert.equal(meterHtml.split('<i ').length-1,DAILY_MAX,'the You meter draws one pip per daily point');
+  assert.equal(meterHtml.split('filled').length-1,DAILY_MAX,'a balanced day fills every pip');
+  assert.ok(meterHtml.indexOf('seg-bonus')>=0,'the bonus pips are identifiable');
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 
