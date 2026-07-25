@@ -568,6 +568,51 @@ const checks = `(()=>{
   assert.equal(todayPillState(todayProgress('alex','2026-06-15')).text,'Not started','before the window the pill reads Not started');
   assert.equal(todayPillState(todayProgress('alex','2026-08-15')).text,'Complete','after the window the pill reads Complete');
   logs=[];
+
+  // Entry 18: challengeProgress gives the You tab its date context and never re-derives what weeksUntilDone already knows.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  let cp=challengeProgress('2026-07-01');
+  assert.equal(cp.state,'active','a day inside the window is active');
+  assert.equal(cp.day,1,'the first day of the window is day 1');
+  assert.equal(cp.totalDays,31,'an inclusive window counts both endpoints');
+  assert.equal(cp.daysLeft,31,'day one still has the whole window left');
+  cp=challengeProgress('2026-07-15');
+  assert.equal(cp.day,15,'the day number counts from the start date');
+  assert.equal(cp.daysLeft,17,'the days left include today');
+  assert.equal(cp.weeksLeft,weeksUntilDone('2026-07-15').weeks,'weeksLeft comes straight from weeksUntilDone');
+  cp=challengeProgress('2026-07-31');
+  assert.equal(cp.day,31,'the last day of the window is the last day');
+  assert.equal(cp.daysLeft,1,'the final day still counts itself');
+  assert.equal(cp.pct,100,'the final day is the whole window');
+  assert.equal(challengeProgress('2026-08-05').state,'ended','a day past the trip date has ended');
+  assert.equal(challengeProgress('2026-08-05').daysLeft,0,'a finished window has no days left');
+  assert.equal(challengeProgress('2026-06-30').state,'before','a day before the start has not begun');
+  assert.equal(challengeProgress('2026-06-30').day,0,'the window has not started counting yet');
+  assert.equal(challengeProgress('garbage'),null,'an unparseable day has no progress');
+  assert.equal(challengeProgress('2026-07-15',{startDate:'2026-07-31',tripDate:'2026-07-01',goal:500}),null,'an inverted window has no progress');
+  for(const d of ['2026-07-01','2026-07-09','2026-07-20','2026-07-31','2026-06-30'])assert.equal(challengeProgress(d).daysLeft,weeksUntilDone(d).days,'daysLeft never drifts from weeksUntilDone on '+d);
+
+  // Entry 18: personalPaceInfo splits the crew goal into a personal share and reuses paceInfo unchanged.
+  logs=[];
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'}]};
+  assert.equal(personalPaceInfo('alex','2026-07-15').share,100,'a solo crew owns the whole goal');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
+  assert.equal(personalPaceInfo('alex','2026-07-15').share,34,'a three-person crew rounds the share up');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'},{name:'Di'}]};
+  assert.equal(personalPaceInfo('alex','2026-07-15').share,25,'a four-person crew splits the goal evenly');
+  logs=[{id:'pp1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'}];
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:8,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'},{name:'Di'}]};
+  let pp=personalPaceInfo('alex','2026-07-15');
+  assert.equal(pp.share,2,'the share is the crew goal split and rounded up');
+  assert.equal(pp.total,SCORING.categories.climb,'the total is the person credited score');
+  assert.equal(pp.pace.state,'met','passing your share of the goal reads as met');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:0,crew:[{name:'Alex'}]};
+  assert.equal(personalPaceInfo('alex','2026-07-15').pace,null,'a zero goal has no pace');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'}]};
+  assert.equal(personalPaceInfo('alex','2026-07-15',{startDate:'2026-07-31',tripDate:'2026-07-01',goal:100}).pace,null,'an inverted window has no pace');
+  assert.equal(personalPaceInfo('alex','2026-06-15').pace.state,'before','today is honoured as an argument: a pre-window day reads before');
+  assert.equal(personalPaceInfo('alex','2026-08-15').pace.state,'ended','today is honoured as an argument: a post-window day reads ended');
+  logs=[];
 })()`;
 
 vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
@@ -747,6 +792,24 @@ const domChecks = `(()=>{
   assert.equal(meterHtml.split('filled').length-1,DAILY_MAX,'a balanced day fills every pip');
   assert.ok(meterHtml.indexOf('seg-bonus')>=0,'the bonus pips are identifiable');
 
+
+  // Entry 18: the today card carries the personal countdown and the person share of the crew pace.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const countdown=document.querySelector('#youCountdown'),youPace=document.querySelector('#youPace');
+  assert.ok(countdown.textContent.indexOf('Day 6 of 11')>=0,'the countdown names the day and the window length');
+  assert.ok(countdown.textContent.indexOf('6 days left')>=0,'the countdown names the days remaining');
+  assert.equal(youPace.classList.contains('hide'),false,'the personal pace line shows inside the window');
+  assert.equal(youPace.textContent.indexOf('0 / 500 pts'),0,'the pace line opens with the person total over their share');
+  assert.ok(youPace.textContent.indexOf('behind')>=0,'zero points partway through the window reads behind your share');
+  assert.equal(youPace.classList.contains('behind'),true,'the pace line reuses the crew pace colour classes');
+  config={startDate:shift(-20),tripDate:shift(-10),goal:500,crew:[{name:'Alex'}]};
+  render();
+  assert.equal(youPace.classList.contains('hide'),true,'a finished window hides the personal pace line');
+  assert.equal(countdown.textContent.indexOf('Challenge complete'),0,'a finished window reads as complete');
+  assert.ok(countdown.textContent.indexOf(fmtDay(shift(-10)))>=0,'the finished countdown names the end date');
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 
