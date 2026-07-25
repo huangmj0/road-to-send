@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+// The deployed artifact is a single self-contained file the crew downloads on every
+// cold load, so its growth is capped here. Raise BUDGET deliberately in a log entry
+// that explains the growth — never as a side effect of another change.
+const BUDGET = 132000;
+
+const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
+const pct = ((bytes / BUDGET) * 100).toFixed(1);
+
+console.log(`index.html is ${bytes} bytes — ${pct}% of the ${BUDGET}-byte budget.`);
+
+assert.ok(
+  bytes <= BUDGET,
+  `index.html is ${bytes} bytes, over the ${BUDGET}-byte budget: raise \`BUDGET\` deliberately in a log entry that explains the growth — never as a side effect of another change.`,
+);

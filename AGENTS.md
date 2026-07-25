@@ -7,7 +7,7 @@ This is an intentionally self-contained static application. The editable sources
 ## Build, Test, and Development Commands
 
 - `npm run build` regenerates `index.html` from `src/`. Run it after any `src/` change and commit the regenerated artifact alongside the source edits.
-- `npm test` runs the generated-artifact check plus all behavioral, backend-contract, and static checks. Run it before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml` deploys the repository root to GitHub Pages on pushes to `main`.
+- `npm test` runs `scripts/run-tests.mjs`, which runs every suite — the generated-artifact check plus the behavioral, backend-contract, static, documentation, and bundle-size checks — without short-circuiting, prints a `PASS`/`FAIL` line per suite, and exits non-zero if any failed. Run it before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml` runs it again in a `verify` job that gates the deploy job, which publishes only `index.html` to GitHub Pages on pushes to `main`.
 - `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to exercise browser behavior.
 
 Pushes to `main` are expected to deploy the static page through GitHub Pages. Shared-mode changes may also require copying and redeploying the embedded Apps Script as described in `README.md`.

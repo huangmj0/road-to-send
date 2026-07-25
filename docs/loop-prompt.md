@@ -53,10 +53,10 @@ re-do a `Done` entry, or reopen anything.
 
 - Set `Status: In progress — <today>` as your first action.
 - Do exactly what that entry's `### Requirements` says, and nothing its `### Do not` forbids.
-- Entries 15 and 16 contain explicit carve-outs permitting edits to docs, .github/,
-  package.json and scripts/. Honour the carve-out — do NOT go `Blocked` on rules 2/8 for
-  those two. Every other entry is limited to src/app.js, src/index.template.html,
-  src/styles.css and tests.
+- An entry may carve itself out of rules 2 and 8 in its own `### Requirements`. Honour that
+  carve-out — do NOT go `Blocked` on rules 2/8 for an entry that grants itself one. Absent an
+  explicit carve-out they are hard limits: src/app.js, src/index.template.html, src/styles.css
+  and tests only.
 - Reuse the existing helpers the entry names. Never fork scoring math, never call `new Date()`
   for challenge dates (use `challengeToday()`), never add a localStorage key, a dependency,
   or a network request.
@@ -78,11 +78,10 @@ re-do a `Done` entry, or reopen anything.
 
 ## Verify
 
-Run `npm run build` then `npm test`. All suites must pass; never weaken an assertion.
-
-Then run `git status`. If index.html shows as modified, the committed artifact was stale and
-`check:generated` silently rebuilt it — commit the regenerated index.html together with your
-src/ changes. (Entry 16 removes this foot-gun; until it lands, check every time.)
+Run `npm run build` then `npm test`. All suites must pass; never weaken an assertion. The
+runner reports every suite before exiting, so read the PASS/FAIL summary, not just the first
+failure. `check:generated` is read-only: if it fails, run `npm run build` and commit
+index.html together with your src/ changes.
 
 ## Ship
 
@@ -92,14 +91,3 @@ src/ changes. (Entry 16 removes this foot-gun; until it lands, check every time.
   DRAFT PR describing the entry, its tests, and anything you deviated on.
 - Report the entry number, the PR URL, and CI status. Then stop — do not start the next entry.
 ```
-
-## Maintenance
-
-Two lines in the prompt are deliberately temporary and should be removed when they stop being
-true:
-
-- The `git status` / stale-`index.html` paragraph describes a foot-gun that **entry 16
-  removes** by making `check:generated` read-only. Delete it once entry 16 has landed.
-- The "entries 15 and 16 contain explicit carve-outs" paragraph is specific to those two
-  entries. Once both are `Done`, reduce it to the general rule: an entry may carve itself out
-  of rules 2 and 8 in its own `### Requirements`, and absent that they are hard limits.

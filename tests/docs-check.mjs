@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
+import {buildHtml} from '../scripts/build.mjs';
 
 const at=name=>new URL('../'+name,import.meta.url);
 const log=readFileSync(at('IMPROVEMENT_LOG.md'),'utf8');
@@ -42,5 +43,21 @@ assert.match(improvements,/^## 1\. Per-category breakdown card \(You tab\)$/m,'I
 // CLAUDE.md orients agent sessions and points at the queue rather than restating it.
 assert.ok(existsSync(at('CLAUDE.md')),'a repo-root CLAUDE.md orients agent sessions');
 assert.match(readFileSync(at('CLAUDE.md'),'utf8'),/IMPROVEMENT_LOG\.md/,'CLAUDE.md points at IMPROVEMENT_LOG.md');
+
+// The live site is only published from a green tree, and only the app is published.
+const pages=readFileSync(at('.github/workflows/pages.yml'),'utf8');
+assert.ok(pages.includes('needs: verify'),'the pages deploy job waits on the verify job (needs: verify)');
+assert.match(pages,/^\s*run: npm test$/m,'the pages verify job runs npm test before anything deploys');
+assert.ok(!pages.includes('path: .'),'the Pages artifact is a narrowed _site directory, never the repository root (path: .)');
+
+// The generated-artifact check is read-only: a stale index.html must keep failing.
+const checkGenerated=readFileSync(at('scripts/check-generated.mjs'),'utf8');
+assert.ok(!checkGenerated.includes('execFileSync'),'scripts/check-generated.mjs compares in memory instead of shelling out to build.mjs');
+assert.ok(!checkGenerated.includes('writeFileSync'),'scripts/check-generated.mjs never writes index.html');
+
+// buildHtml() is pure and the committed artifact matches it.
+const rendered=buildHtml();
+assert.equal(typeof rendered,'string','buildHtml() returns the rendered artifact as a string');
+assert.equal(rendered,readFileSync(at('index.html'),'utf8'),'index.html matches buildHtml() — run `npm run build` and commit the result');
 
 console.log(`Road to Send documentation checks passed (${entries.length} live entries, ${keys.length} frozen localStorage keys).`);

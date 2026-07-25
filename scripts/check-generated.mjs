@@ -1,15 +1,15 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { artifactPath, buildHtml } from './build.mjs';
 
-const artifact = new URL('../index.html', import.meta.url);
-const before = readFileSync(artifact, 'utf8');
-execFileSync(process.execPath, [new URL('./build.mjs', import.meta.url).pathname], {
-  stdio: 'inherit',
-});
-const after = readFileSync(artifact, 'utf8');
+// Read-only: renders src/ in memory and compares. It never writes index.html, so a
+// stale artifact keeps failing until it is rebuilt and committed.
+const committed = readFileSync(artifactPath, 'utf8');
+const rendered = buildHtml();
 
-if (before !== after) {
-  throw new Error('index.html was stale and has been rebuilt. Commit the generated result.');
+if (committed !== rendered) {
+  throw new Error(
+    'index.html does not match src/. Run `npm run build` and commit the regenerated index.html.',
+  );
 }
 
 console.log('Generated index.html is current.');
