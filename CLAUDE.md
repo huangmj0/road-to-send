@@ -23,8 +23,4 @@ a third thing to drift. The short version:
 - Edit `src/app.js`, `src/index.template.html`, `src/styles.css` and `tests/`. **Never** edit
   `index.html` by hand; run `npm run build` to regenerate it, then `npm test`.
 - Commit the regenerated `index.html` with your `src/` changes. Never weaken an existing assertion.
-- **Rebuild foot-gun:** `npm run check:generated` shells out to `build.mjs`, which **overwrites
-  `index.html` in place** before comparing, so a stale-artifact failure silently "passes" on the
-  second run and leaves an unstaged `index.html`. After any test failure, run `git status` and
-  commit the regenerated `index.html` alongside your `src/` changes. (Entry 16 removes this
-  foot-gun and deletes this note when it does.)
+- `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html`.

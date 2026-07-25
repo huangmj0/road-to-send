@@ -15,7 +15,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The live crew site is only ever published from a green tree. GitHub Actions
+  # `needs:` cannot reference a job in another workflow, so the gate lives here
+  # rather than depending on test.yml, which still covers pull requests.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run tests
+        run: npm test
+
   deploy:
+    needs: verify
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -27,10 +43,16 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+      # Publish only the app. index.html is intentionally self-contained (styles
+      # and script are inlined at build time), so it is the whole site — if it
+      # ever gains a sibling asset, copy that into _site here too. Uploading the
+      # repository root would publish src/, tests/ and every markdown file.
+      - name: Assemble site
+        run: mkdir -p _site && cp index.html _site/index.html
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
