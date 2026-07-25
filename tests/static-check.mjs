@@ -49,6 +49,11 @@ assert.match(html,/data-panel="you"[\s\S]*id="todayRemaining"[^>]*role="status"[
 assert.match(html,/id="youMeter"[^>]*role="img"[^>]*aria-label=/,'the today meter stays a labelled graphic');
 assert.match(html,/data-panel="you"[\s\S]*id="youMeter"[\s\S]*id="todayCategories"[\s\S]*id="todayRemaining"[\s\S]*data-tab="record"[\s\S]*id="bountyCapHint"/,'the category chips and remaining line sit between the today meter and the Record button, above the bounty card');
 assert.match(script,/function todayProgress\(/,'the today-progress helper backs the category chips');
+assert.match(html,/data-panel="you"[\s\S]*id="youCountdown"/,'the personal countdown lives in the You panel');
+assert.match(html,/data-panel="you"[\s\S]*id="youPace"[^>]*class="[^"]*pace[^"]*"/,'the personal pace line reuses the crew pace classes inside the You panel');
+assert.match(html,/data-panel="you"[\s\S]*id="todayCategories"[\s\S]*id="youCountdown"[\s\S]*id="youPace"[\s\S]*data-tab="record"[\s\S]*id="bountyCapHint"/,'the countdown and personal pace sit between the category chips and the Record button, above the bounty card');
+assert.match(script,/function challengeProgress\(/,'the challenge-progress helper backs the personal countdown');
+assert.match(script,/function personalPaceInfo\(/,'the personal pace helper backs the personal share line');
 assert.match(script,/function setSegmentedMeter\(/,'the You meter renders identifiable per-category segments');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="record"/,'the per-category breakdown card lives inside the You panel');
 assert.match(html,/data-panel="you"[\s\S]*class="stat-grid"[\s\S]*id="youTotal"[\s\S]*id="youRank"[\s\S]*id="youStreak"[\s\S]*id="youBestStreak"[\s\S]*data-panel="record"/,'the current and best streak stat cards join the stat grid on the You panel');
