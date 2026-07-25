@@ -53,11 +53,14 @@ assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="weeklyTrend"/,'the week
 assert.match(html,/\.trend-scroll\{overflow-x:auto\}/,'the trend wrapper scrolls horizontally instead of squeezing');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
+assert.match(html,/id="leaderPointsBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Points toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderBountyBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Bounties toggle is a real button with aria-pressed');
+assert.match(html,/id="leaderMetricToggle"[^>]*aria-label=/,'the points/bounties metric toggle is a labelled group');
+assert.match(html,/id="leaderScopeToggle"[^>]*aria-label=/,'the weekly/overall scope toggle is a labelled group');
 assert.match(html,/data-panel="you"[\s\S]*id="youEmptyState"[\s\S]*id="personalActivity"[\s\S]*data-panel="record"/,'the You onboarding empty state sits in the recent-activity area of the You panel');
 assert.match(html,/id="youEmptyState"[\s\S]*data-tab="record"/,'the empty state offers a button that jumps to the Record tab');
 assert.match(html,/data-panel="crew"[\s\S]*id="crewLocalHint"/,'the crew local-mode hint lives in the Crew panel');
-assert.equal((html.match(/<table>/g)||[]).length,1,'all crew share one leaderboard');
+assert.equal((html.match(/<table[\s>]/g)||[]).length,1,'all crew share one leaderboard');
 assert.match(html,/<meta[^>]+name="theme-color"[^>]+content="#f5eee3"/,'a theme-color meta tints the browser chrome to the brand background');
 assert.match(html,/<link[^>]+rel="icon"[^>]+href="data:image\/svg\+xml,/,'an inline SVG data-URI favicon is present');
 assert.match(html,/<meta[^>]+name="color-scheme"[^>]+content="[^"]*dark[^"]*"/,'a color-scheme meta opts the page into dark rendering');
