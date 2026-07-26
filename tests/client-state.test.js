@@ -471,6 +471,34 @@ const checks = `(()=>{
   assert.equal(earnedThrough('2026-07-10'),3,'a future-dated entry is excluded from the through-today total');
   assert.equal(earnedThrough('2026-07-25'),5,'once its date has arrived the entry counts toward the rate');
 
+  // Entry 25: computeCredits memoizes the live (logs, config) pair only. Every way that pair can
+  // change is checked here with a case whose stale answer would be a DIFFERENT number, so a
+  // broken invalidation fails loudly instead of merely being slow.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[{id:'m1',name:'Mem',type:'climb',date:'2026-07-02',createdAt:'1'}];
+  assert.equal(computeCredits(logs).totals.get('mem'),3,'the first scan scores the live log');
+  assert.equal(computeCredits(logs).totals.get('mem'),3,'a repeat call with nothing changed agrees with itself');
+  logs=logs.concat([{id:'m2',name:'Mem',type:'exercise',date:'2026-07-02',createdAt:'2'}]);
+  assert.equal(computeCredits(logs).totals.get('mem'),5,'a replaced logs reference rescans');
+  logs.push({id:'m3',name:'Mem',type:'mobility',date:'2026-07-02',createdAt:'3'});
+  assert.equal(computeCredits(logs).totals.get('mem'),8,'an in-place push changes the length, so the len guard rescans');
+  logs.splice(2,1);
+  assert.equal(computeCredits(logs).totals.get('mem'),5,'an in-place splice changes the length, so the len guard rescans');
+  config={startDate:'2026-08-01',tripDate:'2026-08-31',goal:500,crew:[]};
+  assert.equal(computeCredits(logs).totals.get('mem'),undefined,'a replaced config rescans, so an out-of-window log scores nothing');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.equal(computeCredits(logs).totals.get('mem'),5,'putting the window back rescans again');
+  // A derived array never touches the memo: it neither reads a wrong answer nor evicts the live one.
+  const memoLive=computeCredits(logs);
+  assert.equal(computeCredits([...logs,{id:'m4',name:'Mem',type:'mobility',date:'2026-07-02',createdAt:'4'}]).totals.get('mem'),8,'a derived array is scored on its own terms');
+  assert.equal(computeCredits(logs),memoLive,'and leaves the live memo in place');
+  assert.equal(computeCredits(logs,{startDate:'2026-08-01',tripDate:'2026-08-31',goal:500,crew:[]}).totals.get('mem'),undefined,'explicit settings bypass the memo');
+  assert.equal(computeCredits(logs),memoLive,'and leave the live memo in place too');
+  logs=[
+    {id:'e1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
+    {id:'e2',name:'Alex',type:'exercise',date:'2026-07-20',createdAt:'1'},
+  ];
+
   // challengeToday only trusts serverDate while the sync that produced it is from the current local day.
   endpoint='https://sheet.example.test/exec';challengeTimeZone='Not/AZone';serverDate='2000-01-01';
   lastSyncedAt=Date.now();
@@ -807,6 +835,38 @@ const domChecks = `(()=>{
   endpoint='https://sheet.example.test/exec';
   render();
   assert.equal(crewHint.classList.contains('hide'),true,'the crew local hint hides when an endpoint is connected');
+
+  // Entry 25: one render() runs the raw scorer a FIXED number of times. Before the memo it was
+  // about one scan per helper plus one per leaderboard row; now every computeCredits(logs) call
+  // inside a render collapses onto a single scan. The remainder is the callers that deliberately
+  // pass a DERIVED array and so bypass the memo by design: earnedThrough() passes a date-filtered
+  // copy and updateRecordPreview() passes [...logs,draft]. If this delta moves, a new derived-array
+  // caller appeared inside render() — find it rather than editing the number.
+  endpoint='';me='Alex';recordingFor='Alex';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  const runsBefore=creditRuns;
+  render();
+  assert.equal(creditRuns-runsBefore,2,'one render scores the live log exactly twice');
+  const liveMemo=computeCredits(logs);
+  assert.equal(creditRuns-runsBefore,2,'reading the live pair again after a render costs no scan at all');
+  // The point of the memo is that this number is now a constant. Before it, weekTrend() ran inside
+  // leaders.map(), so the count grew with the crew; here a six-person crew costs exactly what a
+  // one-person crew costs.
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cass'},{name:'Dee'},{name:'Eli'},{name:'Fay'}]};
+  logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'r2',name:'Bo',type:'exercise',date:shift(-1),createdAt:'2'},{id:'r3',name:'Cass',type:'mobility',date:shift(-2),createdAt:'3'}];
+  render();
+  const runsCrewBefore=creditRuns;
+  render();
+  assert.equal(creditRuns-runsCrewBefore,2,'a six-person crew costs the same two scans as a one-person crew');
+  // updateRecordPreview() is the one render-path caller that passes a DERIVED array ([...logs,draft]),
+  // so it always pays its own scan and must never disturb the live memo.
+  const runsAfterRender=creditRuns;
+  updateRecordPreview();
+  assert.equal(creditRuns-runsAfterRender,1,'the preview array is scored on its own terms, never from the memo');
+  assert.equal(computeCredits(logs),computeCredits(logs),'the live pair still answers from one memoized object');
+  assert.notEqual(computeCredits(logs),liveMemo,'and that object is the current one, not the pre-crew answer');
 
   // Entry 10: the Personal records card hides until the person logs something, and its grade rows track graded climbs.
   endpoint='';me='Alex';recordingFor='Alex';

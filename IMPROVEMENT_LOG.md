@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 24 — Re-baseline the bundle budget for this queue — Done — 2026-07-26
-- 25 — Score the live log once per render — Todo
+- 25 — Score the live log once per render — Done — 2026-07-26
 - 26 — Delete the entry you confirmed — Todo
 - 27 — One guarded localStorage write — Todo
 - 28 — Undo a local delete — Todo
@@ -56,57 +55,49 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 24. Re-baseline the bundle budget for this queue
-
-Status: Done — 2026-07-26
-Notes: Commit `Re-baseline the bundle budget against a measured start`. `tests/size-check.mjs`
-carries `BUDGET = 161000` and a rewritten comment block in entry 23's arithmetic style: the
-measured start (135,867 bytes after entry 22, against entry 23's projected 143,500 — it expected
-entries 19–22 to add ~18,000 and they added 10,447), this queue's projection (~+12,600 for entries
-25–41, itemised per entry, with 30 giving ~500 back by collapsing the duplicated row markup),
-the landing figure near 148,500, and the ~12,500 cushion that leaves. The standing instruction is
-kept and restated against the new number: if the queue again lands well under its projection, the
-next budget entry lowers `BUDGET` toward the real figure, and each entry's own byte delta in
-`Notes:` (rule 10) is what that check reads. The always-printed size/percent line and the failure
-message are byte-identical. No file under `src/` was touched, so `npm run build` was a no-op and
-`index.html` is unchanged at 135,867 bytes — now 84.4% of the 161,000-byte budget. Deviations:
-(1) This entry is the first of a parallel-orchestration pass: seventeen entries are being authored
-by subagents working concurrently in separate worktrees, and landed one commit at a time by an
-orchestrator that owns `IMPROVEMENT_LOG.md` and `IMPROVEMENTS.md` outright. Implementers therefore
-leave their `Status:` on `Todo` and hand back a `Notes:` paragraph, and the orchestrator applies
-rule 10's status, notes, index and archiving edits in the same commit as the implementation — the
-bookkeeping rule 10 describes is honoured, but by the integrator rather than the implementer,
-because `tests/docs-check.mjs`'s at-most-one-`Done` invariant cannot survive two implementers
-writing this file at once. (2) For the same reason entries land in dependency order rather than
-the strict top-to-bottom order the "Before you start" rule gives: every function in `src/app.js`
-occupies one physical line, so two entries touching `render()` or `init()` are an unmergeable
-same-line conflict, and the landing order is chosen so no two concurrent authors own a line.
-Each entry still gets its own commit, its own `Done` status and serial verbatim archiving.
-(3) Rule 10 archiving: entry 22 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
-21 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
-one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 21 was
-confirmed intact and unsplit.
-
-### Why
-`tests/size-check.mjs` caps `index.html` at `BUDGET = 156000`, a figure entry 23 derived from a projection that has since been measured and missed: it expected entries 19–22 to add ~18,000 bytes and land near 143,500, but they added 10,447 and landed at 135,867 (87.1%). The comment at `tests/size-check.mjs:8-13` therefore carries a standing instruction — "If the queue lands under that, lower `BUDGET` back toward the real figure: a cap that only ratchets upward stops being a guard" — and rule 3 says the number moves only in an entry that explains it. Entries 25–41 below project ~+12,600 bytes (landing near 148,500), so the honest move is neither to leave stale arithmetic in place nor to ratchet silently, but to restate the cap against a measured start and a written projection.
-
-### Requirements
-- `tests/size-check.mjs` — set `BUDGET = 161000` and rewrite the comment block to record the measured start (135,867 bytes after entry 22), this queue's projection (~+12,600 for entries 25–41, landing near 148,500) and the ~12,500 cushion that leaves, in the same arithmetic style entry 23 used.
-- Keep the always-printed size/percent line and the failure message exactly as they are. This entry moves the constant and its explanation, nothing else (rule 3).
-- Keep the standing instruction alive in the comment: if this queue again lands well under its projection, the next budget entry lowers `BUDGET` toward the real figure.
-- Touch no file under `src/`, so `index.html` does not change — `npm run build` is a no-op here, but still run it and `npm test` (rule 3).
-
-### Tests
-- `tests/size-check.mjs` is itself the test: `npm test` must report the new percentage against 161,000 with `index.html` unchanged at 135,867 bytes.
-
-### Do not
-Raise the cap without writing the arithmetic into the comment; touch any file under `src/`; weaken or delete the budget assertion or its size/percent line; treat this entry as licence for later entries to grow unmeasured — each still reports its own byte delta in `Notes:` (rule 10).
-
----
-
 ## 25. Score the live log once per render
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Score the live log once per render`. `computeCreditsRaw(entries,settings)` is the
+old function body with two changes and no third: the name, and a leading `creditRuns++`. Its
+scan-sort-cap-bonus logic is character-identical, so the `deepEqual` shape assertions rule 6
+protects are untouched. `computeCredits(entries,settings=config)` is now a wrapper that keeps the
+exact name, arity and default: anything that is not the live pair (`entries!==logs||settings!==
+config`) goes straight to `computeCreditsRaw` and neither reads nor writes the cache, which is what
+stops `updateRecordPreview()`'s `[...logs,draft]` and `earnedThrough()`'s date-filtered copy from
+poisoning it; the live pair answers from `creditMemo` when the reference, the length and the
+settings all still match, and otherwise rescans and re-seeds. `logs.push(draft)` in
+`submitActivity()` became `logs=logs.concat([draft])` and `logs.splice(index,1)` in
+`performDelete()`'s local branch became `logs=logs.filter((x,i)=>i!==index)`, so the reference is
+load-bearing everywhere; every other write already reassigned. No caller mutates the returned
+`Map`s — checked before relying on it — and they are now shared within a render, so they are
+read-only by contract. index.html 135,867 → 136,311 bytes (+444; 84.7% of the 161,000-byte
+budget, against the ~300 this entry was projected to cost). Tests: harness-1 gains an invalidation
+matrix in which every stale answer would be a *different number* — reassignment 3→5, an in-place
+`push` 5→8, an in-place `splice` 8→5, a replaced `config` 5→`undefined` and back — plus proof that
+a derived array and explicit settings each bypass the memo without evicting it. Harness-2 pins
+`render()`'s raw-scan delta at exactly 2 and then asserts the number is a *constant*: a six-person
+crew costs the same two scans as a one-person crew, which is the regression that matters, since
+`weekTrend()` used to rescan inside `leaders.map(...)`. `static-check.mjs` adds
+`function computeCreditsRaw\(` and the structural guard
+`doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|fill|copyWithin)\(/)`.
+Deviations: (1) `creditMemo` carries a fourth field, `cfg`, so its shape is `{ref,len,cfg,value}`
+rather than the `{ref,len,value}` the entry specifies. The entry's own gate
+(`entries===logs&&settings===config`) cannot catch a *replaced* `config`: the gate compares the
+argument to the current global, both of which are the new object, while the memoized value was
+computed under the old one — so the memo would serve a stale answer, and the entry's own required
+test case "a replaced `config` yields the freshly correct `totals`" would fail. Storing the
+settings reference is the minimum fix. (2) The harness-2 delta is 2, not the 3 a reading of "the
+two derived-array callers" would predict: during `render()` only `earnedThrough()` reaches its
+`computeCredits(logs.filter(...))` call, while `updateRecordPreview()`'s derived-array path is not
+taken from inside `render()` in this stub. It is measured separately in the same block — called
+directly it costs exactly 1 scan and leaves the live memo intact — so the derived-array bypass is
+still covered, and the assertion carries a comment saying what would make the number move.
+(3) `performDelete()` still removes by index; entry 26 is the one that switches it to identity, and
+doing it here would have pre-empted that entry. (4) Rule 10 archiving: entry 24 was moved verbatim
+into `IMPROVEMENTS.md` after the archived entry 22 and its index line dropped; the lifted block was
+string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
+at the start of its own line) and entry 22 was confirmed intact and unsplit.
 
 ### Why
 `computeCredits(entries,settings=config)` is a full scan-and-sort of the whole activity log, and one `render()` runs it about a dozen times — `totalsModel()`, `activityMarkup()` twice, `todayProgress()`, `categoryBreakdown()`, `personalRecords()`, `heatmapDays()`, `streakInfo()`, `weeklyTrend()`, `bountyWeekProgress()`, `earnedThrough()` and `updateRecordPreview()` — **plus one more per leaderboard row**, because `weekTrend()` calls it inside `leaders.map(...)`. A six-person crew therefore scores the same log about nineteen times to paint one screen, and the cost grows with both crew size and challenge length. The blocker for a cache is that `logs` is mutated in place in two spots — `logs.push(draft)` in `submitActivity()` and `logs.splice(index,1)` in `performDelete()` — so a reference-keyed memo would serve stale results.

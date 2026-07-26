@@ -42,6 +42,8 @@ assert.deepEqual(scoring.grades,['V0','V1','V2','V3','V4','V5','V6','V7','V8','V
 const sharedConfig=(script.match(/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/g)||[]).length;
 assert.ok(sharedConfig>=2,'browser and Apps Script both read the shared scoring config');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
+assert.match(script,/function computeCreditsRaw\(/,'the raw scorer is separable from the memo that fronts it');
+assert.doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|fill|copyWithin)\(/,'logs is replaced, never mutated in place');
 assert.match(script,/Saved to the Sheet, but refresh failed\. Do not retry/,'confirmed saves are distinguished from refresh failures');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');

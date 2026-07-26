@@ -644,6 +644,54 @@ Use `navigator.share` — a permission-gated async path that still needs the cli
 
 ---
 
+## 24. Re-baseline the bundle budget for this queue
+
+Status: Done — 2026-07-26
+Notes: Commit `Re-baseline the bundle budget against a measured start`. `tests/size-check.mjs`
+carries `BUDGET = 161000` and a rewritten comment block in entry 23's arithmetic style: the
+measured start (135,867 bytes after entry 22, against entry 23's projected 143,500 — it expected
+entries 19–22 to add ~18,000 and they added 10,447), this queue's projection (~+12,600 for entries
+25–41, itemised per entry, with 30 giving ~500 back by collapsing the duplicated row markup),
+the landing figure near 148,500, and the ~12,500 cushion that leaves. The standing instruction is
+kept and restated against the new number: if the queue again lands well under its projection, the
+next budget entry lowers `BUDGET` toward the real figure, and each entry's own byte delta in
+`Notes:` (rule 10) is what that check reads. The always-printed size/percent line and the failure
+message are byte-identical. No file under `src/` was touched, so `npm run build` was a no-op and
+`index.html` is unchanged at 135,867 bytes — now 84.4% of the 161,000-byte budget. Deviations:
+(1) This entry is the first of a parallel-orchestration pass: seventeen entries are being authored
+by subagents working concurrently in separate worktrees, and landed one commit at a time by an
+orchestrator that owns `IMPROVEMENT_LOG.md` and `IMPROVEMENTS.md` outright. Implementers therefore
+leave their `Status:` on `Todo` and hand back a `Notes:` paragraph, and the orchestrator applies
+rule 10's status, notes, index and archiving edits in the same commit as the implementation — the
+bookkeeping rule 10 describes is honoured, but by the integrator rather than the implementer,
+because `tests/docs-check.mjs`'s at-most-one-`Done` invariant cannot survive two implementers
+writing this file at once. (2) For the same reason entries land in dependency order rather than
+the strict top-to-bottom order the "Before you start" rule gives: every function in `src/app.js`
+occupies one physical line, so two entries touching `render()` or `init()` are an unmergeable
+same-line conflict, and the landing order is chosen so no two concurrent authors own a line.
+Each entry still gets its own commit, its own `Done` status and serial verbatim archiving.
+(3) Rule 10 archiving: entry 22 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+21 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 21 was
+confirmed intact and unsplit.
+
+### Why
+`tests/size-check.mjs` caps `index.html` at `BUDGET = 156000`, a figure entry 23 derived from a projection that has since been measured and missed: it expected entries 19–22 to add ~18,000 bytes and land near 143,500, but they added 10,447 and landed at 135,867 (87.1%). The comment at `tests/size-check.mjs:8-13` therefore carries a standing instruction — "If the queue lands under that, lower `BUDGET` back toward the real figure: a cap that only ratchets upward stops being a guard" — and rule 3 says the number moves only in an entry that explains it. Entries 25–41 below project ~+12,600 bytes (landing near 148,500), so the honest move is neither to leave stale arithmetic in place nor to ratchet silently, but to restate the cap against a measured start and a written projection.
+
+### Requirements
+- `tests/size-check.mjs` — set `BUDGET = 161000` and rewrite the comment block to record the measured start (135,867 bytes after entry 22), this queue's projection (~+12,600 for entries 25–41, landing near 148,500) and the ~12,500 cushion that leaves, in the same arithmetic style entry 23 used.
+- Keep the always-printed size/percent line and the failure message exactly as they are. This entry moves the constant and its explanation, nothing else (rule 3).
+- Keep the standing instruction alive in the comment: if this queue again lands well under its projection, the next budget entry lowers `BUDGET` toward the real figure.
+- Touch no file under `src/`, so `index.html` does not change — `npm run build` is a no-op here, but still run it and `npm test` (rule 3).
+
+### Tests
+- `tests/size-check.mjs` is itself the test: `npm test` must report the new percentage against 161,000 with `index.html` unchanged at 135,867 bytes.
+
+### Do not
+Raise the cap without writing the arithmetic into the comment; touch any file under `src/`; weaken or delete the budget assertion or its size/percent line; treat this entry as licence for later entries to grow unmeasured — each still reports its own byte delta in `Notes:` (rule 10).
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so
