@@ -650,6 +650,18 @@ const checks = `(()=>{
   assert.equal(personSummary('bo',onDay(0)).rank,2,'the runner-up ranks second');
   assert.equal(personSummary('Nobody',onDay(0)),null,'an unknown name has no card');
   assert.equal(personSummary('   ',onDay(0)),null,'a blank name has no card');
+
+  // Entry 21: the Record-tab preview copy is a pure ladder over a plain draft summary — no DOM.
+  assert.equal(creditPreviewCopy({type:'climb',hasTarget:true,inWindow:true,base:3,credit:3,reason:''}),'Counts in full · +3 today','full credit keeps its wording');
+  assert.equal(creditPreviewCopy({type:'climb',hasTarget:true,inWindow:true,base:3,credit:0,reason:'already logged'}),CAT_LABELS.climb+' already logged today · earns 0 more','a repeat category keeps its wording');
+  assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'',base:0,credit:0,reason:''}),'Choose one of today’s bounties.','an unchosen bounty keeps its wording');
+  assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'century-club',base:3,credit:0,reason:'weekly cap'}),'Weekly bounty cap reached · bragging rights only','an over-cap bounty keeps its wording');
+  assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'send-it',base:3,credit:3,reason:''}),'Bounty! +3 toward your week','a credited bounty keeps its wording');
+  assert.equal(creditPreviewCopy({type:'climb',hasTarget:false,inWindow:true,base:3,credit:3,reason:''}),'Choose who you are to save this.','no target explains why Save is dead');
+  const outCopy=creditPreviewCopy({type:'climb',hasTarget:true,inWindow:false,base:3,credit:3,reason:'',startDate:'2026-07-01',tripDate:'2026-07-31'});
+  assert.equal(outCopy.indexOf('Outside the challenge window'),0,'an out-of-window date explains why Save is dead');
+  assert.ok(outCopy.indexOf(fmtDay('2026-07-01'))>=0,'the out-of-window copy names the window start');
+  assert.ok(outCopy.indexOf(fmtDay('2026-07-31'))>=0,'the out-of-window copy names the window end');
   logs=[];
 })()`;
 
@@ -902,6 +914,39 @@ const domChecks = `(()=>{
   assert.ok(personTitle.textContent.indexOf('Alex')>=0,'an unknown name leaves the open card untouched');
   closeModal('personModal');
   assert.equal(personModal.classList.contains('open'),false,'closing the dialog clears the open class');
+
+  // Entry 21: a dead Save button explains itself, the in-flight flag survives a mid-save input
+  // change, and the bounty hint carries the chosen bounty's description.
+  me='Alex';recordingFor='Alex';endpoint='';logs=[];
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  const typeRadio=document.querySelector('input[name="activityType"]:checked'),saveBtn=document.querySelector('#saveActivityBtn'),creditEl=document.querySelector('#creditPreview'),hintEl=document.querySelector('#bountyHint'),bountyEl=document.querySelector('#bountySelect');
+  typeRadio.value='climb';
+  dateBox.classList.remove('hide');
+  dateField.value=shift(-20);
+  updateRecordPreview();
+  assert.equal(creditEl.textContent.indexOf('Outside the challenge window'),0,'an out-of-window date explains the dead Save button');
+  assert.equal(saveBtn.disabled,true,'an out-of-window date disables Save');
+  dateField.value=shift(-1);
+  updateRecordPreview();
+  assert.equal(saveBtn.disabled,false,'a date back inside the window re-enables Save');
+  saving=true;
+  updateRecordPreview();
+  assert.equal(saveBtn.disabled,true,'a save in flight keeps Save disabled even with a valid draft');
+  saving=false;
+  updateRecordPreview();
+  assert.equal(saveBtn.disabled,false,'clearing the in-flight flag re-enables Save');
+  typeRadio.value='bounty';
+  dateBox.classList.add('hide');
+  dateField.value=challengeToday();
+  populateBountySelect();
+  const pickedBounty=dailyBounties(challengeToday())[0];
+  bountyEl.value=pickedBounty.id;
+  updateRecordPreview();
+  assert.equal(hintEl.textContent,pickedBounty.description,'the hint shows the chosen bounty description');
+  bountyEl.value='';
+  updateRecordPreview();
+  assert.equal(hintEl.textContent,'','clearing the choice empties the hint');
+  typeRadio.value='climb';
 
   endpoint='';logs=[];me='';recordingFor='';
 })()`;

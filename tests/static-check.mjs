@@ -45,6 +45,8 @@ assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyr
 assert.match(script,/Saved to the Sheet, but refresh failed\. Do not retry/,'confirmed saves are distinguished from refresh failures');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');
+assert.match(html,/id="bountyHint"/,'the Record tab has a slot for the chosen bounty description');
+assert.match(html,/id="bountySelect"[^>]*aria-describedby="bountyHint"/,'the bounty select is described by its hint as well as labelled');
 assert.match(html,/data-panel="you"[\s\S]*id="bountyCapHint"[\s\S]*id="todayBounties"/,'the weekly bounty-cap progress hint sits in the bounty card head on the You panel');
 assert.match(html,/data-panel="you"[\s\S]*today-card[\s\S]*id="bountyCapHint"[\s\S]*id="todayBounties"[\s\S]*class="stat-grid"/,'the bounty card sits directly under the today card, above the stat grid, on the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="todayBounties"[\s\S]*id="personalActivity"[\s\S]*class="stat-grid"/,'the recent activity feed sits above the analytics stat grid on the You panel');
