@@ -1562,4 +1562,59 @@ test('opening a dialog moves focus into it, and only the backdrop closes it', as
   await vm.runInNewContext(`${source}\n${focusChecks}`, focusContext, {filename: 'index.html'});
 });
 
+test('the share sheet is tried first, and a dismissed one is not a failure', async () => {
+  const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
+  const makeShareContext = share => {
+    const elements = new Map();
+    const written = [];
+    const shared = [];
+    const navigator = {clipboard: {writeText: value => {written.push(String(value)); return Promise.resolve()}}};
+    if (share) navigator.share = payload => {shared.push(payload); return share()};
+    return {
+      written, shared,
+      context: {
+        assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+        location: {search: '', href: 'https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you', hash: '#you'},
+        history: {replaceState() {}},
+        window: {scrollTo() {}},
+        navigator,
+        document: {
+          visibilityState: 'visible', activeElement: null,
+          querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+          querySelectorAll: () => [],
+          addEventListener() {}, removeEventListener() {}, createElement: () => makeElement(),
+        },
+        fetch: async () => {throw Error('this harness makes no network calls')},
+        localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+        setTimeout() {}, clearTimeout() {},
+      },
+    };
+  };
+  const setup = `me='Alex';recordingFor='Alex';endpoint='';config={startDate:'${dayShift(-5)}',tripDate:'${dayShift(5)}',goal:500,crew:[{name:'Alex'}]};logs=[{id:'x1',name:'Alex',type:'climb',date:'${dayShift(-1)}',createdAt:'1'}];`;
+  const abort = () => {const error = Error('user dismissed the sheet'); error.name = 'AbortError'; return Promise.reject(error)};
+
+  const native = makeShareContext(() => Promise.resolve());
+  await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, native.context, {filename: 'index.html'});
+  assert.equal(native.shared.length, 1, 'a working share sheet is used');
+  assert.equal(native.written.length, 0, 'and nothing reaches the clipboard behind it');
+  assert.ok(native.shared[0].text.indexOf('Alex') >= 0, 'the shared payload is the summary text');
+  assert.equal(native.shared[0].text.indexOf('sheet='), -1, 'and it still excludes the crew endpoint');
+
+  const noShare = makeShareContext(null);
+  await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, noShare.context, {filename: 'index.html'});
+  assert.equal(noShare.written.length, 1, 'with no share sheet at all, the clipboard fallback runs');
+  assert.equal(noShare.context.document.querySelector('#toast').textContent, 'Progress copied — paste it anywhere.', 'and says so');
+
+  const dismissed = makeShareContext(abort);
+  await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, dismissed.context, {filename: 'index.html'});
+  assert.equal(dismissed.shared.length, 1, 'the sheet was opened');
+  assert.equal(dismissed.written.length, 0, 'a dismissed sheet is a completed action: nothing is copied');
+  assert.equal(dismissed.context.document.querySelector('#toast').textContent, '', 'and nothing is said -- no error toast, no second prompt');
+
+  const broken = makeShareContext(() => Promise.reject(Error('share is not allowed here')));
+  await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, broken.context, {filename: 'index.html'});
+  assert.equal(broken.written.length, 1, 'a genuine share failure falls back to the clipboard');
+  assert.equal(broken.context.document.querySelector('#toast').textContent, 'Progress copied — paste it anywhere.', 'and reports the copy');
+});
+
 console.log('Client state and scoring tests passed.');

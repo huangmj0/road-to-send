@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 38 — Show more of the feed — Done — 2026-07-26
-- 40 — Share through the system share sheet — Todo
+- 40 — Share through the system share sheet — Done — 2026-07-26
 - 41 — Preview the week's bounties — Todo
 
 Entries 1–14 shipped and now live in `IMPROVEMENTS.md` under "v11 pass — frontend enhancement queue (entries 1–14)", together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. Entry numbers never restart.
@@ -42,59 +41,34 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 38. Show more of the feed
-
-Status: Done — 2026-07-26
-Notes: Commit `Let the feeds show more than their opening page`. Module-level `crewFeedLimit` and
-`personalFeedLimit` are seeded at the current 20 and 5; `showMoreFeed(feed)` raises the relevant one
-by a page and repaints; `resetFeedLimits()` puts both back and is called from `loadInitialState()`
-and `performDisconnect()`. `#personalShowMore` and `#crewShowMore` sit under their feeds and are
-hidden by `renderShowMore()` whenever the feed already shows everything it has. The crew feed keeps
-`false` for `allowDelete` (entry 29), and its `activityMarkup(...)` call site is still a plain
-`,false)` — see deviation 1. Both buttons reuse `.text-btn`, which already carries `min-height:44px`
-(rule 7), so no CSS was added. index.html 140,533 → 141,564 bytes (+1,031; 87.9% of the
-161,000-byte budget, inside the ~1,500 this entry was projected to cost). Tests: harness-2 builds a
-log of eight entries, asserts the personal feed opens at five with the button offered, that
-`showMoreFeed('personal')` renders all eight and hides the button, that paging **past** the end
-renders no phantom rows and leaves the limit at the log length, and that a feed already showing
-everything never offers the button at all. `static-check.mjs` gains presence assertions for both
-button ids and `function showMoreFeed\(`. Deviations: (1) The bound on growth is applied **inside**
-`showMoreFeed()` (`Math.min(limit+page,logs.length)`) and deliberately **not** inline at the
-`activityMarkup(...)` call site. Writing the clamp at the call site would produce
-`activityMarkup(logs,Math.min(crewFeedLimit,logs.length),false)`, and entry 29's static assertion
-matches `activityMarkup\([^)]*,false\)` — a character class that cannot cross the inner closing
-paren — so the read-only guard would have silently stopped matching. A comment above that assertion
-now records the constraint. (2) `renderShowMore(id,shown,total)` is a fourth small helper rather
-than two inline `classList.toggle` calls, so the show/hide rule is written once. (3) The page size is
-5 for the personal feed and 20 for the crew feed — each feed pages by its own opening page rather
-than by a shared constant, so "show more" reveals a proportionate amount in both. (4) Rule 10
-archiving: entry 37 was moved verbatim into `IMPROVEMENTS.md` after the archived entry 36 and its
-index line dropped; the lifted block was string-matched back out of the archive (exactly one
-occurrence, gone from the log, heading confirmed at the start of its own line) and entry 36 was
-confirmed intact and unsplit.
-
-### Why
-`render()` paints `activityMarkup(logs,20,…)` into `#activityList` and `activityMarkup(myLogs,5,…)` into `#personalActivity`. Those caps are hard: across a ten-week challenge the personal feed shows the last five entries and the crew feed the last twenty, with no way to see anything older — no "show more", no pagination, no filter. The data is already in memory; only the slice is missing.
-
-### Requirements
-- `src/app.js` — module-level `crewFeedLimit` and `personalFeedLimit` seeded at the current 20 and 5, and a named top-level `showMoreFeed(feed)` raising the relevant one by a page and repainting. Reset both to their defaults in `loadInitialState()` and `performDisconnect()`.
-- `src/index.template.html` — a `Show more` button under each feed, hidden when that feed already shows everything it has.
-- Keep the crew feed read-only: its `activityMarkup(...)` call keeps `false` for `allowDelete` (entry 29). Entry 29's static assertion matches that argument rather than the number, so swapping in a variable limit keeps it passing.
-- `src/styles.css` — both buttons at least 44px (rule 7); reuse `.text-btn`.
-- Growth is bounded by `logs.length`; never render a page beyond the data.
-
-### Tests
-- `tests/client-state.test.js` harness-2 `domChecks`: with more entries than the default limit the feed renders the default count and the button is visible; `showMoreFeed('personal')` renders more; once everything is shown the button hides.
-- `tests/static-check.mjs` — **add** presence assertions for both button ids and `assert.match(script,/function showMoreFeed\(/)`.
-
-### Do not
-Add a filter, sort control or search box in this entry; persist the expanded limit (rule 4 — no new localStorage key); re-enable delete controls on the crew feed; change `activityMarkup()`'s sort order or signature.
-
----
-
 ## 40. Share through the system share sheet
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Share progress through the system share sheet when there is one`. New
+`async function shareProgress()` sits behind `#shareBtn`: it builds the text once with
+`shareSummary()`, returns early on an empty summary, guards the global the way `copyText()` does
+(`typeof navigator === 'undefined' ? null : navigator`, since optional chaining still throws
+`ReferenceError` on an undeclared identifier in the harnesses), and `await`s `navigator.share({text})`
+inside a `try` when it exists. **A dismissed sheet does nothing at all**: `AbortError` returns
+without touching the clipboard, without a toast and without a second prompt, because closing the
+sheet is a completed action rather than a failure. Only a missing API or a non-abort rejection
+reaches the `copyText()` fallback. `shareSummary()` and `publicUrl()` are unchanged, so the shared
+text still excludes the `sheet` param and every other person's data, and the single
+`navigator.clipboard.writeText` call site stays inside `copyText()` — entry 22's architectural guard
+still reads 1. index.html 141,564 → 141,849 bytes (+285; 88.1% of the 161,000-byte budget, inside
+the ~1,000 this entry was projected to cost). Tests: a new `test(...)` covers all four contexts from
+one factory — `navigator.share` resolving (the sheet is used, nothing reaches the clipboard, and the
+payload carries the name but not `sheet=`), `navigator.share` absent (the fallback copies and
+toasts), rejecting with an `AbortError` (the sheet opened, nothing was copied, `#toast` stayed
+empty), and rejecting otherwise (the fallback runs). `static-check.mjs` gains
+`function shareProgress\(` and the clipboard count guard still passes. Deviations: (1)
+`shareProgress()` returns early when `shareSummary()` yields `''` — a blank or unknown profile —
+rather than opening an empty share sheet or copying an empty string. (2) The `#shareBtn` listener is
+now `shareProgress` directly rather than an arrow wrapper, since the handler takes no arguments.
+(3) Rule 10 archiving: entry 38 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+37 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 37 was
+confirmed intact and unsplit.
 
 ### Why
 Entry 22 built `shareSummary()`, routed `#shareBtn` through `copyText()`, and deferred the native path in as many words: "`navigator.share` — a permission-gated async path that still needs the clipboard fallback and is not observable in the stub harness, so propose it separately." On a phone, which is what this app is built for, copying to the clipboard means opening another app and pasting; the system share sheet is one tap to any destination.

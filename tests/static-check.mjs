@@ -76,6 +76,7 @@ assert.match(html,/id="undoDismiss"[^>]*type="button"/,'dismissing the undo bar 
 assert.match(html,/id="undoBar"[\s\S]*id="toast"/,'the undo bar sits above the toast in document order');
 assert.match(script,/function undoDelete\(/,'a named undo handler restores the row');
 assert.match(html,/\.undo-bar:not\(\.hide\)~\.toast\{bottom:160px\}/,'the toast lifts out of the undo bar rather than overlapping it');
+assert.match(script,/function shareProgress\(/,'the Share button goes through the system share sheet first');
 assert.match(script,/function writeStore\(/,'the shared storage helper exists');
 assert.equal((script.match(/localStorage\.setItem/g)||[]).length,1,'storage writes funnel through one helper');
 assert.ok((script.match(/pendingDelete=null/g)||[]).length>=3,'a dismissed confirm clears the pending delete, on top of the declaration and the confirmed path');
