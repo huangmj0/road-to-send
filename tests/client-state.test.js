@@ -1336,4 +1336,57 @@ test('a full disk never reports a saved entry as failed, and never traps the ide
   await vm.runInNewContext(`${source}\n${storageChecks}`, storageContext, {filename: 'index.html'});
 });
 
+test('a blocked export says so instead of failing silently', async () => {
+  // Neither Blob nor a throwing click() exists in any other harness, so both stubs are additive.
+  const makeExportContext = ({clickThrows = false, blobThrows = false} = {}) => {
+    const elements = new Map();
+    const revoked = [];
+    const anchors = [];
+    return {
+      revoked, anchors,
+      context: {
+        assert, console, URL: Object.assign(function () {}, URL, {
+          createObjectURL: () => 'blob:road-to-send/1',
+          revokeObjectURL: value => revoked.push(value),
+        }),
+        URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+        location: {search: '', href: 'https://example.test/app/', hash: ''},
+        history: {replaceState() {}},
+        window: {scrollTo() {}},
+        Blob: function (parts) {if (blobThrows) throw Error('Blob is not available here'); this.parts = parts},
+        document: {
+          visibilityState: 'visible', activeElement: null,
+          querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+          querySelectorAll: () => [],
+          addEventListener() {}, removeEventListener() {},
+          createElement: () => {
+            const el = makeElement();
+            el.click = () => {if (clickThrows) throw Error('downloads are blocked'); anchors.push(el.href)};
+            return el;
+          },
+        },
+        fetch: async () => {throw Error('this harness makes no network calls')},
+        localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+        setTimeout() {}, clearTimeout() {},
+      },
+    };
+  };
+
+  const good = makeExportContext();
+  await vm.runInNewContext(`${source}\nexportData();`, good.context, {filename: 'index.html'});
+  assert.equal(good.context.document.querySelector('#toast').textContent, 'Export downloaded.', 'a working export reports success');
+  assert.deepEqual(good.anchors, ['blob:road-to-send/1'], 'and the download really fired');
+  assert.deepEqual(good.revoked, ['blob:road-to-send/1'], 'the object URL is revoked on the success path');
+
+  const blockedClick = makeExportContext({clickThrows: true});
+  await vm.runInNewContext(`${source}\nexportData();`, blockedClick.context, {filename: 'index.html'});
+  assert.equal(blockedClick.context.document.querySelector('#toast').textContent, 'Export failed — try a different browser.', 'a blocked download is reported, not swallowed');
+  assert.deepEqual(blockedClick.revoked, ['blob:road-to-send/1'], 'and the object URL is revoked on the failure path too');
+
+  const blockedBlob = makeExportContext({blobThrows: true});
+  await vm.runInNewContext(`${source}\nexportData();`, blockedBlob.context, {filename: 'index.html'});
+  assert.equal(blockedBlob.context.document.querySelector('#toast').textContent, 'Export failed — try a different browser.', 'a restricted context that cannot even build the Blob is reported the same way');
+  assert.deepEqual(blockedBlob.revoked, [], 'with nothing to revoke, nothing is revoked');
+});
+
 console.log('Client state and scoring tests passed.');

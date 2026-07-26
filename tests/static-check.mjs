@@ -42,6 +42,7 @@ assert.deepEqual(scoring.grades,['V0','V1','V2','V3','V4','V5','V6','V7','V8','V
 const sharedConfig=(script.match(/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/g)||[]).length;
 assert.ok(sharedConfig>=2,'browser and Apps Script both read the shared scoring config');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
+assert.match(script,/Export downloaded\./,'a finished export says so out loud');
 assert.match(script,/function breakdownRow\(/,'one breakdown row shape serves the You panel and the person card');
 assert.match(script,/function pyramidRow\(/,'one pyramid row shape serves both');
 assert.match(script,/function recordsRow\(/,'one records row shape serves both');

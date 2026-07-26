@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 30 — One row-markup helper for the repeated cards — Done — 2026-07-26
-- 31 — Say something when the export fails — Todo
+- 31 — Say something when the export fails — Done — 2026-07-26
 - 32 — Show the save in the credit preview — Todo
 - 33 — Tap a category chip to start recording it — Todo
 - 34 — Show the note you wrote on a bounty — Todo
@@ -50,60 +49,29 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 30. One row-markup helper for the repeated cards
-
-Status: Done — 2026-07-26
-Notes: Commit `Render the repeated card rows from one shape`. Three pure helpers —
-`breakdownRow(icon,label,points,pct)`, `pyramidRow(grade,count,pct)` and `recordsRow(label,value)`
-— take plain values rather than model objects, so neither renderer reshapes its data, and all four
-call sites now render through them: `renderBreakdown()`, `renderPyramid()`, `renderRecords()` and
-`renderPersonCard()`'s three sections. The **person-card** shape is the one that was adopted, so
-every bar now carries `role="img"` with a per-row `aria-label` and an `aria-hidden="true"` inner
-`<i>` (rule 7): the You panel is upgraded and the modal is unchanged, which is the drift this entry
-existed to close. Nothing about what `categoryBreakdown()`, `personalRecords()` or `gradePyramid()`
-returns changed, and no container id moved. index.html 138,232 → 137,944 bytes (**−288**; 85.7% of
-the 161,000-byte budget — collapsing the duplication gives bytes back even after the added labels).
-Tests: harness-2 renders the You panel and opens the person card for the same person and asserts
-`#youBreakdown.innerHTML` is **identical** to `#personBreakdown.innerHTML` and `#gradePyramid` to
-`#personPyramid` — the strongest available statement that one shape serves both — plus that the
-You-panel rows now contain `role="img"` and `aria-label="` while the decorative fill keeps
-`aria-hidden="true"`. `static-check.mjs` gains a presence assertion for each helper and
-single-source counts for the row markup; every existing `role="img"[^>]*aria-label=` assertion
-still passes. Deviations: (1) `#gradePyramid` already carried a container-level `role="img"` with an
-`aria-label` enumerating every row, and assistive technology ignores descendants of a `role="img"`
-element — so the per-row labels **inside the pyramid are inert**. The entry asks for one shared
-shape and that is what shipped, but the real accessibility gain here is on the breakdown and records
-rows, not the pyramid. Recorded so a later a11y pass reads the redundancy as deliberate rather than
-discovering and removing it. (2) The `records-row` class is also used by `renderWeekReview()`'s
-leader list, whose rows are rank-plus-name rather than label-plus-value and which this entry does
-not name. It was left alone rather than bent to fit, so the single-source count assertion for that
-shape is 2 — `recordsRow()` and the Week in Review — with a comment saying why. (3) Rule 10
-archiving: entry 29 was moved verbatim into `IMPROVEMENTS.md` after the archived entry 28 and its
-index line dropped; the lifted block was string-matched back out of the archive (exactly one
-occurrence, gone from the log, heading confirmed at the start of its own line) and entry 28 was
-confirmed intact and unsplit.
-
-### Why
-The breakdown, records and pyramid rows are written twice: once in `renderBreakdown()`, `renderRecords()` and `renderPyramid()` for the You panel, and again in `renderPersonCard()` for `#personModal`. The two copies have drifted, and the drift is an accessibility one — the person-card bars carry `role="img"` with a per-row `aria-label`, while the You-panel bars are bare `aria-hidden="true"` decoration. The same information is announced inside the modal and silent on the main tab, and roughly 1,350 characters of near-duplicate template are kept in sync by hand.
-
-### Requirements
-- `src/app.js` — three small pure helpers returning markup strings, shared by both call sites: a labelled proportional bar row (breakdown), a records row, and a pyramid row. Take plain values rather than model objects so neither renderer has to reshape its data.
-- Adopt the **person-card** version as the shared one: every bar gets `role="img"` with a meaningful `aria-label` and decorative inner elements stay `aria-hidden="true"` (rule 7). This upgrades the You panel and must not downgrade the modal.
-- `renderBreakdown()`, `renderRecords()`, `renderPyramid()` and `renderPersonCard()` all render through the helpers, with no change to what any of them computes or to any container id.
-- Keep the compact single-line style of the surrounding code (rule 8).
-
-### Tests
-- `tests/client-state.test.js` harness-2 `domChecks`: `#youBreakdown` and `#personBreakdown` contain the same row markup for the same data, and the You-panel rows now carry `role="img"` in their `innerHTML`.
-- `tests/static-check.mjs` — **add** a presence assertion for each new helper, and keep every existing `role="img"[^>]*aria-label=` assertion passing.
-
-### Do not
-Change what `categoryBreakdown()`, `personalRecords()` or `gradePyramid()` return; rename or remove `#youBreakdown`, `#recordsList`, `#gradePyramid`, `#personBreakdown`, `#personRecords` or `#personPyramid`; drop the modal's existing labels to make the two shapes match; introduce a templating abstraction beyond three string-returning functions.
-
----
-
 ## 31. Say something when the export fails
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Say whether the export actually downloaded`. `exportData()`'s body is wrapped in a
+`try`, toasting `Export downloaded.` after the click lands and `Export failed — try a different
+browser.` on any throw; it never throws. The object URL is held in a `let url` and revoked in a
+`finally`, so both paths release it and a context that could not even construct the `Blob` has
+nothing to revoke and revokes nothing. The exported JSON is untouched: the same
+`{version, exportedAt, mode, config, activities}` keys in the same order, the same `null,2`
+formatting and the same `road-to-send-export.json` filename, because other tooling reads that file.
+index.html 137,944 → 138,066 bytes (+122; 85.8% of the 161,000-byte budget, well inside the ~400
+this entry was projected to cost). Tests: a new `test(...)` builds three fresh contexts from one factory
+— neither `Blob` nor a throwing `click()` exists in any current harness, so both stubs are additive
+rather than a weakened assertion. The working context asserts the success toast, that the download
+really fired, and that the URL was revoked; the blocked-`click()` context asserts the failure toast
+and that the URL is *still* revoked; the blocked-`Blob` context asserts the same failure toast and
+that nothing is revoked when there was nothing to revoke. `static-check.mjs` gains
+`Export downloaded\.`. Deviations: (1) The revoke moved into a `finally` rather than being written
+twice, which is what makes the "revoke on both paths" requirement true by construction instead of
+by repetition. (2) Rule 10 archiving: entry 30 was moved verbatim into `IMPROVEMENTS.md` after the
+archived entry 29 and its index line dropped; the lifted block was string-matched back out of the
+archive (exactly one occurrence, gone from the log, heading confirmed at the start of its own line)
+and entry 29 was confirmed intact and unsplit.
 
 ### Why
 `exportData()` builds a `Blob`, calls `URL.createObjectURL`, clicks a synthetic anchor and revokes the URL, with no `try` anywhere and no toast on either outcome. `Blob` construction and `createObjectURL` both throw in restricted contexts and a synthetic `.click()` is a no-op in others, so the one documented recovery path in the app (P2, data ownership) can fail in total silence — leaving the user to conclude their data is gone rather than that the download was blocked.
