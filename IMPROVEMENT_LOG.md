@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 25 — Score the live log once per render — Done — 2026-07-26
-- 26 — Delete the entry you confirmed — Todo
+- 26 — Delete the entry you confirmed — Done — 2026-07-26
 - 27 — One guarded localStorage write — Todo
 - 28 — Undo a local delete — Todo
 - 29 — Keep the Crew feed read-only — Todo
@@ -55,73 +54,43 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 25. Score the live log once per render
-
-Status: Done — 2026-07-26
-Notes: Commit `Score the live log once per render`. `computeCreditsRaw(entries,settings)` is the
-old function body with two changes and no third: the name, and a leading `creditRuns++`. Its
-scan-sort-cap-bonus logic is character-identical, so the `deepEqual` shape assertions rule 6
-protects are untouched. `computeCredits(entries,settings=config)` is now a wrapper that keeps the
-exact name, arity and default: anything that is not the live pair (`entries!==logs||settings!==
-config`) goes straight to `computeCreditsRaw` and neither reads nor writes the cache, which is what
-stops `updateRecordPreview()`'s `[...logs,draft]` and `earnedThrough()`'s date-filtered copy from
-poisoning it; the live pair answers from `creditMemo` when the reference, the length and the
-settings all still match, and otherwise rescans and re-seeds. `logs.push(draft)` in
-`submitActivity()` became `logs=logs.concat([draft])` and `logs.splice(index,1)` in
-`performDelete()`'s local branch became `logs=logs.filter((x,i)=>i!==index)`, so the reference is
-load-bearing everywhere; every other write already reassigned. No caller mutates the returned
-`Map`s — checked before relying on it — and they are now shared within a render, so they are
-read-only by contract. index.html 135,867 → 136,311 bytes (+444; 84.7% of the 161,000-byte
-budget, against the ~300 this entry was projected to cost). Tests: harness-1 gains an invalidation
-matrix in which every stale answer would be a *different number* — reassignment 3→5, an in-place
-`push` 5→8, an in-place `splice` 8→5, a replaced `config` 5→`undefined` and back — plus proof that
-a derived array and explicit settings each bypass the memo without evicting it. Harness-2 pins
-`render()`'s raw-scan delta at exactly 2 and then asserts the number is a *constant*: a six-person
-crew costs the same two scans as a one-person crew, which is the regression that matters, since
-`weekTrend()` used to rescan inside `leaders.map(...)`. `static-check.mjs` adds
-`function computeCreditsRaw\(` and the structural guard
-`doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|fill|copyWithin)\(/)`.
-Deviations: (1) `creditMemo` carries a fourth field, `cfg`, so its shape is `{ref,len,cfg,value}`
-rather than the `{ref,len,value}` the entry specifies. The entry's own gate
-(`entries===logs&&settings===config`) cannot catch a *replaced* `config`: the gate compares the
-argument to the current global, both of which are the new object, while the memoized value was
-computed under the old one — so the memo would serve a stale answer, and the entry's own required
-test case "a replaced `config` yields the freshly correct `totals`" would fail. Storing the
-settings reference is the minimum fix. (2) The harness-2 delta is 2, not the 3 a reading of "the
-two derived-array callers" would predict: during `render()` only `earnedThrough()` reaches its
-`computeCredits(logs.filter(...))` call, while `updateRecordPreview()`'s derived-array path is not
-taken from inside `render()` in this stub. It is measured separately in the same block — called
-directly it costs exactly 1 scan and leaves the live memo intact — so the derived-array bypass is
-still covered, and the assertion carries a comment saying what would make the number move.
-(3) `performDelete()` still removes by index; entry 26 is the one that switches it to identity, and
-doing it here would have pre-empted that entry. (4) Rule 10 archiving: entry 24 was moved verbatim
-into `IMPROVEMENTS.md` after the archived entry 22 and its index line dropped; the lifted block was
-string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
-at the start of its own line) and entry 22 was confirmed intact and unsplit.
-
-### Why
-`computeCredits(entries,settings=config)` is a full scan-and-sort of the whole activity log, and one `render()` runs it about a dozen times — `totalsModel()`, `activityMarkup()` twice, `todayProgress()`, `categoryBreakdown()`, `personalRecords()`, `heatmapDays()`, `streakInfo()`, `weeklyTrend()`, `bountyWeekProgress()`, `earnedThrough()` and `updateRecordPreview()` — **plus one more per leaderboard row**, because `weekTrend()` calls it inside `leaders.map(...)`. A six-person crew therefore scores the same log about nineteen times to paint one screen, and the cost grows with both crew size and challenge length. The blocker for a cache is that `logs` is mutated in place in two spots — `logs.push(draft)` in `submitActivity()` and `logs.splice(index,1)` in `performDelete()` — so a reference-keyed memo would serve stale results.
-
-### Requirements
-- `src/app.js` — rename the existing function body to `computeCreditsRaw(entries,settings)` **without changing a character of its logic**, and add a wrapper keeping the exact name, arity and `settings=config` default. The wrapper consults the memo only when `entries===logs&&settings===config`; every other call goes straight to `computeCreditsRaw` and neither reads nor writes the cache, which is what stops `updateRecordPreview()`'s `[...logs,draft]` and `earnedThrough()`'s filtered copy from poisoning it.
-- Module-level `creditMemo` of shape `{ref,len,value}`, plus a module-level `creditRuns` counter incremented on every raw scan (the test hook). `len` catches an in-place mutation that keeps the same reference.
-- Replace both in-place mutations so the reference is load-bearing: `logs=logs.concat([draft])` in `submitActivity()`, `logs=logs.filter(...)` in `performDelete()`'s local branch. Every other write already reassigns `logs`.
-- The returned `Map`s are now shared by every caller within a render (`totalsModel()` shallow-copies with `Object.assign`), so treat them as read-only.
-- `computeCredits()`'s return shape is locked by `deepEqual` assertions (rule 6) and must not change.
-
-### Tests
-- `tests/client-state.test.js` harness-1 `checks` (no backticks, no `${`; build strings with `+`): an invalidation matrix in which a stale answer would give a **different number** — reassignment, an in-place `push`, an in-place `splice`, and a replaced `config` each yield the freshly correct `totals` value.
-- `tests/client-state.test.js` harness-2 `domChecks`: read `creditRuns` before and after `render()` and pin the delta to an exact number; assert `computeCredits(logs)` returns the identical object before and after `updateRecordPreview()`, proving the preview array neither evicts nor replaces the live memo.
-- `tests/static-check.mjs` — **add** `assert.match(script,/function computeCreditsRaw\(/)` and a structural guard `assert.doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|fill|copyWithin)\(/,'logs is replaced, never mutated in place')`, so a later entry cannot silently reintroduce staleness.
-
-### Do not
-Change what `computeCredits()` returns or the order in which it applies caps and bonuses; memoize calls that pass a derived array or explicit settings; call `.set()` or `.delete()` on a returned `Map`; delete harness-1's existing in-place `logs.push` line (it is precisely the case the `len` guard exists for); memoize any other helper in this entry.
-
----
-
 ## 26. Delete the entry you confirmed
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Delete the entry you confirmed, not the row in its place`. `requestDelete()` now
+captures the row itself — `pendingDelete={entry:item,index,id,feed,position}` — and
+`performDelete()` destructures `{entry,id,feed,position}`, so the local branch reads
+`else if(logs.indexOf(entry)>=0){logs=logs.filter(x=>x!==entry);…}`: it removes the object the
+dialog described, and a captured row that has already left `logs` takes nothing with it — there is
+no positional fallback. The shared branch still deletes by `id`, unchanged. Dismissal is now
+handled in one place: `closeModal(id)` clears `pendingDelete` and `confirmAction` when `id` is
+`confirmModal`, which covers the cancel button, the ×, the Escape handler and any future route
+without wiring each one separately. `performDelete()` still nulls `pendingDelete` up front, and
+`confirmProceed()` still nulls `confirmAction` before invoking the action, so the confirmed path
+is unaffected by the addition. index.html 136,311 → 136,407 bytes (+96; 84.7% of the 161,000-byte
+budget, against the ~500 this entry was projected to cost). Tests: harness-2 gains a block that
+cancels a pending delete and then fires `performDelete()` — the log is untouched both times, which
+is the regression lock for intent surviving a dismissal — then deletes the middle of three rows by
+identity and asserts the survivors keep their order, then removes the captured row from `logs`
+between the request and the confirm and asserts nothing is deleted and the dialog still closes.
+`static-check.mjs` gains the `pendingDelete=null` count guard. Deviations: (1) The entry specifies
+that guard as `>=2`, which was already true before this commit: the module declaration
+`let pendingDelete=null,confirmAction=null;` and `performDelete()`'s own reset are two occurrences,
+so the assertion could not have failed. It is written as `>=3` — declaration, confirmed path,
+dismissal path — with a message naming all three, which is the count that actually detects the
+bug. (2) Clearing lives in `closeModal()` rather than in three separate handlers. The entry names
+the cancel button, the × and the Escape handler; routing through the one function they all already
+call covers exactly those three today and, deliberately, also covers the scrim-click dismissal that
+entry 37 is about to add — which the entry's own enumeration would otherwise have missed.
+(3) The staleness guard is scoped to the local branch. Applying it to the shared branch would break
+shared deletes outright: `loadRemote()` replaces `logs` wholesale, so object identity does not
+survive a background sync and every shared confirm after a sync would silently do nothing. The
+shared branch is `id`-keyed by design and stays that way. (4) `index` is still carried on
+`pendingDelete` as the entry's shape requires, but `performDelete()` no longer destructures it,
+since reading it is precisely the bug. (5) Rule 10 archiving: entry 25 was moved verbatim into
+`IMPROVEMENTS.md` after the archived entry 24 and its index line dropped; the lifted block was
+string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
+at the start of its own line) and entry 24 was confirmed intact and unsplit.
 
 ### Why
 `requestDelete(index,id,feed)` stores `pendingDelete={index,id,feed,position}`, and `performDelete()` acts on that index — but nothing clears `pendingDelete` when the dialog goes away by any route other than confirmation. The `#confirmCancel` path, the × button and the Escape handler all leave it set, and `askConfirm()` has been shared with `disconnect()` since entry 19, so a cancelled delete can sit in module state across an unrelated confirm. The local branch also removes by position rather than by identity, which is only correct for as long as nothing else reorders `logs`.

@@ -974,6 +974,30 @@ const domChecks = `(()=>{
   assert.equal(confirmDialog.classList.contains('open'),false,'confirming closes the dialog');
   performDelete();
   assert.equal(logs.length,beforeCount-1,'a second confirm with nothing pending deletes nothing');
+  // Entry 26: a dismissed confirm leaves no intent behind, and a confirmed one acts on the row it
+  // described rather than on a position that may since have come to mean something else.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'c1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'c2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'c3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
+  render();
+  requestDelete(1,'c2','personal');
+  assert.equal(confirmDialog.classList.contains('open'),true,'requesting a delete opens the dialog');
+  closeModal('confirmModal');
+  assert.equal(logs.length,3,'cancelling deletes nothing');
+  performDelete();
+  assert.equal(logs.length,3,'and a confirm that arrives after the cancel is a no-op, not a delayed delete');
+  // The middle of three rows, by identity: the other two survive in their original order.
+  requestDelete(1,'c2','personal');
+  performDelete();
+  assert.equal(logs.length,2,'confirming removes exactly one row');
+  assert.deepEqual(logs.map(x=>x.id),['c1','c3'],'the row that goes is the one the dialog described, and the rest keep their order');
+  // A row that has left logs between the request and the confirm is not replaced by a positional guess.
+  requestDelete(0,'c1','personal');
+  logs=logs.filter(x=>x.id!=='c1');
+  performDelete();
+  assert.deepEqual(logs.map(x=>x.id),['c3'],'a captured row that is already gone takes nothing with it');
+  assert.equal(confirmDialog.classList.contains('open'),false,'and the dialog still closes');
+
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
 
