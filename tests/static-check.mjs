@@ -87,6 +87,12 @@ assert.match(html,/id="leaderScopeToggle"[^>]*aria-label=/,'the weekly/overall s
 assert.match(html,/data-panel="you"[\s\S]*id="youEmptyState"[\s\S]*id="personalActivity"[\s\S]*data-panel="record"/,'the You onboarding empty state sits in the recent-activity area of the You panel');
 assert.match(html,/id="youEmptyState"[\s\S]*data-tab="record"/,'the empty state offers a button that jumps to the Record tab');
 assert.match(html,/data-panel="crew"[\s\S]*id="crewLocalHint"/,'the crew local-mode hint lives in the Crew panel');
+assert.match(html,/data-panel="you"[\s\S]*id="shareBtn"[^>]*type="button"/,'the You panel offers a real Share button');
+assert.match(html,/data-panel="you"[\s\S]*id="shareBtn"[\s\S]*today-card/,'the Share button sits in the You page head, above the today card');
+assert.equal((script.match(/navigator\.clipboard\.writeText/g)||[]).length,1,'clipboard writes funnel through one helper');
+assert.match(script,/function copyText\(/,'the shared clipboard helper exists');
+assert.match(script,/function publicUrl\(/,'shared text is built from the endpoint-free public URL');
+assert.match(script,/function shareSummary\(/,'the share summary helper backs the Share button');
 assert.equal((html.match(/<table[\s>]/g)||[]).length,1,'all crew share one leaderboard');
 assert.match(html,/<meta[^>]+name="theme-color"[^>]+content="#f5eee3"/,'a theme-color meta tints the browser chrome to the brand background');
 assert.match(html,/<link[^>]+rel="icon"[^>]+href="data:image\/svg\+xml,/,'an inline SVG data-URI favicon is present');
