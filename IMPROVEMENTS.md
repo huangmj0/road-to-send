@@ -873,6 +873,67 @@ Add a localStorage key, change a stored value's shape, or migrate anything (rule
 
 ---
 
+## 28. Undo a local delete
+
+Status: Done — 2026-07-26
+Notes: Commit `Offer a local delete back before it is gone`. `#undoBar` sits immediately before
+`#toast`, outside every `[data-panel]`, carrying `role="status"`/`aria-live="polite"` with
+`#undoText`, `#undoDelete` and `#undoDismiss`. Module-level `lastDeleted` is set **only** in
+`performDelete()`'s local branch, which now reads the row's index off `logs` as it removes it:
+`{entry,index:at,label:pending.label}`. `undoDelete()` returns early in shared mode, rebuilds the
+array with `logs.slice(0,index).concat([entry],logs.slice(index))` so the row lands where it came
+from rather than on the end, persists, repaints and toasts. `renderUndo()` shows the bar only when
+`lastDeleted` is set, force-clears it whenever `endpoint` is truthy, and is called from the tail of
+`render()` next to `renderSync()` — idempotent and cheap enough to run every time (rule 6). There
+is **no timer**: the bar clears on undo, on dismiss, on the next delete (which simply overwrites
+`lastDeleted`), on `performDisconnect()`, on an endpoint appearing, and on `showTab()`, which is
+also how a successful `submitActivity()` clears it — that function already calls `showTab('you')`
+on its success path, so one mechanism covers both cases the entry lists. `src/styles.css` gains one
+appended line before the `prefers-reduced-motion` query: `.undo-bar` at the toast's slot above
+`.bottom-nav`, `min-height:44px` on both buttons, and the exact
+`.undo-bar:not(.hide)~.toast{bottom:160px}` sibling rule, so the two never overlap; it is CSS only,
+so the existing reduced-motion kill-switch applies (rule 7). index.html 136,672 → 138,431 bytes
+(+1,759; 86.0% of the 161,000-byte budget, inside the ~2,500 this entry was projected to cost).
+Tests: harness-2 deletes the middle of three rows and asserts the bar appears with `#undoText`
+starting `Deleted `, that undo restores the length **and** the original index (`u1,u2,u3`, not
+`u1,u3,u2`), and that the bar hides once the offer is taken; then that a second delete offers
+again and `showTab('crew')` puts it away; then that setting `endpoint` and calling `renderUndo()`
+hides it and that `undoDelete()` is inert in shared mode even when called directly.
+`static-check.mjs` gains the `#undoBar` role/live assertions, `type="button"` on both controls, the
+`id="undoBar"` → `id="toast"` order assertion, `function undoDelete\(`, and the exact compact CSS
+text. Deviations: (1) `pendingDelete` gains a `label` field, so entry 26's shape is now
+`{entry,index,id,feed,position,label}`. The alternative was recomputing the confirm dialog's
+description a second time inside `performDelete()`; carrying the string `requestDelete()` already
+built keeps one source for the wording the user just read. (2) `undoDelete()` toasts
+`Restored on this device only — storage is full.` when the write fails, rather than always
+`Entry restored.`. Entry 27 landed one commit earlier and made `persistLocal()` report instead of
+throw; claiming a clean restore over a failed write would reintroduce exactly the dishonesty entry
+27 removed. (3) The harness-2 block resets `lastDeleted=null` in its setup, because the preceding
+entry-26 block leaves a delete pending — that is block-local state hygiene, not a weakened
+assertion. (4) Rule 10 archiving: entry 27 was moved verbatim into `IMPROVEMENTS.md` after the
+archived entry 26 and its index line dropped; the lifted block was string-matched back out of the
+archive (exactly one occurrence, gone from the log, heading confirmed at the start of its own line)
+and entry 26 was confirmed intact and unsplit.
+
+### Why
+Entry 19 shipped the confirm dialog and deferred undo in as many words — "undo deserves its own entry (local-mode only, a real button, not the toast)" — because `#toast` is `pointer-events:none` and cannot carry a control, and because re-POSTing a deleted row in shared mode would mint a new `id`/`createdAt` against the live Sheet. In local mode neither constraint applies: the row is a plain object and putting it back is an array rebuild.
+
+### Requirements
+- `src/index.template.html` — `<div id="undoBar" class="undo-bar hide" role="status" aria-live="polite"><span id="undoText"></span><button id="undoDelete" class="text-btn" type="button">Undo</button><button id="undoDismiss" class="icon-btn" type="button" aria-label="Dismiss">×</button></div>` immediately **before** `#toast`, outside every `[data-panel]` — deletes fire from both feeds, and this position collides with no existing order assertion.
+- `src/app.js` — module-level `lastDeleted` holding `{entry,index,label}`, set **only** in `performDelete()`'s local branch. Named top-level `undoDelete()` restores the row at its original index (`logs=logs.slice(0,i).concat([entry],logs.slice(i))`), persists, repaints and toasts `Entry restored.`; named top-level `renderUndo()` shows the bar only when `lastDeleted` is set and `endpoint` is falsy, called from the tail of `render()` and cheap enough to run every time (rule 6).
+- **No timer.** `setTimeout` is a no-op in the harnesses, so a timed dismissal would be untestable and permanently sticky in tests. The bar clears on: undo, dismiss, the next delete, a successful `submitActivity()`, `performDisconnect()`, an endpoint appearing, and `showTab()` — switching tabs puts it away, so it never outlives the action it describes.
+- `src/styles.css` — `.undo-bar` sits at the toast's slot above `.bottom-nav`, and `.undo-bar:not(.hide)~.toast{bottom:160px}` lifts the toast while the bar is up so the two never overlap. CSS only, so the existing `prefers-reduced-motion` kill-switch applies (rule 7); both buttons keep `min-height:44px`.
+- Shared mode never offers undo: `renderUndo()` force-hides whenever `endpoint` is truthy.
+
+### Tests
+- `tests/client-state.test.js` harness-2 `domChecks` (`performDelete()`'s local branch contains no `await`, so its effects land synchronously — the same reason entry 19's harness could call it): delete the middle of three rows and assert `#undoBar` is visible with `#undoText` starting `Deleted `; `undoDelete()` restores the length **and** puts the row back at its original index; the bar hides again; setting `endpoint` and calling `renderUndo()` hides it.
+- `tests/static-check.mjs` — **add**: `#undoBar` with `role="status"` and `aria-live="polite"`; `#undoDelete` and `#undoDismiss` as `type="button"`; an order assertion `id="undoBar"` → `id="toast"`; `assert.match(script,/function undoDelete\(/)`; and the exact compact CSS text `.undo-bar:not(.hide)~.toast{bottom:160px}`.
+
+### Do not
+Offer undo in shared mode, re-POST a deleted row, or touch the `action:'delete'` request (rule 2 places the Apps Script out of scope); put the control in `#toast`; use `setTimeout` for dismissal; add a localStorage key so undo survives a reload (rule 4); leave the bar on screen after the user has moved on.
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so

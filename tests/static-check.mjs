@@ -42,6 +42,7 @@ assert.deepEqual(scoring.grades,['V0','V1','V2','V3','V4','V5','V6','V7','V8','V
 const sharedConfig=(script.match(/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/g)||[]).length;
 assert.ok(sharedConfig>=2,'browser and Apps Script both read the shared scoring config');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
+assert.match(script,/#activityList'\)\.innerHTML=activityMarkup\([^)]*,false\)/,'the crew feed is read-only');
 assert.match(html,/id="undoBar"[^>]*role="status"[^>]*aria-live="polite"/,'the undo bar announces itself politely');
 assert.match(html,/id="undoDelete"[^>]*type="button"/,'undo is a real button');
 assert.match(html,/id="undoDismiss"[^>]*type="button"/,'dismissing the undo bar is a real button');

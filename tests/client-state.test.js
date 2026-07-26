@@ -972,8 +972,11 @@ const domChecks = `(()=>{
   const ownFeed=document.querySelector('#personalActivity'),crewFeed=document.querySelector('#activityList');
   assert.ok(ownFeed.innerHTML.indexOf('data-del=')>=0,'the You feed offers delete buttons for your own entries');
   assert.ok(ownFeed.innerHTML.indexOf('aria-label="Delete ')>=0,'each You-feed delete button names the entry it removes');
-  assert.ok(crewFeed.innerHTML.indexOf('data-del=')>=0,'the Crew feed keeps its delete buttons');
-  assert.ok(crewFeed.innerHTML.indexOf('aria-label="Delete ')>=0,'the Crew feed keeps its delete labels');
+  // Entry 29 inverted these two: the Crew feed used to render a delete button on every other
+  // person's entry, which is the affordance that entry removes. Asserted the other way round now,
+  // against the same rendered feed, so the old behaviour cannot come back unnoticed.
+  assert.equal(crewFeed.innerHTML.indexOf('data-del='),-1,'the Crew feed offers no delete buttons');
+  assert.equal(crewFeed.innerHTML.indexOf('aria-label="Delete '),-1,'and no delete labels either');
   const confirmDialog=document.querySelector('#confirmModal'),confirmBody=document.querySelector('#confirmBody');
   requestDelete(0,'d1','personal');
   assert.equal(confirmDialog.classList.contains('open'),true,'requesting a delete opens the in-app dialog instead of a native prompt');
