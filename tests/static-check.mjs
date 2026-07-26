@@ -42,6 +42,14 @@ assert.deepEqual(scoring.grades,['V0','V1','V2','V3','V4','V5','V6','V7','V8','V
 const sharedConfig=(script.match(/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/g)||[]).length;
 assert.ok(sharedConfig>=2,'browser and Apps Script both read the shared scoring config');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
+assert.match(script,/function breakdownRow\(/,'one breakdown row shape serves the You panel and the person card');
+assert.match(script,/function pyramidRow\(/,'one pyramid row shape serves both');
+assert.match(script,/function recordsRow\(/,'one records row shape serves both');
+assert.equal((script.match(/class="breakdown-row"/g)||[]).length,1,'the breakdown row markup is written once');
+assert.equal((script.match(/class="pyramid-row"/g)||[]).length,1,'the pyramid row markup is written once');
+// records-row is also the Week in Review leader list's class, and that renderer is another entry's
+// surface, so the count here is the two owners of the shape: recordsRow() and renderWeekReview().
+assert.equal((script.match(/class="records-row"/g)||[]).length,2,'the You panel and the person card share one records row');
 assert.match(script,/#activityList'\)\.innerHTML=activityMarkup\([^)]*,false\)/,'the crew feed is read-only');
 assert.match(html,/id="undoBar"[^>]*role="status"[^>]*aria-live="polite"/,'the undo bar announces itself politely');
 assert.match(html,/id="undoDelete"[^>]*type="button"/,'undo is a real button');

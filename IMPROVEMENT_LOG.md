@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 29 — Keep the Crew feed read-only — Done — 2026-07-26
-- 30 — One row-markup helper for the repeated cards — Todo
+- 30 — One row-markup helper for the repeated cards — Done — 2026-07-26
 - 31 — Say something when the export fails — Todo
 - 32 — Show the save in the credit preview — Todo
 - 33 — Tap a category chip to start recording it — Todo
@@ -51,50 +50,38 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 29. Keep the Crew feed read-only
-
-Status: Done — 2026-07-26
-Notes: Commit `Stop the Crew feed inviting deletes of other people's entries`. `render()` paints
-`#activityList` with `activityMarkup(logs,20,false)`, so the crew feed renders no delete controls,
-and the `#activityList` click listener in `init()` was **removed** rather than left in place — a
-handler that can act on a row the user has no control for is the same bug one layer down.
-`#personalActivity` keeps `activityMarkup(myLogs,5,true)` and its own listener, so deleting your own
-entry is unaffected, and `feedSelector()`, `nextFocusIndex()` and `restoreFeedFocus()` keep their
-signatures and keep working for the `'personal'` feed. index.html 138,431 → 138,232 bytes (**−199**;
-85.9% of the 161,000-byte budget — this entry gives bytes back, as projected). Tests:
-`static-check.mjs` gains `#activityList'\)\.innerHTML=activityMarkup\([^)]*,false\)`, which
-matches the `false` argument rather than the limit, so entry 38 can replace the number with a
-variable without retargeting it. Deviation: (1) Two assertions in harness-2's entry-19 block —
-`the Crew feed keeps its delete buttons` and `the Crew feed keeps its delete labels` — asserted
-exactly the behaviour this entry removes, so they could not both survive. They were **inverted, not
-deleted**: same feed, same render, same `innerHTML`, now asserting the absence of `data-del=` and
-`aria-label="Delete ` with a comment recording why they flipped. That is the entry's intent made
-enforceable rather than a weakened assertion; entry 19's focus-restoration assertions, which this
-entry's `### Do not` protects by name, are untouched and still pass. (2) Rule 10 archiving: entry 28
-was moved verbatim into `IMPROVEMENTS.md` after the archived entry 27 and its index line dropped;
-the lifted block was string-matched back out of the archive (exactly one occurrence, gone from the
-log, heading confirmed at the start of its own line) and entry 27 was confirmed intact and unsplit.
-
-### Why
-`render()` paints the crew feed with `activityMarkup(logs,20,true)` — the same `allowDelete` flag the You feed uses — and `#activityList`'s click handler calls `requestDelete(...,'crew')` with no ownership check. Every crew member therefore sees a × on every other member's entry and can remove it in two taps against live shared data. Entry 19 added delete deliberately and its `### Do not` fenced "delete buttons for other people's entries", but only the You feed was in its scope, so the crew feed has been offering them ever since. The backend permits the write — anyone with the crew link may delete — which is exactly why the interface should not invite it.
-
-### Requirements
-- `src/app.js` — the crew feed renders without delete controls: `activityMarkup(logs,20,false)` for `#activityList`. `#personalActivity` keeps its delete buttons unchanged, so deleting your own entry is unaffected.
-- Remove the now-dead `#activityList` delete listener rather than leaving a handler that can act on a row the user has no control for; record which you did in `Notes:`.
-- `feedSelector()`, `restoreFeedFocus()` and `nextFocusIndex()` keep working for the `'personal'` feed; do not change their signatures.
-
-### Tests
-- `tests/client-state.test.js` harness-2 `domChecks`: after `render()`, `#activityList`'s `innerHTML` contains no `data-del=` while `#personalActivity`'s still does.
-- `tests/static-check.mjs` — **add** `assert.match(script,/#activityList'\)\.innerHTML=activityMarkup\([^)]*,false\)/,'the crew feed is read-only')`. Match the `false` argument, not the limit — entry 38 replaces that number with a variable and must not have to retarget this assertion.
-
-### Do not
-Remove delete from the You feed; add an ownership check to `requestDelete()` instead of removing the affordance (the backend still permits the write — this entry is about not inviting it); change the shared delete request; weaken entry 19's focus-restoration assertions.
-
----
-
 ## 30. One row-markup helper for the repeated cards
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Render the repeated card rows from one shape`. Three pure helpers —
+`breakdownRow(icon,label,points,pct)`, `pyramidRow(grade,count,pct)` and `recordsRow(label,value)`
+— take plain values rather than model objects, so neither renderer reshapes its data, and all four
+call sites now render through them: `renderBreakdown()`, `renderPyramid()`, `renderRecords()` and
+`renderPersonCard()`'s three sections. The **person-card** shape is the one that was adopted, so
+every bar now carries `role="img"` with a per-row `aria-label` and an `aria-hidden="true"` inner
+`<i>` (rule 7): the You panel is upgraded and the modal is unchanged, which is the drift this entry
+existed to close. Nothing about what `categoryBreakdown()`, `personalRecords()` or `gradePyramid()`
+returns changed, and no container id moved. index.html 138,232 → 137,944 bytes (**−288**; 85.7% of
+the 161,000-byte budget — collapsing the duplication gives bytes back even after the added labels).
+Tests: harness-2 renders the You panel and opens the person card for the same person and asserts
+`#youBreakdown.innerHTML` is **identical** to `#personBreakdown.innerHTML` and `#gradePyramid` to
+`#personPyramid` — the strongest available statement that one shape serves both — plus that the
+You-panel rows now contain `role="img"` and `aria-label="` while the decorative fill keeps
+`aria-hidden="true"`. `static-check.mjs` gains a presence assertion for each helper and
+single-source counts for the row markup; every existing `role="img"[^>]*aria-label=` assertion
+still passes. Deviations: (1) `#gradePyramid` already carried a container-level `role="img"` with an
+`aria-label` enumerating every row, and assistive technology ignores descendants of a `role="img"`
+element — so the per-row labels **inside the pyramid are inert**. The entry asks for one shared
+shape and that is what shipped, but the real accessibility gain here is on the breakdown and records
+rows, not the pyramid. Recorded so a later a11y pass reads the redundancy as deliberate rather than
+discovering and removing it. (2) The `records-row` class is also used by `renderWeekReview()`'s
+leader list, whose rows are rank-plus-name rather than label-plus-value and which this entry does
+not name. It was left alone rather than bent to fit, so the single-source count assertion for that
+shape is 2 — `recordsRow()` and the Week in Review — with a comment saying why. (3) Rule 10
+archiving: entry 29 was moved verbatim into `IMPROVEMENTS.md` after the archived entry 28 and its
+index line dropped; the lifted block was string-matched back out of the archive (exactly one
+occurrence, gone from the log, heading confirmed at the start of its own line) and entry 28 was
+confirmed intact and unsplit.
 
 ### Why
 The breakdown, records and pyramid rows are written twice: once in `renderBreakdown()`, `renderRecords()` and `renderPyramid()` for the You panel, and again in `renderPersonCard()` for `#personModal`. The two copies have drifted, and the drift is an accessibility one — the person-card bars carry `role="img"` with a per-row `aria-label`, while the You-panel bars are bare `aria-hidden="true"` decoration. The same information is announced inside the modal and silent on the main tab, and roughly 1,350 characters of near-duplicate template are kept in sync by hand.

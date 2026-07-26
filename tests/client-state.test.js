@@ -1084,6 +1084,26 @@ const domChecks = `(()=>{
   closeModal('personModal');
   assert.equal(personModal.classList.contains('open'),false,'closing the dialog clears the open class');
 
+  // Entry 30: the You panel and the person card render the SAME row shape for the same person, and
+  // the You-panel bars are no longer silent decoration — they announce themselves like the card's.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  render();
+  openPersonCard('Alex');
+  const youBd=document.querySelector('#youBreakdown'),personBd=document.querySelector('#personBreakdown');
+  assert.ok(youBd.innerHTML.length>0,'the You breakdown has rows to compare');
+  assert.equal(youBd.innerHTML,personBd.innerHTML,'the same data renders the same row markup in both places');
+  assert.ok(youBd.innerHTML.indexOf('role="img"')>=0,'the You-panel bars are announced as graphics');
+  assert.ok(youBd.innerHTML.indexOf('aria-label="')>=0,'and each one carries its own text alternative');
+  assert.ok(youBd.innerHTML.indexOf('<i style="width:')>=0&&youBd.innerHTML.indexOf('aria-hidden="true"></i>')>=0,'while the decorative fill stays hidden');
+  const youPy=document.querySelector('#gradePyramid'),personPy=document.querySelector('#personPyramid');
+  assert.ok(youPy.innerHTML.length>0,'the You pyramid has rows to compare');
+  assert.equal(youPy.innerHTML,personPy.innerHTML,'the pyramid rows match too');
+  const youRec=document.querySelector('#recordsList'),personRec=document.querySelector('#personRecords');
+  assert.ok(youRec.innerHTML.indexOf('records-row')>=0&&personRec.innerHTML.indexOf('records-row')>=0,'both records lists render through the shared row');
+  closeModal('personModal');
+
   // Entry 21: a dead Save button explains itself, the in-flight flag survives a mid-save input
   // change, and the bounty hint carries the chosen bounty's description.
   me='Alex';recordingFor='Alex';endpoint='';logs=[];
