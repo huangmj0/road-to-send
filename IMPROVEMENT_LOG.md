@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 36 — Caption the heatmap and the trend chart — Done — 2026-07-26
-- 37 — Focus the dialog you just opened — Todo
+- 37 — Focus the dialog you just opened — Done — 2026-07-26
 - 38 — Show more of the feed — Todo
 - 40 — Share through the system share sheet — Todo
 - 41 — Preview the week's bounties — Todo
@@ -44,59 +43,39 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 36. Caption the heatmap and the trend chart
-
-Status: Done — 2026-07-26
-Notes: Commit `Caption the heatmap and the trend chart`. `#heatmapSummary` sits inside
-`#heatmapCard` after `#youHeatmap`, and `#trendSummary` inside `#weeklyTrendCard` after the
-`.trend-scroll` wrapper — after the wrapper, so the existing `.trend-scroll` → `#weeklyTrend`
-adjacency assertion is untouched. Both are plain text set with `textContent`. Two pure helpers,
-`heatmapCaption(days)` and `trendCaption(rows)`, build the strings from exactly what `heatmapDays()`
-and `weeklyTrend()` already return — the heatmap caption names the best day (via `fmtDay()`, rule 6)
-and the active-day count, the trend caption the best week and the current one. They are set inside
-`renderHeatmap()` and `renderTrend()`, beside the `card.classList.toggle('hide',…)` decision, which
-is the only place that can honour "empty when the card is hidden". Both existing container
-`aria-label`s are kept, no day is enumerated into a label, and the `title` attributes stay. index.html
-139,166 → 140,112 bytes (+946; 87.0% of the 161,000-byte budget, inside the ~1,500 this entry was
-projected to cost). Tests: harness-1 covers both helpers against crafted days and weeks, including
-the empty case, an all-zero case, and single-day/single-point cases that would expose a stray plural.
-Harness-2 asserts both captions are non-empty when their cards are shown and empty once the logs are
-cleared and the cards hide. `static-check.mjs` gains presence assertions for both ids, both order
-assertions, and a presence assertion for each helper; the existing `.trend-scroll{overflow-x:auto}`
-and adjacency assertions still pass. Deviations: (1) The entry's markup says `class="muted"`, but
-**`.muted` has no rule in `src/styles.css`** — it exists only as the CSS custom property `--muted`.
-The existing muted-caption class is `.hint`, so both captions use `class="hint"`, which is what the
-entry's own requirement ("reuse the existing muted-caption styling; add at most a spacing rule")
-asks for, and no CSS was added at all. (2) `trendCaption()` gates on any week having points rather
-than on the row count alone, matching `renderTrend()`'s own `empty` test, so the caption and the card
-appear and disappear together. (3) Rule 10 archiving: entry 35 was moved verbatim into
-`IMPROVEMENTS.md` after the archived entry 34 and its index line dropped; the lifted block was
-string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
-at the start of its own line) and entry 34 was confirmed intact and unsplit.
-
-### Why
-Both graphics already carry `role="img"` with a summarising `aria-label` — `#youHeatmap` announces its active-day and point totals, `#weeklyTrend` its per-week list — so the container level is covered and this entry must not redo it. What is missing is per-datum detail for everyone else: each heatmap cell and each trend column keeps its numbers in a `title=` attribute on an `aria-hidden="true"` element, which never appears on touch, is invisible on a phone, and is the only place that individual day's or week's figure exists.
-
-### Requirements
-- `src/index.template.html` — `<p id="heatmapSummary" class="muted">` inside `#heatmapCard` after `#youHeatmap`, and `<p id="trendSummary" class="muted">` inside `#weeklyTrendCard` after the `.trend-scroll` wrapper. Both are plain text set with `textContent`. Placing the trend caption after the wrapper keeps the existing `.trend-scroll` → `<div id="weeklyTrend">` adjacency assertion intact.
-- `src/app.js` — two small pure helpers building the caption strings from what `heatmapDays()` and `weeklyTrend()` already return: the heatmap caption names the best day and the active-day count, the trend caption the best week and the current one. Reuse `fmtDay()` for dates (rule 6).
-- Keep both existing `aria-label`s. The captions are additive and must not simply restate them.
-- Do not enumerate every day into an `aria-label` — a ten-week challenge would make it unusable.
-- `src/styles.css` — reuse the existing muted-caption styling; add at most a spacing rule.
-
-### Tests
-- `tests/client-state.test.js` harness-1: both caption helpers against crafted days and weeks, including the empty case (returns `''`) and a single-day case (no stray plural).
-- `tests/client-state.test.js` harness-2 `domChecks`: after `render()` both captions have non-empty `textContent`, and both are empty when their cards are hidden.
-- `tests/static-check.mjs` — **add** presence assertions for both ids plus order assertions `id="youHeatmap"` → `id="heatmapSummary"` and `class="trend-scroll"` → `id="trendSummary"`; the existing `.trend-scroll{overflow-x:auto}` and adjacency assertions must keep passing.
-
-### Do not
-Remove or rewrite the existing `aria-label`s; make heatmap cells or trend columns focusable (a seventy-cell tab-stop run is worse than the caption); drop the `title` attributes; change what `heatmapDays()`, `heatLevel()` or `weeklyTrend()` return.
-
----
-
 ## 37. Focus the dialog you just opened
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Move focus into the dialog, and let the backdrop close it`. `openModal(id)` now moves
+focus to the dialog's first focusable element through the existing `focusableIn()` helper, straight
+after the Tab trap is installed — so `#personModal`, `#confirmModal` and `#weekReviewModal` no longer
+open with focus left on the element behind them, and the first Tab can no longer land outside the
+trap. `openIdentity()`, `openProxy()` and `openSetup()` keep focusing their own field, because their
+explicit `.focus()` calls run after `openModal()` returns. The first focusable element is
+deliberately not a destructive control: in `#confirmModal` that is Cancel, not `#confirmOk`. New
+`closeIfScrim(event,id)` closes only when `event.target` is the backdrop element itself — no
+`closest()`, so the stub harness can call it directly — and is wired on all six modal backdrops in
+`init()`. Escape, the × buttons, `closeModal()`'s `lastFocused` restoration and the trap itself are
+unchanged, and there is no second focus-trap implementation. index.html 140,112 → 140,533 bytes
+(+421; 87.3% of the 161,000-byte budget, inside the ~700 this entry was projected to cost). Tests: a
+new `test(...)` builds a context whose element factory records `focus()` calls and whose
+`#confirmModal` returns two focusable children — the shared `makeElement()` stubs `focus` as a no-op
+and returns `[]` from `querySelectorAll`, so none of this is observable in any existing harness and a
+richer factory in a fresh context is additive, not a weakened assertion. It asserts that opening
+focuses the **cancel** button rather than the confirm one, that `closeIfScrim` with an inner node
+leaves the dialog open, that `closeIfScrim` with the backdrop closes it, and that closing an
+already-closed dialog is harmless. `static-check.mjs` gains `function closeIfScrim\(` and
+`'weekReviewTitle'` **appended** to the existing dialog-naming array — appended, never retargeted,
+since entries 19 and 20 previously collided in that exact array. Deviations: (1) The new scrim path
+is a **fourth** way to dismiss `#confirmModal`. Entry 26 shipped one commit earlier and had already
+anticipated this: it clears `pendingDelete` and `confirmAction` inside `closeModal()` rather than in
+each individual handler, so the scrim route is covered by construction and no cancelled delete can
+survive it. (2) The harness compares recorded focus calls as a joined string rather than with
+`deepEqual`, because the array is built in the host realm and the expected literal inside the vm has
+a different `Array` prototype, which `deepStrictEqual` rejects. (3) Rule 10 archiving: entry 36 was
+moved verbatim into `IMPROVEMENTS.md` after the archived entry 35 and its index line dropped; the
+lifted block was string-matched back out of the archive (exactly one occurrence, gone from the log,
+heading confirmed at the start of its own line) and entry 35 was confirmed intact and unsplit.
 
 ### Why
 `openModal()` installs a Tab trap and `closeModal()` restores focus to the trigger, but neither moves focus **into** the dialog. Three call sites compensate by focusing a field themselves — `openIdentity()`, `openProxy()`, `openSetup()` — and three do not: `#personModal`, `#confirmModal` and `#weekReviewModal` open with focus still on the element behind them, so the first Tab can land outside the trap and a screen-reader user is never told a dialog opened. Clicking the scrim closes nothing either; only Escape and the explicit × do. `#weekReviewModal` is also the one dialog missing from `static-check.mjs`'s dialog-naming loop, despite carrying the right attributes.

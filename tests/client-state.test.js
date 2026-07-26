@@ -1487,4 +1487,55 @@ test('a blocked export says so instead of failing silently', async () => {
   assert.deepEqual(blockedBlob.revoked, [], 'with nothing to revoke, nothing is revoked');
 });
 
+test('opening a dialog moves focus into it, and only the backdrop closes it', async () => {
+  // The shared makeElement() stubs focus as a no-op and returns [] from querySelectorAll, so none of
+  // this is observable in the existing harnesses. A richer factory in a fresh context is additive.
+  const focused = [];
+  const elements = new Map();
+  const makeFocusable = name => {
+    const el = makeElement();
+    el.name = name;
+    el.focus = () => focused.push(name);
+    el.offsetParent = {};
+    return el;
+  };
+  const okBtn = makeFocusable('confirmOk');
+  const cancelBtn = makeFocusable('confirmCancel');
+  const confirmModal = makeElement();
+  confirmModal.querySelectorAll = () => [cancelBtn, okBtn];
+  elements.set('#confirmModal', confirmModal);
+  const focusContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: () => [],
+      addEventListener() {}, removeEventListener() {}, createElement: () => makeElement(),
+    },
+    focusOrder: () => focused,
+    innerNode: () => okBtn,
+    theModal: () => confirmModal,
+    fetch: async () => {throw Error('this harness makes no network calls')},
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const focusChecks = `(()=>{
+    openModal('confirmModal');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the dialog opened');
+    assert.equal(focusOrder().join(','),'confirmCancel','focus lands on the dialog first focusable element, not on the destructive one');
+    // A click inside the dialog is not a dismissal.
+    closeIfScrim({target:innerNode()},'confirmModal');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'a click on something inside the dialog leaves it open');
+    // A click on the backdrop itself is.
+    closeIfScrim({target:theModal()},'confirmModal');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'a click on the backdrop closes it');
+    closeIfScrim({target:theModal()},'confirmModal');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'and closing an already-closed dialog is harmless');
+  })()`;
+  await vm.runInNewContext(`${source}\n${focusChecks}`, focusContext, {filename: 'index.html'});
+});
+
 console.log('Client state and scoring tests passed.');

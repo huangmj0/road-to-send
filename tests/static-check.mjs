@@ -17,7 +17,7 @@ assert.match(html,/class="bottom-nav"[^>]+aria-label="Primary"/,'bottom navigati
 assert.match(html,/id="recordMeter"[^>]+aria-label=/,'record preview meter is accessible');
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'persistent sync diagnostics are announced');
 assert.match(html,/id="toast"[^>]+role="status"[^>]+aria-live="polite"/,'toast is announced');
-for(const title of ['identityTitle','proxyTitle','setupTitle','confirmTitle','personTitle'])assert.match(html,new RegExp(`role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="${title}"`),`${title} dialog is named`);
+for(const title of ['identityTitle','proxyTitle','setupTitle','confirmTitle','personTitle','weekReviewTitle'])assert.match(html,new RegExp(`role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="${title}"`),`${title} dialog is named`);
 assert.match(html,/aria-label="Close identity picker"/);
 assert.match(html,/aria-label="Close person picker"/);
 assert.match(html,/aria-label="Close shared setup"/);
@@ -26,6 +26,7 @@ assert.match(html,/id="confirmOk"[^>]*type="button"/,'the confirm dialog confirm
 assert.match(html,/id="confirmCancel"[^>]*type="button"/,'the confirm dialog cancels with a real button');
 assert.match(script,/function requestDelete\(/,'deleting an entry goes through the confirm request helper');
 assert.match(html,/aria-label="Close person details"/);
+assert.match(script,/function closeIfScrim\(/,'clicking the backdrop closes the dialog it belongs to');
 assert.match(script,/data-person="/,'leaderboard rows expose the climber name as a per-person hook');
 assert.match(script,/function openPersonCard\(/,'tapping a climber opens the per-person card');
 assert.match(script,/<button class="climber" type="button"[^>]*data-person=/,'the climber name is a real button, not a clickable row');
