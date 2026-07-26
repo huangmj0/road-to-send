@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 33 — Tap a category chip to start recording it — Done — 2026-07-26
-- 34 — Show the note you wrote on a bounty — Todo
+- 34 — Show the note you wrote on a bounty — Done — 2026-07-26
 - 35 — Say which day the app thinks it is — Todo
 - 36 — Caption the heatmap and the trend chart — Todo
 - 37 — Focus the dialog you just opened — Todo
@@ -47,64 +46,28 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 33. Tap a category chip to start recording it
-
-Status: Done — 2026-07-26
-Notes: Commit `Make the category chips start the recording they describe`. Each chip is now
-`<button class="cat-chip …" type="button" data-cat="{type}">` nested **inside** its existing
-`role="listitem"` wrapper, which is a new `<span class="chip-item">` — the chip cannot itself be the
-list item, because `role="listitem"` on a button destroys the button semantics, and `#todayCategories`
-keeps `role="list"` as `static-check.mjs` asserts. `prefillCategory(type)` mirrors `claimBounty()`'s
-steps rather than copying its body: it looks the radio up first and returns if there is none, then
-`setDefaultRecordDate()`, collapses `#dateFields` and resets `#dateToggle`, checks the radio,
-`showTab('record')` and `updateRecordPreview()`. One delegated `#todayCategories` listener sits
-beside the `#todayBounties` one in `init()`. No new module state, no fourth chip state, and no new
-copy in `#todayRemaining`. Already-logged chips stay tappable and undisabled: logging a category
-twice is legal and simply scores 0, so the affordance must not imply an error. `src/styles.css`
-gains one appended line — `.chip-item{display:inline-flex}`, the button reset the chip needs
-(`font-family:inherit`, `cursor:pointer`), a `:focus-visible` outline and an `:active` background;
-`.cat-chip` already carried `min-height:44px` (rule 7). index.html 138,118 → 139,049 bytes (+931;
-86.4% of the 161,000-byte budget, inside the ~1,200 this entry was projected to cost). Tests:
-harness-2's three existing chip assertions count occurrences of `cat-chip` and `cat-chip done`, and
-they still hold **because the wrapper class is `chip-item`, not a `cat-chip` variant** — a wrapper
-named `cat-chip-item` would have silently inflated every one of those counts. Saying so here so a
-later pass does not "fix" them. New assertions cover the button markup, the nesting order, the
-preselect, and that no done chip is disabled. `static-check.mjs` gains
-`<button class="cat-chip` and `function prefillCategory\(`. Deviations: (1) The entry's test asks
-that `prefillCategory('exercise')` "leaves the Record panel active", which is not observable in
-harness 2: `showTab()` moves panels through `document.querySelectorAll('[data-panel]')` and the stub
-returns `[]` from it. The jump is asserted through an effect that *is* observable — `showTab()`
-clears `lastDeleted` (entry 28), so a seeded undo offer being gone proves the tab change ran — plus
-`#dateFields` gaining `hide`, which is the date reset the entry asks `prefillCategory` to mirror.
-A comment in the harness records why. (2) A harness-local `const typeRadio` collided with entry 21's
-declaration in the same IIFE scope and was renamed `chipRadio`; nothing of entry 21's was touched.
-(3) Rule 10 archiving: entry 32 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
-31 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
-one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 31 was
-confirmed intact and unsplit.
-
-### Why
-Entry 17 shipped `#todayCategories` as status chips and explicitly left interaction for later — "a tap-to-preselect path duplicates entry 14's claim flow and the card's own Record CTA, so leave it for a later entry". Entry 14 has since shipped exactly that flow for bounties, where `claimBounty(id)` jumps to Record pre-filled, so the pattern now exists. The chips are the one place in the today-card that shows a missing category without offering the action that fixes it.
-
-### Requirements
-- `src/index.template.html` / `src/app.js` — each chip becomes a real `<button class="cat-chip …" type="button">` nested **inside** its existing `role="listitem"` wrapper. The chip cannot itself be the list item (a `role="listitem"` on a button destroys the button semantics) and the container keeps `role="list"`, which `static-check.mjs` asserts.
-- Named top-level `prefillCategory(type)` mirroring `claimBounty()`: select the matching activity-type radio, reset the date fields the way `claimBounty()` does, `showTab('record')`, and repaint the preview. No new module state.
-- Already-logged chips stay tappable. Logging a category twice is legal and simply scores 0, so the affordance must not imply an error.
-- `src/styles.css` — chips keep `min-height:44px` (rule 7) and gain only the focus/press styling `.text-btn` does not already provide.
-- Harness-2's three chip assertions count occurrences of `cat-chip` and `cat-chip done` rather than matching exact markup, so nesting a button inside the wrapper keeps every count intact. Say so in `Notes:` so a later pass does not "fix" them.
-
-### Tests
-- `tests/client-state.test.js` harness-2 `domChecks`: `prefillCategory('exercise')` selects the exercise radio and leaves the Record panel active; the existing chip counts still hold.
-- `tests/static-check.mjs` — **add** `assert.match(script,/<button class="cat-chip/)` and `assert.match(script,/function prefillCategory\(/)`, keeping the `role="list"` assertion passing.
-
-### Do not
-Remove `role="list"` or put `role="listitem"` on the button; change what `todayProgress()` returns or add bounty rows to it (entry 14's card owns those); copy `claimBounty()`'s body instead of mirroring its steps; add a fourth chip state or new copy to `#todayRemaining`.
-
----
-
 ## 34. Show the note you wrote on a bounty
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Show the note written on a bounty claim`. One ternary branch: `activityMarkup()`'s
+bounty `detail` now appends ` · ` plus the escaped note when one is present, matching the
+exercise/mobility branch exactly. Climb entries keep the grade in that slot and gain nothing. `esc()`
+stays around the note — it is user-entered text arriving from a shared Google Sheet, so this is an
+injection boundary. The feed row structure, the delete-button markup, the note's storage, its POST
+body and `#activityNote`'s 120-character `maxlength` are all untouched. index.html 139,049 → 139,080
+bytes (+31; 86.4% of the 161,000-byte budget, against the ~100 this entry was projected to cost).
+Tests: harness-2 renders a bounty carrying a note and asserts the **whole** detail string —
+`title · note · date` — rather than merely that the note appears somewhere, then a bounty without a
+note and asserts the detail reads `title · date` exactly as before, then a note containing
+`<img src=x onerror=…>` and asserts it is escaped rather than injected. `static-check.mjs` needs no
+new assertion; the existing parse and markup checks cover it. Deviations: (1) A first draft asserted
+the absence of ` · ` for a note-less bounty, which is wrong — the row template already joins the
+detail to the date with that separator, so the assertion could never have held. Both assertions were
+rewritten against the full detail string, which is what actually distinguishes the two cases.
+(2) Rule 10 archiving: entry 33 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+32 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 32 was
+confirmed intact and unsplit.
 
 ### Why
 `#noteFields` is visible for bounty entries, `draftActivity()` sets `base.note` for them and `submitActivity()` POSTs it, so the note round-trips to the Sheet and back. But `activityMarkup()`'s bounty branch renders `🎯 <title>` and nothing else — notes are only rendered for exercise and mobility. Whatever a crew member writes on a bounty claim is stored and shown to no one.

@@ -919,6 +919,28 @@ const domChecks = `(()=>{
   assert.equal(claimSelect.value,claimId,'claiming a bounty preselects it in the Record dropdown');
   assert.equal(claimDateBox.classList.contains('hide'),true,'claiming a bounty snaps to today and closes the date picker');
 
+  // Entry 34: a note written on a bounty claim round-trips to the Sheet and back, and until now was
+  // rendered to nobody — the bounty branch showed the title and stopped.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  const notedId=dailyBounties(challengeToday())[0].id,notedTitle=bountyById(notedId).title;
+  logs=[{id:'n1',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'felt strong today',date:shift(-1),createdAt:'1'}];
+  render();
+  const notedFeed=document.querySelector('#personalActivity');
+  assert.ok(notedFeed.innerHTML.indexOf(notedTitle)>=0,'the bounty still names itself');
+  assert.ok(notedFeed.innerHTML.indexOf('felt strong today')>=0,'and now shows the note that was written on it');
+  // The row already joins detail to date with the same separator, so assert the whole detail.
+  assert.ok(notedFeed.innerHTML.indexOf(notedTitle+' · felt strong today · '+fmtDay(shift(-1)))>=0,'the note joins the title the way the exercise and mobility rows join theirs');
+  logs=[{id:'n2',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,date:shift(-1),createdAt:'2'}];
+  render();
+  assert.equal(notedFeed.innerHTML.indexOf('felt strong today'),-1,'a bounty with no note carries no note');
+  assert.ok(notedFeed.innerHTML.indexOf(notedTitle+' · '+fmtDay(shift(-1)))>=0,'and renders exactly as it did before, title straight to date');
+  // The note is user-entered text arriving from a shared Sheet, so it stays escaped.
+  logs=[{id:'n3',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'<img src=x onerror=alert(1)>',date:shift(-1),createdAt:'3'}];
+  render();
+  assert.equal(notedFeed.innerHTML.indexOf('<img'),-1,'a note carrying markup is escaped, never injected');
+  assert.ok(notedFeed.innerHTML.indexOf('&lt;img')>=0,'and is shown as the text it is');
+
   // Entry 17: the today card names which categories are done and whether the balanced-day bonus is still live.
   me='Alex';recordingFor='Alex';endpoint='';
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
