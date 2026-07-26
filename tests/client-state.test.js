@@ -431,6 +431,19 @@ const checks = `(()=>{
   recordingFor='Maya';
   assert.equal(me,'Alex','temporary proxy target does not replace device owner');
 
+  // Entry 27: writeStore is the one place storage is written, and it reports rather than throws.
+  assert.equal(writeStore('roadToSendMe','Alex'),true,'a normal write reports success');
+  assert.equal(localStorage.getItem('roadToSendMe'),'Alex','and the value really landed');
+  const realStore=localStorage;
+  localStorage={getItem:key=>realStore.getItem(key),removeItem:key=>realStore.removeItem(key),setItem:()=>{throw Error('QuotaExceededError')}};
+  assert.equal(writeStore('roadToSendMe','Bo'),false,'a throwing setItem is reported, not raised');
+  assert.equal(persistLocal(),false,'and the failure is propagated by the callers that need it');
+  localStorage={getItem:key=>realStore.getItem(key),removeItem:key=>realStore.removeItem(key)};
+  assert.equal(writeStore('roadToSendMe','Bo'),false,'storage with no setItem at all is reported too');
+  localStorage=realStore;
+  assert.equal(localStorage.getItem('roadToSendMe'),'Alex','none of that disturbed the real store');
+  assert.equal(persistLocal(),true,'and a working store still reports success');
+
   // Pace toward the group goal: expected points scale linearly across the window.
   const paceSettings={startDate:'2026-07-01',tripDate:'2026-07-10',goal:100};
   assert.deepEqual(paceInfo(50,paceSettings,'2026-07-05'),{state:'on',diff:0,perDay:9},'exactly expected is on pace');
@@ -1217,6 +1230,48 @@ test('copyText reports a successful clipboard write and keeps the crew link deli
     endpoint='';
   })()`;
   await vm.runInNewContext(`${source}\n${copyChecks}`, copyContext, {filename: 'index.html'});
+});
+
+test('a full disk never reports a saved entry as failed, and never traps the identity dialog', async () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const store = new Map();
+  const today = new Date().toISOString().slice(0, 10);
+  const storageContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: () => [],
+      addEventListener: (type, handler) => listeners.set(type, handler),
+      removeEventListener() {}, createElement: () => makeElement(),
+    },
+    // Safari private mode and an exhausted quota both throw here. Reads still work, which is why
+    // safeJson() was never the problem — every write in the app was the unguarded half.
+    fetch: async () => {throw Error('this harness makes no network calls')},
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: () => {throw Error('QuotaExceededError')}, removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const storageChecks = `(async()=>{
+    endpoint='';
+    config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};
+    logs=[];me='';recordingFor='';
+    document.querySelector('#identityMember').value='Alex';
+    document.querySelector('#identityModal').classList.add('open');
+    saveIdentity();
+    assert.equal(me,'Alex','a failed write still records the identity in memory');
+    assert.equal(document.querySelector('#identityModal').classList.contains('open'),false,'and the dialog closes instead of trapping the user behind an uncaught throw');
+    document.querySelector('#activityDate').value='${today}';
+    document.querySelector('#recordFor').value='Alex';
+    await submitActivity({preventDefault(){}});
+    assert.equal(logs.length,1,'the entry is in the log either way, so it must not be reported as lost');
+    assert.equal(document.querySelector('#toast').textContent,'Saved on this device only — storage is full.','the toast names the real failure instead of claiming the save failed');
+    assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save activity','and the button is handed back');
+  })()`;
+  await vm.runInNewContext(`${source}\n${storageChecks}`, storageContext, {filename: 'index.html'});
 });
 
 console.log('Client state and scoring tests passed.');

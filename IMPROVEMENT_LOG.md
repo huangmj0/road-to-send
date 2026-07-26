@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 26 — Delete the entry you confirmed — Done — 2026-07-26
-- 27 — One guarded localStorage write — Todo
+- 27 — One guarded localStorage write — Done — 2026-07-26
 - 28 — Undo a local delete — Todo
 - 29 — Keep the Crew feed read-only — Todo
 - 30 — One row-markup helper for the repeated cards — Todo
@@ -54,65 +53,46 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 26. Delete the entry you confirmed
-
-Status: Done — 2026-07-26
-Notes: Commit `Delete the entry you confirmed, not the row in its place`. `requestDelete()` now
-captures the row itself — `pendingDelete={entry:item,index,id,feed,position}` — and
-`performDelete()` destructures `{entry,id,feed,position}`, so the local branch reads
-`else if(logs.indexOf(entry)>=0){logs=logs.filter(x=>x!==entry);…}`: it removes the object the
-dialog described, and a captured row that has already left `logs` takes nothing with it — there is
-no positional fallback. The shared branch still deletes by `id`, unchanged. Dismissal is now
-handled in one place: `closeModal(id)` clears `pendingDelete` and `confirmAction` when `id` is
-`confirmModal`, which covers the cancel button, the ×, the Escape handler and any future route
-without wiring each one separately. `performDelete()` still nulls `pendingDelete` up front, and
-`confirmProceed()` still nulls `confirmAction` before invoking the action, so the confirmed path
-is unaffected by the addition. index.html 136,311 → 136,407 bytes (+96; 84.7% of the 161,000-byte
-budget, against the ~500 this entry was projected to cost). Tests: harness-2 gains a block that
-cancels a pending delete and then fires `performDelete()` — the log is untouched both times, which
-is the regression lock for intent surviving a dismissal — then deletes the middle of three rows by
-identity and asserts the survivors keep their order, then removes the captured row from `logs`
-between the request and the confirm and asserts nothing is deleted and the dialog still closes.
-`static-check.mjs` gains the `pendingDelete=null` count guard. Deviations: (1) The entry specifies
-that guard as `>=2`, which was already true before this commit: the module declaration
-`let pendingDelete=null,confirmAction=null;` and `performDelete()`'s own reset are two occurrences,
-so the assertion could not have failed. It is written as `>=3` — declaration, confirmed path,
-dismissal path — with a message naming all three, which is the count that actually detects the
-bug. (2) Clearing lives in `closeModal()` rather than in three separate handlers. The entry names
-the cancel button, the × and the Escape handler; routing through the one function they all already
-call covers exactly those three today and, deliberately, also covers the scrim-click dismissal that
-entry 37 is about to add — which the entry's own enumeration would otherwise have missed.
-(3) The staleness guard is scoped to the local branch. Applying it to the shared branch would break
-shared deletes outright: `loadRemote()` replaces `logs` wholesale, so object identity does not
-survive a background sync and every shared confirm after a sync would silently do nothing. The
-shared branch is `id`-keyed by design and stays that way. (4) `index` is still carried on
-`pendingDelete` as the entry's shape requires, but `performDelete()` no longer destructures it,
-since reading it is precisely the bug. (5) Rule 10 archiving: entry 25 was moved verbatim into
-`IMPROVEMENTS.md` after the archived entry 24 and its index line dropped; the lifted block was
-string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
-at the start of its own line) and entry 24 was confirmed intact and unsplit.
-
-### Why
-`requestDelete(index,id,feed)` stores `pendingDelete={index,id,feed,position}`, and `performDelete()` acts on that index — but nothing clears `pendingDelete` when the dialog goes away by any route other than confirmation. The `#confirmCancel` path, the × button and the Escape handler all leave it set, and `askConfirm()` has been shared with `disconnect()` since entry 19, so a cancelled delete can sit in module state across an unrelated confirm. The local branch also removes by position rather than by identity, which is only correct for as long as nothing else reorders `logs`.
-
-### Requirements
-- `src/app.js` — carry the captured row on `pendingDelete` (`{entry,index,id,feed,position}`) so the confirm acts on the object it described rather than a position that may no longer mean the same thing.
-- `performDelete()`'s local branch removes by identity: `logs=logs.filter(x=>x!==entry)` (entry 25 has already replaced the `splice`). The shared branch keeps deleting by `id`.
-- Clear `pendingDelete` whenever the confirm dialog closes without deleting — the cancel button, the × and the Escape handler — so no cancelled intent survives into the next `askConfirm()` call.
-- If the captured row is no longer in `logs` when the confirm fires, close the dialog and do nothing else; never fall back to deleting by index.
-
-### Tests
-- `tests/client-state.test.js` harness-2 `domChecks`: `requestDelete()` then cancel leaves `logs` unchanged **and** a following `performDelete()` is a no-op; `requestDelete()` on the middle of three rows then `performDelete()` removes exactly that row, leaving the other two in order.
-- `tests/static-check.mjs` — **add** `assert.ok((script.match(/pendingDelete=null/g)||[]).length>=2,'a dismissed confirm clears the pending delete')`.
-
-### Do not
-Change the shared-mode delete request body or its `action:'delete'` id semantics; reintroduce an in-place `splice` (entry 25's static guard forbids it); alter `restoreFeedFocus()` or the focus-position logic entry 19 shipped; add a second confirm dialog.
-
----
-
 ## 27. One guarded localStorage write
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Funnel every storage write through one guarded helper`. `writeStore(key,value)`
+guards the global the way `copyText()` does (`typeof localStorage === 'undefined' ? null :
+localStorage`, because optional chaining still throws `ReferenceError` on an undeclared identifier
+in the harnesses), returns `false` when storage is missing, has no `setItem`, or throws, returns
+`true` on a successful write, and never throws. All **eleven** `localStorage.setItem` occurrences
+now route through it, so the architectural guard counts exactly one — the single literal on
+`writeStore`'s own write line. `persistLocal()` and `persistShared()` now attempt every write
+before reporting (`const a=…,b=…;return a&&b`, never a short-circuit that would skip the second
+key) and hand back a boolean. `submitActivity()` carries `storageFailed=!persistLocal()` in its
+local branch and heads its toast ladder with `Saved on this device only — storage is full.`, so the
+entry that is already in `logs` is never reported as a failed save; `render()` and `showTab('you')`
+run before the toast as they always did. `saveIdentity()` closes its dialog and repaints regardless
+of the write result, because nothing between the write and `closeModal()` can throw any more. No
+key was added, renamed or reshaped, and `safeJson()`'s read behaviour is untouched (rule 4).
+index.html 136,407 → 136,672 bytes (+265; 84.9% of the 161,000-byte budget, inside the ~800 this
+entry was projected to cost). Tests: harness-1 swaps `localStorage` for a stub whose `setItem`
+throws and asserts `writeStore()` returns `false` without raising and that `persistLocal()`
+propagates it, then for a stub with no `setItem` at all, then restores the real store and confirms
+neither the stored value nor the success path was disturbed. A new async `test(...)` runs the whole
+failure in one piece: with every write throwing, `saveIdentity()` still sets `me` and still closes
+`#identityModal` — the dialog no longer traps the user behind an uncaught throw — and a local-mode
+`submitActivity()` leaves the row in `logs`, toasts the storage message rather than `Save failed`,
+and hands the Save button back. `static-check.mjs` gains `function writeStore\(` and the
+`localStorage.setItem` count guard. Deviations: (1) The entry lists five functions to convert —
+`persistLocal()`, `persistShared()`, `saveIdentity()`, `maybeShowWeekReview()` and `saveSetup()` —
+which is eight of the eleven call sites. The other three are in `loadInitialState()` (the `?sheet=`
+endpoint write and the one-time `roadToSendConfigV8` → `roadToSendConfigV9` migration write) and in
+`createProfile()` (`roadToSendMe`). They had to be converted too or the entry's own
+`length === 1` guard could not pass. Converting the migration write does not migrate anything new
+and changes no key or shape — rule 4's "only the existing one-time migration writes
+`roadToSendConfigV9`" still describes exactly one write; a failed migration simply retries on the
+next load, where before it threw out of `loadInitialState()` entirely. (2) `persistShared()`
+returns `false` on the early `if(!endpoint)` return rather than `undefined`, so its result is a
+boolean on every path; no caller reads it today. (3) Rule 10 archiving: entry 26 was moved verbatim
+into `IMPROVEMENTS.md` after the archived entry 25 and its index line dropped; the lifted block was
+string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
+at the start of its own line) and entry 25 was confirmed intact and unsplit.
 
 ### Why
 `safeJson()` wraps every read in a `try`, but every write is bare: `persistLocal()`, `persistShared()`, `saveIdentity()`, `maybeShowWeekReview()` and `saveSetup()` all call `localStorage.setItem` unguarded. In Safari private mode and on quota exhaustion those throw, and two paths then fail badly. In local mode `submitActivity()` appends to `logs` and calls `persistLocal()` inside its `try`, so a throw is caught and toasted as `Save failed` — but the entry is already in the in-memory `logs` and `render()` was skipped, so it appears on the next repaint having never been persisted. And `saveIdentity()` has no `try` at all, so a throw escapes the click handler and `closeModal`/`render` never run, leaving the identity dialog stuck open. This is the shape of bug entry 22 fixed for the clipboard: an unguarded side effect reported as a failure of the thing around it.

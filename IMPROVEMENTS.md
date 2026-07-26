@@ -756,6 +756,62 @@ Change what `computeCredits()` returns or the order in which it applies caps and
 
 ---
 
+## 26. Delete the entry you confirmed
+
+Status: Done — 2026-07-26
+Notes: Commit `Delete the entry you confirmed, not the row in its place`. `requestDelete()` now
+captures the row itself — `pendingDelete={entry:item,index,id,feed,position}` — and
+`performDelete()` destructures `{entry,id,feed,position}`, so the local branch reads
+`else if(logs.indexOf(entry)>=0){logs=logs.filter(x=>x!==entry);…}`: it removes the object the
+dialog described, and a captured row that has already left `logs` takes nothing with it — there is
+no positional fallback. The shared branch still deletes by `id`, unchanged. Dismissal is now
+handled in one place: `closeModal(id)` clears `pendingDelete` and `confirmAction` when `id` is
+`confirmModal`, which covers the cancel button, the ×, the Escape handler and any future route
+without wiring each one separately. `performDelete()` still nulls `pendingDelete` up front, and
+`confirmProceed()` still nulls `confirmAction` before invoking the action, so the confirmed path
+is unaffected by the addition. index.html 136,311 → 136,407 bytes (+96; 84.7% of the 161,000-byte
+budget, against the ~500 this entry was projected to cost). Tests: harness-2 gains a block that
+cancels a pending delete and then fires `performDelete()` — the log is untouched both times, which
+is the regression lock for intent surviving a dismissal — then deletes the middle of three rows by
+identity and asserts the survivors keep their order, then removes the captured row from `logs`
+between the request and the confirm and asserts nothing is deleted and the dialog still closes.
+`static-check.mjs` gains the `pendingDelete=null` count guard. Deviations: (1) The entry specifies
+that guard as `>=2`, which was already true before this commit: the module declaration
+`let pendingDelete=null,confirmAction=null;` and `performDelete()`'s own reset are two occurrences,
+so the assertion could not have failed. It is written as `>=3` — declaration, confirmed path,
+dismissal path — with a message naming all three, which is the count that actually detects the
+bug. (2) Clearing lives in `closeModal()` rather than in three separate handlers. The entry names
+the cancel button, the × and the Escape handler; routing through the one function they all already
+call covers exactly those three today and, deliberately, also covers the scrim-click dismissal that
+entry 37 is about to add — which the entry's own enumeration would otherwise have missed.
+(3) The staleness guard is scoped to the local branch. Applying it to the shared branch would break
+shared deletes outright: `loadRemote()` replaces `logs` wholesale, so object identity does not
+survive a background sync and every shared confirm after a sync would silently do nothing. The
+shared branch is `id`-keyed by design and stays that way. (4) `index` is still carried on
+`pendingDelete` as the entry's shape requires, but `performDelete()` no longer destructures it,
+since reading it is precisely the bug. (5) Rule 10 archiving: entry 25 was moved verbatim into
+`IMPROVEMENTS.md` after the archived entry 24 and its index line dropped; the lifted block was
+string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
+at the start of its own line) and entry 24 was confirmed intact and unsplit.
+
+### Why
+`requestDelete(index,id,feed)` stores `pendingDelete={index,id,feed,position}`, and `performDelete()` acts on that index — but nothing clears `pendingDelete` when the dialog goes away by any route other than confirmation. The `#confirmCancel` path, the × button and the Escape handler all leave it set, and `askConfirm()` has been shared with `disconnect()` since entry 19, so a cancelled delete can sit in module state across an unrelated confirm. The local branch also removes by position rather than by identity, which is only correct for as long as nothing else reorders `logs`.
+
+### Requirements
+- `src/app.js` — carry the captured row on `pendingDelete` (`{entry,index,id,feed,position}`) so the confirm acts on the object it described rather than a position that may no longer mean the same thing.
+- `performDelete()`'s local branch removes by identity: `logs=logs.filter(x=>x!==entry)` (entry 25 has already replaced the `splice`). The shared branch keeps deleting by `id`.
+- Clear `pendingDelete` whenever the confirm dialog closes without deleting — the cancel button, the × and the Escape handler — so no cancelled intent survives into the next `askConfirm()` call.
+- If the captured row is no longer in `logs` when the confirm fires, close the dialog and do nothing else; never fall back to deleting by index.
+
+### Tests
+- `tests/client-state.test.js` harness-2 `domChecks`: `requestDelete()` then cancel leaves `logs` unchanged **and** a following `performDelete()` is a no-op; `requestDelete()` on the middle of three rows then `performDelete()` removes exactly that row, leaving the other two in order.
+- `tests/static-check.mjs` — **add** `assert.ok((script.match(/pendingDelete=null/g)||[]).length>=2,'a dismissed confirm clears the pending delete')`.
+
+### Do not
+Change the shared-mode delete request body or its `action:'delete'` id semantics; reintroduce an in-place `splice` (entry 25's static guard forbids it); alter `restoreFeedFocus()` or the focus-position logic entry 19 shipped; add a second confirm dialog.
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so
