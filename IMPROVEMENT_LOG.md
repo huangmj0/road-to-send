@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 22 — Share my progress: one clipboard helper, and stop a denied copy failing setup — Done — 2026-07-26
-- 24 — Re-baseline the bundle budget for this queue — Todo
+- 24 — Re-baseline the bundle budget for this queue — Done — 2026-07-26
 - 25 — Score the live log once per render — Todo
 - 26 — Delete the entry you confirmed — Todo
 - 27 — One guarded localStorage write — Todo
@@ -44,62 +43,6 @@ Entries 1–14 shipped and now live in `IMPROVEMENTS.md` under "v11 pass — fro
 
 ---
 
-## 22. Share my progress: one clipboard helper, and stop a denied copy failing setup
-
-Status: Done — 2026-07-26
-Notes: Commit `Share your progress through one clipboard helper`. `copyText(text, okMessage)` is
-the only place the clipboard is written: it guards on a missing `navigator`/`clipboard`/`writeText`,
-`await`s the write inside a `try`, toasts `okMessage` and returns `true`, and on any rejection
-toasts `Copy failed — copy it manually.` and returns `false` — it never throws. `copyCrewLink()`,
-`copyScript()` and the `#diagnosticCode` handler all route through it, and `copyCrewLink()` returns
-the boolean. `saveSetup()` keeps the save and `loadRemote()` inside its `try` and now reads
-`const copied = await copyCrewLink()`, toasting `Shared setup saved. Crew link copied.` or
-`Shared setup saved. Copy the crew link from setup.`; `#setupErrors` stays hidden either way.
-`publicUrl()` returns `location.href` with the hash cleared and the `sheet` param deleted;
-`copyCrewLink()` builds on it and re-adds `sheet` deliberately. `shareSummary(nameLower, today =
-challengeToday())` composes only `totalsModel().sorted` (name, total, rank), `challengeProgress()`,
-`categoryBreakdown()`, `streakInfo()`, `personalRecords().hardest` and `publicUrl()`; a person with
-no credited points gets the two-line "Just getting started" variant and a blank or unknown name
-returns `''`. `#shareBtn` sits in the You panel's `.page-head` inside a new `.head-actions` wrapper
-next to `#changeMeBtn`, is wired in `init()` to `copyText(shareSummary(…), 'Progress copied — paste
-it anywhere.')`, and `render()` both hides and disables it when no profile is selected. index.html
-133,957 → 135,867 bytes (87.1% of the 156,000-byte budget, inside the ~3,000 this entry was
-projected to cost); `BUDGET` untouched. Deviations: (1) `copyText` cannot write
-`navigator?.clipboard?.writeText` as the guard — `navigator` is undeclared in the test harnesses and
-optional chaining still throws `ReferenceError` on an undeclared identifier, so the guard reads
-`typeof navigator === 'undefined' ? null : navigator` and the single literal
-`navigator.clipboard.writeText` the architectural guard counts lives on the `await` line. (2) The
-Share button is both hidden (`hide`) and `disabled` rather than one or the other; the entry allows
-either and doing both keeps the stub-harness assertion honest for each. (3) `.head-actions` is one
-new wrapper `div` so the two head buttons group at the right of the `space-between` `.page-head`
-instead of being spread apart; the CSS is the spacing rule the entry allows plus `min-height:44px`
-on both buttons. (4) Two extra `static-check.mjs` assertions (`function copyText(`,
-`function publicUrl(`) accompany the required ones; nothing existing was retargeted. (5) Rule 10
-archiving: entry 21 was moved verbatim into `IMPROVEMENTS.md` after the archived entry 20 and its
-index line dropped; the lifted block was string-matched back out of the archive (exactly one
-occurrence, gone from the log) and entry 20 was confirmed intact and unsplit.
-
-### Why
-There is no way to share or brag about progress — `exportData()` only downloads raw JSON — and there are three hand-rolled `navigator.clipboard.writeText` call sites with **no shared helper and no `try`/`catch`**: `copyCrewLink()`, `copyScript()`, and the inline `#diagnosticCode` handler. That missing catch is a real bug: `saveSetup()` `await`s `copyCrewLink()` **inside its `try`**, so a rejected clipboard write (insecure context, denied permission) lands in the `catch` and paints `#setupErrors` as though setup itself had failed — even though the config was saved to the Sheet and the endpoint persisted.
-
-### Requirements
-- `src/app.js` — new `async function copyText(text, okMessage)`: returns `false` and toasts `Copy failed — copy it manually.` when `navigator?.clipboard?.writeText` is missing or rejects; otherwise toasts `okMessage` and returns `true`. **It never throws.** Rewire all three call sites — `copyCrewLink()`, `copyScript()` and the `#diagnosticCode` handler in `init()` — through it, and have `copyCrewLink()` return `copyText`'s boolean.
-- Fix `saveSetup()`: keep the save and `loadRemote` work inside the `try`, and let the success toast reflect the copy result — `Shared setup saved. Crew link copied.` when `copyCrewLink()` returns true, `Shared setup saved. Copy the crew link from setup.` when it does not. `#setupErrors` must stay hidden in both cases.
-- New pure helper `publicUrl()` → `location.href` with the hash cleared and the `sheet` query param **removed**, so shared text never leaks the crew's Apps Script endpoint. `copyCrewLink()` keeps its own behaviour — it intentionally *includes* `sheet` — so factor out only the URL construction, not the semantics.
-- New pure helper `shareSummary(nameLower, today = challengeToday())` → a short multi-line string composed from existing helpers only: name, `challengeProgress()` (entry 18) for the `Day N of M` line, total and rank from `totalsModel().sorted`, the `categoryBreakdown()` rows as icon/number pairs, `streakInfo()` for the streak, `personalRecords().hardest` when graded, and `publicUrl()` on the last line. A person with no credited points gets a short "just getting started" variant; a blank or unknown `me` returns `''`. No new scoring math, no `new Date()`.
-- `src/index.template.html` — `<button id="shareBtn" class="text-btn" type="button">Share</button>` in the You panel's existing `.page-head`, next to `#changeMeBtn`. That is **above** every You-panel anchor (`today-card`, `#bountyCapHint`, `#todayBounties`, `#personalActivity`, `.stat-grid`), so no existing order assertion is affected. Wire it in `init()` to `copyText(shareSummary(String(me).toLowerCase()), 'Progress copied — paste it anywhere.')`, and hide or disable it when no profile is selected.
-- `src/styles.css` — no new rules if `.text-btn` suffices; add only spacing for the two-button `.page-head` group, keeping both at least 44px.
-
-### Tests
-- `tests/client-state.test.js` harness-1 `checks` literal (no backticks, no `${`; emoji are fine): `shareSummary` on a crafted roster contains the person's name, `Day ` plus the day number, the total, the rank and the streak, and does **not** contain `sheet=` or the endpoint host — that is the privacy assertion. A person with no logs yields the short variant; a blank name yields `''`. `publicUrl()` strips both the hash and the `sheet` param.
-- `tests/client-state.test.js` — a **new** async `test(...)` case modelled on the existing `test('background sync respects the open date picker…')` harness, whose context is the only one already carrying `Promise`, `fetch` and its own `makeElement()` map. Give it `navigator:{clipboard:{writeText:()=>Promise.reject(Error('denied'))}}` plus a `fetch` stub that accepts `saveConfig`, populate the setup fields, `await saveSetup()`, then assert `endpoint` is set, `#setupErrors` still has the `hide` class, and the toast reports a saved setup with an uncopied link. That is the regression lock for the false-failure bug. Add a second case with a resolving `writeText` asserting `copyText` returns `true` and toasts `okMessage`. Adding a `navigator` stub to a context object is additive, not a weakened assertion.
-- `tests/static-check.mjs` — **add**: `#shareBtn` exists inside `data-panel="you"` with `type="button"`; a new order assertion `data-panel="you"` → `id="shareBtn"` → `today-card`; and an architectural guard, `assert.equal((script.match(/navigator\.clipboard\.writeText/g)||[]).length, 1, 'clipboard writes funnel through one helper')`.
-
-### Do not
-Use `navigator.share` — a permission-gated async path that still needs the clipboard fallback and is not observable in the stub harness, so propose it separately; include the `sheet` param, the endpoint, or any other person's data in the shared text; make `copyText` throw or re-throw; change `exportData()`'s JSON shape or the `action:'saveConfig'` request body; add a network request, a dependency, or a localStorage key.
-
----
-
 ## Tone rule for entries 24–41
 
 This app runs on a real crew's shared data, and everyone in it sees the same board. **No entry in this pass adds a nudge, a reminder, or a prompt to participate.** Concretely:
@@ -115,7 +58,34 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ## 24. Re-baseline the bundle budget for this queue
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Re-baseline the bundle budget against a measured start`. `tests/size-check.mjs`
+carries `BUDGET = 161000` and a rewritten comment block in entry 23's arithmetic style: the
+measured start (135,867 bytes after entry 22, against entry 23's projected 143,500 — it expected
+entries 19–22 to add ~18,000 and they added 10,447), this queue's projection (~+12,600 for entries
+25–41, itemised per entry, with 30 giving ~500 back by collapsing the duplicated row markup),
+the landing figure near 148,500, and the ~12,500 cushion that leaves. The standing instruction is
+kept and restated against the new number: if the queue again lands well under its projection, the
+next budget entry lowers `BUDGET` toward the real figure, and each entry's own byte delta in
+`Notes:` (rule 10) is what that check reads. The always-printed size/percent line and the failure
+message are byte-identical. No file under `src/` was touched, so `npm run build` was a no-op and
+`index.html` is unchanged at 135,867 bytes — now 84.4% of the 161,000-byte budget. Deviations:
+(1) This entry is the first of a parallel-orchestration pass: seventeen entries are being authored
+by subagents working concurrently in separate worktrees, and landed one commit at a time by an
+orchestrator that owns `IMPROVEMENT_LOG.md` and `IMPROVEMENTS.md` outright. Implementers therefore
+leave their `Status:` on `Todo` and hand back a `Notes:` paragraph, and the orchestrator applies
+rule 10's status, notes, index and archiving edits in the same commit as the implementation — the
+bookkeeping rule 10 describes is honoured, but by the integrator rather than the implementer,
+because `tests/docs-check.mjs`'s at-most-one-`Done` invariant cannot survive two implementers
+writing this file at once. (2) For the same reason entries land in dependency order rather than
+the strict top-to-bottom order the "Before you start" rule gives: every function in `src/app.js`
+occupies one physical line, so two entries touching `render()` or `init()` are an unmergeable
+same-line conflict, and the landing order is chosen so no two concurrent authors own a line.
+Each entry still gets its own commit, its own `Done` status and serial verbatim archiving.
+(3) Rule 10 archiving: entry 22 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+21 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 21 was
+confirmed intact and unsplit.
 
 ### Why
 `tests/size-check.mjs` caps `index.html` at `BUDGET = 156000`, a figure entry 23 derived from a projection that has since been measured and missed: it expected entries 19–22 to add ~18,000 bytes and land near 143,500, but they added 10,447 and landed at 135,867 (87.1%). The comment at `tests/size-check.mjs:8-13` therefore carries a standing instruction — "If the queue lands under that, lower `BUDGET` back toward the real figure: a cap that only ratchets upward stops being a guard" — and rule 3 says the number moves only in an entry that explains it. Entries 25–41 below project ~+12,600 bytes (landing near 148,500), so the honest move is neither to leave stale arithmetic in place nor to ratchet silently, but to restate the cap against a measured start and a written projection.
