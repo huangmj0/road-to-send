@@ -22,7 +22,6 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 - 36 — Caption the heatmap and the trend chart — Todo
 - 37 — Focus the dialog you just opened — Todo
 - 38 — Show more of the feed — Todo
-- 39 — One line for what the crew did this week — Todo
 - 40 — Share through the system share sheet — Todo
 - 41 — Preview the week's bounties — Todo
 
@@ -103,7 +102,14 @@ Use `navigator.share` — a permission-gated async path that still needs the cli
 
 ## Tone rule for entries 24–41
 
-This app runs on a real crew's shared data, and everyone in it sees the same board. Entries in this pass **surface what people did, never what they didn't**: no absence counts, no laggard lists, no "you haven't logged" copy, no per-person zero-week callout, no streak-loss warnings. Nothing new opens on its own either — every surface these entries add appears in response to a tap, and the one persistent element (entry 28's undo bar) carries its own dismissal. Each entry restates the part of this that binds it in its own `### Do not`; this block is the shared statement of intent, not a numbered rule, and it does not renumber anything.
+This app runs on a real crew's shared data, and everyone in it sees the same board. **No entry in this pass adds a nudge, a reminder, or a prompt to participate.** Concretely:
+
+- **Surface what people did, never what they didn't.** No absence counts, no laggard lists, no "you haven't logged" copy, no per-person zero-week callout, no streak-loss warnings, no "still time to log today" prompts.
+- **Aggregating does not launder it.** A crew-wide participation figure is the same nudge with the names filed off, and is equally out of scope. An earlier draft of this queue proposed one; it was dropped rather than reworded, which is why the numbering skips 39.
+- **Nothing new opens, appears, or speaks on its own.** Every surface these entries add is reached by a tap, and the one persistent element (entry 28's undo bar) carries its own dismissal and clears when the user moves on.
+- New information is reported **only where the user went looking for it** — their own card, their own feed, the diagnostics they opened.
+
+Each entry restates the part of this that binds it in its own `### Do not`. This block is a shared statement of intent, not a numbered rule, and it renumbers nothing.
 
 ---
 
@@ -438,28 +444,6 @@ Status: Todo
 
 ### Do not
 Add a filter, sort control or search box in this entry; persist the expanded limit (rule 4 — no new localStorage key); re-enable delete controls on the crew feed; change `activityMarkup()`'s sort order or signature.
-
----
-
-## 39. One line for what the crew did this week
-
-Status: Todo
-
-### Why
-The Crew tab shows a group total, a pace line, a projection, a weekly trend chart and a leaderboard — every one of them either cumulative or per-person. Nothing says in a sentence what the crew did *together* this week, though `computeCredits()` already returns `dayMeter` keyed by `name|date`, which makes a count of active person-days a filter and a length.
-
-### Requirements
-- `src/app.js` — a small pure helper taking `today` and returning the number of crew person-days logged in the current week. Filter to `config.crew`: `totalsModel().sorted` also carries names harvested from `logs` that are no longer on the roster. Use `weekKey()` and `challengeToday()`; never `new Date()` (rule 6).
-- `src/index.template.html` — `<p id="crewMomentum" role="status" aria-live="polite">` in the Crew group card after `#goalProjection`, reading like `The crew logged 24 days this week.`
-- Hide the line entirely unless `challengeProgress().state` is active, and when the count is zero — an empty week gets no line rather than a zero.
-- The figure is an aggregate. It names no one, and there is no per-person variant of it.
-
-### Tests
-- `tests/client-state.test.js` harness-1: the helper across a crafted roster — a normal week, a week containing entries from a non-roster name (excluded), a zero week, and a date before the challenge starts.
-- `tests/static-check.mjs` — **add** `#crewMomentum` with `role="status"` and `aria-live="polite"`, plus an order assertion `id="goalProjection"` → `id="crewMomentum"`.
-
-### Do not
-Name individuals, count or list who has not logged, or add any "you haven't logged" copy — this line reports what the crew did, never what anyone didn't; duplicate the leaderboard's per-person figures; call `paceInfo()` or change `projectedTotal()`; add a third `aria-live` region to the You panel (this one lives on Crew).
 
 ---
 
