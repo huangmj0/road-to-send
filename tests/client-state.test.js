@@ -618,6 +618,38 @@ const checks = `(()=>{
   assert.equal(nextFocusIndex(0,3),0,'deleting the first row focuses the new first row');
   assert.equal(nextFocusIndex(2,2),1,'a deleted last row hands focus to the new last row');
   assert.equal(nextFocusIndex(5,3),2,'a position past the end clamps to the last row');
+
+  // Entry 20: the per-person card composes the existing per-person helpers and adds no scoring math.
+  const monday=weekKey(challengeToday()),onDay=n=>{const d=parseDateOnly(monday);d.setDate(d.getDate()+n);return localDate(d)};
+  config={startDate:onDay(-14),tripDate:onDay(14),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  const firstBounty=SCORING.bounties[0],bp=firstBounty.points;
+  logs=[
+    {id:'ps1',name:'Alex',type:'climb',hardestGrade:'V5',date:onDay(0),createdAt:'1'},
+    {id:'ps2',name:'Alex',type:'exercise',date:onDay(0),createdAt:'2'},
+    {id:'ps3',name:'Alex',type:'mobility',date:onDay(0),createdAt:'3'},
+    {id:'ps4',name:'Alex',type:'climb',hardestGrade:'V3',date:onDay(1),createdAt:'4'},
+    {id:'ps5',name:'Alex',type:'climb',hardestGrade:'V7',date:onDay(-7),createdAt:'5'},
+    {id:'ps6',name:'Alex',type:'bounty',bountyId:firstBounty.id,date:onDay(1),createdAt:'6'},
+    {id:'ps7',name:'Bo',type:'climb',hardestGrade:'V2',date:onDay(0),createdAt:'7'},
+  ];
+  const card=personSummary('Alex',onDay(0));
+  assert.equal(card.name,'Alex','the card keeps the roster spelling of the name');
+  assert.equal(card.rank,1,'the card ranks by all-time points, matching the You-tab rank');
+  assert.equal(card.week,11+bp,'the week figure is the leaderboard row week figure');
+  assert.equal(card.total,14+bp,'the all-time figure is the leaderboard row total');
+  assert.equal(card.bounties,1,'the weekly bounty count comes from the same model row');
+  assert.equal(card.bountiesTotal,1,'the all-time bounty count comes from the same model row');
+  assert.deepEqual(card.streak,streakInfo('alex',onDay(0)),'the card streak is streakInfo, not a second implementation');
+  assert.equal(card.trend,weekTrend('alex',onDay(0)),'the card trend is weekTrend');
+  assert.equal(card.trend,'up','a bigger week than the one before reads as up');
+  assert.equal(card.breakdown.rows.reduce((sum,r)=>sum+r.points,0),card.total,'the breakdown rows plus the bonus row sum to the total');
+  assert.equal(card.breakdown.bonus,SCORING.balancedDayBonus,'a balanced day shows up as the bonus row');
+  assert.deepEqual(card.pyramid.map(r=>r.grade),['V7','V5','V3'],'the pyramid is ordered hardest first');
+  assert.equal(card.records.hardest,'V7','the records come straight from personalRecords');
+  assert.equal(personSummary('ALEX',onDay(0)).name,'Alex','a differently cased name resolves to the same person');
+  assert.equal(personSummary('bo',onDay(0)).rank,2,'the runner-up ranks second');
+  assert.equal(personSummary('Nobody',onDay(0)),null,'an unknown name has no card');
+  assert.equal(personSummary('   ',onDay(0)),null,'a blank name has no card');
   logs=[];
 })()`;
 
@@ -842,6 +874,34 @@ const domChecks = `(()=>{
   assert.equal(logs.length,beforeCount-1,'a second confirm with nothing pending deletes nothing');
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
+
+  // Entry 20: tapping a leaderboard row opens the per-person card. Element listeners are
+  // no-ops in this stub and elements have no closest(), so call openPersonCard directly.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[{id:'q1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-1),createdAt:'1'},{id:'q2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'q3',name:'Bo',type:'climb',hardestGrade:'V2',date:shift(-1),createdAt:'3'}];
+  render();
+  const leaderRows=document.querySelector('#leaderRows');
+  assert.ok(leaderRows.innerHTML.indexOf('data-person="Alex"')>=0,'every leaderboard row carries a per-person hook');
+  assert.ok(leaderRows.innerHTML.indexOf('<button class="climber"')>=0,'the climber name is a real button, not a clickable row');
+  assert.equal(leaderRows.innerHTML.indexOf('tabindex'),-1,'the row itself gets no fake tab stop');
+  const personModal=document.querySelector('#personModal'),personTitle=document.querySelector('#personTitle'),personBreakdown=document.querySelector('#personBreakdown'),personSummaryEl=document.querySelector('#personSummary');
+  openPersonCard('Alex');
+  assert.equal(personModal.classList.contains('open'),true,'opening the card opens the shared dialog');
+  assert.ok(personTitle.textContent.indexOf('Alex')>=0,'the dialog is titled with the person tapped');
+  assert.ok(personBreakdown.innerHTML.length>0,'the card renders a category breakdown');
+  assert.ok(personBreakdown.innerHTML.indexOf(CAT_LABELS.climb)>=0,'the breakdown names a category');
+  assert.ok(personSummaryEl.innerHTML.indexOf('#1')>=0,'the summary names the rank');
+  assert.ok(document.querySelector('#personPyramid').innerHTML.indexOf('V5')>=0,'the pyramid lists the hardest send');
+  assert.ok(document.querySelector('#personRecords').innerHTML.length>0,'the card renders the personal records rows');
+  const summaryBefore=personSummaryEl.innerHTML;
+  logs=logs.concat([{id:'q4',name:'Alex',type:'mobility',date:shift(-1),createdAt:'4'}]);
+  render();
+  assert.notEqual(personSummaryEl.innerHTML,summaryBefore,'an open card refreshes when a sync re-renders');
+  openPersonCard('Nobody');
+  assert.ok(personTitle.textContent.indexOf('Alex')>=0,'an unknown name leaves the open card untouched');
+  closeModal('personModal');
+  assert.equal(personModal.classList.contains('open'),false,'closing the dialog clears the open class');
 
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
