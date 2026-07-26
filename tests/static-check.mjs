@@ -64,6 +64,11 @@ assert.equal((script.match(/class="pyramid-row"/g)||[]).length,1,'the pyramid ro
 // records-row is also the Week in Review leader list's class, and that renderer is another entry's
 // surface, so the count here is the two owners of the shape: recordsRow() and renderWeekReview().
 assert.equal((script.match(/class="records-row"/g)||[]).length,2,'the You panel and the person card share one records row');
+assert.match(html,/id="personalShowMore"[^>]*type="button"/,'the You feed can show more');
+assert.match(html,/id="crewShowMore"[^>]*type="button"/,'the crew feed can show more');
+assert.match(script,/function showMoreFeed\(/,'one pager serves both feeds');
+// The clamp lives in showMoreFeed(), never inline at the call site, so the read-only assertion
+// below keeps matching a plain `,false)` argument rather than a nested Math.min(...).
 assert.match(script,/#activityList'\)\.innerHTML=activityMarkup\([^)]*,false\)/,'the crew feed is read-only');
 assert.match(html,/id="undoBar"[^>]*role="status"[^>]*aria-live="polite"/,'the undo bar announces itself politely');
 assert.match(html,/id="undoDelete"[^>]*type="button"/,'undo is a real button');

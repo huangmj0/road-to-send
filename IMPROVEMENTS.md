@@ -1299,6 +1299,57 @@ Remove or rewrite the existing `aria-label`s; make heatmap cells or trend column
 
 ---
 
+## 37. Focus the dialog you just opened
+
+Status: Done — 2026-07-26
+Notes: Commit `Move focus into the dialog, and let the backdrop close it`. `openModal(id)` now moves
+focus to the dialog's first focusable element through the existing `focusableIn()` helper, straight
+after the Tab trap is installed — so `#personModal`, `#confirmModal` and `#weekReviewModal` no longer
+open with focus left on the element behind them, and the first Tab can no longer land outside the
+trap. `openIdentity()`, `openProxy()` and `openSetup()` keep focusing their own field, because their
+explicit `.focus()` calls run after `openModal()` returns. The first focusable element is
+deliberately not a destructive control: in `#confirmModal` that is Cancel, not `#confirmOk`. New
+`closeIfScrim(event,id)` closes only when `event.target` is the backdrop element itself — no
+`closest()`, so the stub harness can call it directly — and is wired on all six modal backdrops in
+`init()`. Escape, the × buttons, `closeModal()`'s `lastFocused` restoration and the trap itself are
+unchanged, and there is no second focus-trap implementation. index.html 140,112 → 140,533 bytes
+(+421; 87.3% of the 161,000-byte budget, inside the ~700 this entry was projected to cost). Tests: a
+new `test(...)` builds a context whose element factory records `focus()` calls and whose
+`#confirmModal` returns two focusable children — the shared `makeElement()` stubs `focus` as a no-op
+and returns `[]` from `querySelectorAll`, so none of this is observable in any existing harness and a
+richer factory in a fresh context is additive, not a weakened assertion. It asserts that opening
+focuses the **cancel** button rather than the confirm one, that `closeIfScrim` with an inner node
+leaves the dialog open, that `closeIfScrim` with the backdrop closes it, and that closing an
+already-closed dialog is harmless. `static-check.mjs` gains `function closeIfScrim\(` and
+`'weekReviewTitle'` **appended** to the existing dialog-naming array — appended, never retargeted,
+since entries 19 and 20 previously collided in that exact array. Deviations: (1) The new scrim path
+is a **fourth** way to dismiss `#confirmModal`. Entry 26 shipped one commit earlier and had already
+anticipated this: it clears `pendingDelete` and `confirmAction` inside `closeModal()` rather than in
+each individual handler, so the scrim route is covered by construction and no cancelled delete can
+survive it. (2) The harness compares recorded focus calls as a joined string rather than with
+`deepEqual`, because the array is built in the host realm and the expected literal inside the vm has
+a different `Array` prototype, which `deepStrictEqual` rejects. (3) Rule 10 archiving: entry 36 was
+moved verbatim into `IMPROVEMENTS.md` after the archived entry 35 and its index line dropped; the
+lifted block was string-matched back out of the archive (exactly one occurrence, gone from the log,
+heading confirmed at the start of its own line) and entry 35 was confirmed intact and unsplit.
+
+### Why
+`openModal()` installs a Tab trap and `closeModal()` restores focus to the trigger, but neither moves focus **into** the dialog. Three call sites compensate by focusing a field themselves — `openIdentity()`, `openProxy()`, `openSetup()` — and three do not: `#personModal`, `#confirmModal` and `#weekReviewModal` open with focus still on the element behind them, so the first Tab can land outside the trap and a screen-reader user is never told a dialog opened. Clicking the scrim closes nothing either; only Escape and the explicit × do. `#weekReviewModal` is also the one dialog missing from `static-check.mjs`'s dialog-naming loop, despite carrying the right attributes.
+
+### Requirements
+- `src/app.js` — `openModal(id)` moves focus to the dialog's first focusable element through the existing `focusableIn()` helper, after the trap is installed. The three dialogs that focus a specific field keep doing so, since their explicit `.focus()` calls run afterwards.
+- Named top-level `closeIfScrim(event,id)` closing the modal only when `event.target` is the backdrop itself (`event.target===m`) — no `closest`, so the stub harness can call it. Wire it on each modal's backdrop.
+- Escape, the × buttons and `closeModal()`'s focus restoration are unchanged. Reuse `openModal`/`closeModal`; no second focus-trap implementation.
+
+### Tests
+- `tests/client-state.test.js` — a **new** async `test(...)` whose element factory records `focus()` calls. The shared `makeElement()` stubs `focus` as a no-op and returns `[]` from `querySelectorAll`, so this is not observable in any existing harness; a richer factory in a new context is additive, not a weakened assertion. Assert that opening `#confirmModal` focuses an element inside it, that `closeIfScrim({target:modal},'confirmModal')` closes it, and that `closeIfScrim({target:innerNode},'confirmModal')` does not.
+- `tests/static-check.mjs` — **append** `'weekReviewTitle'` to the existing dialog-naming array. Append, never retarget: entries 19 and 20 previously collided in this exact array.
+
+### Do not
+Replace the focus trap or write a second one; auto-focus a destructive control such as `#confirmOk` — the dialog's first focusable element is the safer default; close a modal on any click that is not the backdrop itself; change `lastFocused` restoration; make any modal open on its own (the Week in Review's once-a-week rule is entry B1's and stays as it is).
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so

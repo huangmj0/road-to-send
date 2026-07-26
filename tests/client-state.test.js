@@ -1139,6 +1139,30 @@ const domChecks = `(()=>{
   assert.equal(logs.length,1,'and undo does nothing in shared mode even if it is called directly');
   endpoint='';
 
+  // Entry 38: the feed caps were hard. Across a ten-week challenge the personal feed showed the
+  // last five entries and the crew feed the last twenty, with no way to see anything older.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;resetFeedLimits();
+  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  for(let i=0;i<8;i++)logs=logs.concat([{id:'p'+i,name:'Alex',type:'mobility',date:shift(-1),createdAt:String(i)}]);
+  render();
+  const pagedFeed=document.querySelector('#personalActivity'),moreBtn=document.querySelector('#personalShowMore');
+  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,5,'the personal feed opens at its default five');
+  assert.equal(moreBtn.classList.contains('hide'),false,'and offers the rest');
+  showMoreFeed('personal');
+  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,8,'showing more renders more');
+  assert.equal(moreBtn.classList.contains('hide'),true,'and the offer goes away once everything is shown');
+  // Growth is bounded by the data: paging past the end renders no phantom rows.
+  showMoreFeed('personal');
+  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,8,'paging past the end changes nothing');
+  assert.equal(personalFeedLimit,8,'and the limit never runs beyond the log');
+  // A feed that already fits never offers the button at all.
+  resetFeedLimits();
+  logs=[{id:'one',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(moreBtn.classList.contains('hide'),true,'a feed that already shows everything makes no offer');
+  assert.equal(document.querySelector('#crewShowMore').classList.contains('hide'),true,'and neither does the crew feed');
+
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
 

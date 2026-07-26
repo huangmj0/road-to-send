@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 37 — Focus the dialog you just opened — Done — 2026-07-26
-- 38 — Show more of the feed — Todo
+- 38 — Show more of the feed — Done — 2026-07-26
 - 40 — Share through the system share sheet — Todo
 - 41 — Preview the week's bounties — Todo
 
@@ -43,60 +42,36 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 37. Focus the dialog you just opened
-
-Status: Done — 2026-07-26
-Notes: Commit `Move focus into the dialog, and let the backdrop close it`. `openModal(id)` now moves
-focus to the dialog's first focusable element through the existing `focusableIn()` helper, straight
-after the Tab trap is installed — so `#personModal`, `#confirmModal` and `#weekReviewModal` no longer
-open with focus left on the element behind them, and the first Tab can no longer land outside the
-trap. `openIdentity()`, `openProxy()` and `openSetup()` keep focusing their own field, because their
-explicit `.focus()` calls run after `openModal()` returns. The first focusable element is
-deliberately not a destructive control: in `#confirmModal` that is Cancel, not `#confirmOk`. New
-`closeIfScrim(event,id)` closes only when `event.target` is the backdrop element itself — no
-`closest()`, so the stub harness can call it directly — and is wired on all six modal backdrops in
-`init()`. Escape, the × buttons, `closeModal()`'s `lastFocused` restoration and the trap itself are
-unchanged, and there is no second focus-trap implementation. index.html 140,112 → 140,533 bytes
-(+421; 87.3% of the 161,000-byte budget, inside the ~700 this entry was projected to cost). Tests: a
-new `test(...)` builds a context whose element factory records `focus()` calls and whose
-`#confirmModal` returns two focusable children — the shared `makeElement()` stubs `focus` as a no-op
-and returns `[]` from `querySelectorAll`, so none of this is observable in any existing harness and a
-richer factory in a fresh context is additive, not a weakened assertion. It asserts that opening
-focuses the **cancel** button rather than the confirm one, that `closeIfScrim` with an inner node
-leaves the dialog open, that `closeIfScrim` with the backdrop closes it, and that closing an
-already-closed dialog is harmless. `static-check.mjs` gains `function closeIfScrim\(` and
-`'weekReviewTitle'` **appended** to the existing dialog-naming array — appended, never retargeted,
-since entries 19 and 20 previously collided in that exact array. Deviations: (1) The new scrim path
-is a **fourth** way to dismiss `#confirmModal`. Entry 26 shipped one commit earlier and had already
-anticipated this: it clears `pendingDelete` and `confirmAction` inside `closeModal()` rather than in
-each individual handler, so the scrim route is covered by construction and no cancelled delete can
-survive it. (2) The harness compares recorded focus calls as a joined string rather than with
-`deepEqual`, because the array is built in the host realm and the expected literal inside the vm has
-a different `Array` prototype, which `deepStrictEqual` rejects. (3) Rule 10 archiving: entry 36 was
-moved verbatim into `IMPROVEMENTS.md` after the archived entry 35 and its index line dropped; the
-lifted block was string-matched back out of the archive (exactly one occurrence, gone from the log,
-heading confirmed at the start of its own line) and entry 35 was confirmed intact and unsplit.
-
-### Why
-`openModal()` installs a Tab trap and `closeModal()` restores focus to the trigger, but neither moves focus **into** the dialog. Three call sites compensate by focusing a field themselves — `openIdentity()`, `openProxy()`, `openSetup()` — and three do not: `#personModal`, `#confirmModal` and `#weekReviewModal` open with focus still on the element behind them, so the first Tab can land outside the trap and a screen-reader user is never told a dialog opened. Clicking the scrim closes nothing either; only Escape and the explicit × do. `#weekReviewModal` is also the one dialog missing from `static-check.mjs`'s dialog-naming loop, despite carrying the right attributes.
-
-### Requirements
-- `src/app.js` — `openModal(id)` moves focus to the dialog's first focusable element through the existing `focusableIn()` helper, after the trap is installed. The three dialogs that focus a specific field keep doing so, since their explicit `.focus()` calls run afterwards.
-- Named top-level `closeIfScrim(event,id)` closing the modal only when `event.target` is the backdrop itself (`event.target===m`) — no `closest`, so the stub harness can call it. Wire it on each modal's backdrop.
-- Escape, the × buttons and `closeModal()`'s focus restoration are unchanged. Reuse `openModal`/`closeModal`; no second focus-trap implementation.
-
-### Tests
-- `tests/client-state.test.js` — a **new** async `test(...)` whose element factory records `focus()` calls. The shared `makeElement()` stubs `focus` as a no-op and returns `[]` from `querySelectorAll`, so this is not observable in any existing harness; a richer factory in a new context is additive, not a weakened assertion. Assert that opening `#confirmModal` focuses an element inside it, that `closeIfScrim({target:modal},'confirmModal')` closes it, and that `closeIfScrim({target:innerNode},'confirmModal')` does not.
-- `tests/static-check.mjs` — **append** `'weekReviewTitle'` to the existing dialog-naming array. Append, never retarget: entries 19 and 20 previously collided in this exact array.
-
-### Do not
-Replace the focus trap or write a second one; auto-focus a destructive control such as `#confirmOk` — the dialog's first focusable element is the safer default; close a modal on any click that is not the backdrop itself; change `lastFocused` restoration; make any modal open on its own (the Week in Review's once-a-week rule is entry B1's and stays as it is).
-
----
-
 ## 38. Show more of the feed
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Let the feeds show more than their opening page`. Module-level `crewFeedLimit` and
+`personalFeedLimit` are seeded at the current 20 and 5; `showMoreFeed(feed)` raises the relevant one
+by a page and repaints; `resetFeedLimits()` puts both back and is called from `loadInitialState()`
+and `performDisconnect()`. `#personalShowMore` and `#crewShowMore` sit under their feeds and are
+hidden by `renderShowMore()` whenever the feed already shows everything it has. The crew feed keeps
+`false` for `allowDelete` (entry 29), and its `activityMarkup(...)` call site is still a plain
+`,false)` — see deviation 1. Both buttons reuse `.text-btn`, which already carries `min-height:44px`
+(rule 7), so no CSS was added. index.html 140,533 → 141,564 bytes (+1,031; 87.9% of the
+161,000-byte budget, inside the ~1,500 this entry was projected to cost). Tests: harness-2 builds a
+log of eight entries, asserts the personal feed opens at five with the button offered, that
+`showMoreFeed('personal')` renders all eight and hides the button, that paging **past** the end
+renders no phantom rows and leaves the limit at the log length, and that a feed already showing
+everything never offers the button at all. `static-check.mjs` gains presence assertions for both
+button ids and `function showMoreFeed\(`. Deviations: (1) The bound on growth is applied **inside**
+`showMoreFeed()` (`Math.min(limit+page,logs.length)`) and deliberately **not** inline at the
+`activityMarkup(...)` call site. Writing the clamp at the call site would produce
+`activityMarkup(logs,Math.min(crewFeedLimit,logs.length),false)`, and entry 29's static assertion
+matches `activityMarkup\([^)]*,false\)` — a character class that cannot cross the inner closing
+paren — so the read-only guard would have silently stopped matching. A comment above that assertion
+now records the constraint. (2) `renderShowMore(id,shown,total)` is a fourth small helper rather
+than two inline `classList.toggle` calls, so the show/hide rule is written once. (3) The page size is
+5 for the personal feed and 20 for the crew feed — each feed pages by its own opening page rather
+than by a shared constant, so "show more" reveals a proportionate amount in both. (4) Rule 10
+archiving: entry 37 was moved verbatim into `IMPROVEMENTS.md` after the archived entry 36 and its
+index line dropped; the lifted block was string-matched back out of the archive (exactly one
+occurrence, gone from the log, heading confirmed at the start of its own line) and entry 36 was
+confirmed intact and unsplit.
 
 ### Why
 `render()` paints `activityMarkup(logs,20,…)` into `#activityList` and `activityMarkup(myLogs,5,…)` into `#personalActivity`. Those caps are hard: across a ten-week challenge the personal feed shows the last five entries and the crew feed the last twenty, with no way to see anything older — no "show more", no pagination, no filter. The data is already in memory; only the slice is missing.
