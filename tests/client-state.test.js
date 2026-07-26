@@ -1211,7 +1211,7 @@ test('background sync respects the open date picker and refreshes stale caches',
   store.set('roadToSendEndpoint', 'https://sheet.example.test/exec');
   store.set('roadToSendMe', 'Alex');
   const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
-  const payload = {version: 11, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '', timeZone: ''};
+  const payload = {version: 11, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: dayShift(0), timeZone: 'America/Los_Angeles'};
   let gets = 0;
   const syncContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
@@ -1254,6 +1254,18 @@ test('background sync respects the open date picker and refreshes stale caches',
     lastSyncedAt=Date.now()-6*60*1000;
     fireDocumentEvent('visibilitychange');
     assert.equal(countGets(),before+1,'a stale cache refreshes on tab return');
+    // Entry 35: a crew member travelling, or anyone whose device clock has rolled past the Sheet's
+    // midnight, can now see which day the app is actually scoring against and whose midnight it is.
+    lastSyncedAt=Date.now();renderSync();
+    const detail=document.querySelector('#diagnosticDetail').textContent;
+    assert.ok(detail.indexOf('Challenge day: '+challengeToday())>=0,'the diagnostics name the challenge day the app is using');
+    assert.ok(detail.indexOf('America/Los_Angeles')>=0,'and the timezone that day comes from');
+    assert.ok(detail.indexOf('Protocol')===0,'the protocol line still leads');
+    assert.equal(detail.indexOf('sheet.example.test'),-1,'and the endpoint is still nowhere in the diagnostics');
+    endpoint='';renderSync();
+    const localDetail=document.querySelector('#diagnosticDetail').textContent;
+    assert.equal(localDetail.indexOf('Challenge day'),-1,'local mode says nothing about a challenge day');
+    assert.equal(localDetail.indexOf('America/Los_Angeles'),-1,'nor about a timezone it does not follow');
   })()`;
   await vm.runInNewContext(`${source}\n${syncChecks}`, syncContext, {filename: 'index.html'});
 });

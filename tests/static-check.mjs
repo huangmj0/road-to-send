@@ -45,6 +45,7 @@ assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyr
 // Saving… was already the label on two buttons (#saveActivityBtn and #saveSetupBtn) before this
 // entry, so the preview branch is the third occurrence — a >=2 guard could never have failed.
 assert.ok((script.match(/Saving…/g)||[]).length>=3,'the preview reports an in-flight save, on top of the two button labels');
+assert.match(script,/Challenge day: /,'the diagnostics say which day the app is scoring against');
 assert.match(script,/Export downloaded\./,'a finished export says so out loud');
 assert.match(script,/<button class="cat-chip/,'each category chip is a real button');
 assert.match(script,/function prefillCategory\(/,'tapping a chip starts a recording for that category');

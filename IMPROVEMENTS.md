@@ -1165,6 +1165,46 @@ Remove `role="list"` or put `role="listitem"` on the button; change what `todayP
 
 ---
 
+## 34. Show the note you wrote on a bounty
+
+Status: Done — 2026-07-26
+Notes: Commit `Show the note written on a bounty claim`. One ternary branch: `activityMarkup()`'s
+bounty `detail` now appends ` · ` plus the escaped note when one is present, matching the
+exercise/mobility branch exactly. Climb entries keep the grade in that slot and gain nothing. `esc()`
+stays around the note — it is user-entered text arriving from a shared Google Sheet, so this is an
+injection boundary. The feed row structure, the delete-button markup, the note's storage, its POST
+body and `#activityNote`'s 120-character `maxlength` are all untouched. index.html 139,049 → 139,080
+bytes (+31; 86.4% of the 161,000-byte budget, against the ~100 this entry was projected to cost).
+Tests: harness-2 renders a bounty carrying a note and asserts the **whole** detail string —
+`title · note · date` — rather than merely that the note appears somewhere, then a bounty without a
+note and asserts the detail reads `title · date` exactly as before, then a note containing
+`<img src=x onerror=…>` and asserts it is escaped rather than injected. `static-check.mjs` needs no
+new assertion; the existing parse and markup checks cover it. Deviations: (1) A first draft asserted
+the absence of ` · ` for a note-less bounty, which is wrong — the row template already joins the
+detail to the date with that separator, so the assertion could never have held. Both assertions were
+rewritten against the full detail string, which is what actually distinguishes the two cases.
+(2) Rule 10 archiving: entry 33 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+32 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 32 was
+confirmed intact and unsplit.
+
+### Why
+`#noteFields` is visible for bounty entries, `draftActivity()` sets `base.note` for them and `submitActivity()` POSTs it, so the note round-trips to the Sheet and back. But `activityMarkup()`'s bounty branch renders `🎯 <title>` and nothing else — notes are only rendered for exercise and mobility. Whatever a crew member writes on a bounty claim is stored and shown to no one.
+
+### Requirements
+- `src/app.js` — the bounty branch of `activityMarkup()`'s `detail` appends ` · ` plus the escaped note when one is present, matching the exercise/mobility branch exactly. Climb entries keep showing the grade in that slot.
+- Keep `esc()` around the note: it is user-entered text arriving from a shared Sheet.
+- No change to the feed row structure, the delete-button markup, or the 120-character `maxlength` on `#activityNote`.
+
+### Tests
+- `tests/client-state.test.js` harness-2 `domChecks`: a bounty entry carrying a note renders that text in `#personalActivity`; a bounty without one renders exactly as it does today.
+- `tests/static-check.mjs` — no new assertion needed; the existing parse and markup checks cover it.
+
+### Do not
+Change the note's storage, length limit or POST body; render notes for climb entries (the grade owns that slot); alter the bounty title fallback chain (`bountyTitle` → catalog lookup → `Bounty`).
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so

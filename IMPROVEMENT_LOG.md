@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 34 — Show the note you wrote on a bounty — Done — 2026-07-26
-- 35 — Say which day the app thinks it is — Todo
+- 35 — Say which day the app thinks it is — Done — 2026-07-26
 - 36 — Caption the heatmap and the trend chart — Todo
 - 37 — Focus the dialog you just opened — Todo
 - 38 — Show more of the feed — Todo
@@ -46,49 +45,31 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 34. Show the note you wrote on a bounty
-
-Status: Done — 2026-07-26
-Notes: Commit `Show the note written on a bounty claim`. One ternary branch: `activityMarkup()`'s
-bounty `detail` now appends ` · ` plus the escaped note when one is present, matching the
-exercise/mobility branch exactly. Climb entries keep the grade in that slot and gain nothing. `esc()`
-stays around the note — it is user-entered text arriving from a shared Google Sheet, so this is an
-injection boundary. The feed row structure, the delete-button markup, the note's storage, its POST
-body and `#activityNote`'s 120-character `maxlength` are all untouched. index.html 139,049 → 139,080
-bytes (+31; 86.4% of the 161,000-byte budget, against the ~100 this entry was projected to cost).
-Tests: harness-2 renders a bounty carrying a note and asserts the **whole** detail string —
-`title · note · date` — rather than merely that the note appears somewhere, then a bounty without a
-note and asserts the detail reads `title · date` exactly as before, then a note containing
-`<img src=x onerror=…>` and asserts it is escaped rather than injected. `static-check.mjs` needs no
-new assertion; the existing parse and markup checks cover it. Deviations: (1) A first draft asserted
-the absence of ` · ` for a note-less bounty, which is wrong — the row template already joins the
-detail to the date with that separator, so the assertion could never have held. Both assertions were
-rewritten against the full detail string, which is what actually distinguishes the two cases.
-(2) Rule 10 archiving: entry 33 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
-32 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
-one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 32 was
-confirmed intact and unsplit.
-
-### Why
-`#noteFields` is visible for bounty entries, `draftActivity()` sets `base.note` for them and `submitActivity()` POSTs it, so the note round-trips to the Sheet and back. But `activityMarkup()`'s bounty branch renders `🎯 <title>` and nothing else — notes are only rendered for exercise and mobility. Whatever a crew member writes on a bounty claim is stored and shown to no one.
-
-### Requirements
-- `src/app.js` — the bounty branch of `activityMarkup()`'s `detail` appends ` · ` plus the escaped note when one is present, matching the exercise/mobility branch exactly. Climb entries keep showing the grade in that slot.
-- Keep `esc()` around the note: it is user-entered text arriving from a shared Sheet.
-- No change to the feed row structure, the delete-button markup, or the 120-character `maxlength` on `#activityNote`.
-
-### Tests
-- `tests/client-state.test.js` harness-2 `domChecks`: a bounty entry carrying a note renders that text in `#personalActivity`; a bounty without one renders exactly as it does today.
-- `tests/static-check.mjs` — no new assertion needed; the existing parse and markup checks cover it.
-
-### Do not
-Change the note's storage, length limit or POST body; render notes for climb entries (the grade owns that slot); alter the bounty title fallback chain (`bountyTitle` → catalog lookup → `Bounty`).
-
----
-
 ## 35. Say which day the app thinks it is
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Say which day the app is scoring against`. `renderSync()` appends
+` Challenge day: 2026-07-26 · America/Los_Angeles.` to `#diagnosticDetail` after the protocol and
+last-sync sentence, reading `challengeToday()` and the cached `challengeTimeZone` — no `new Date()`
+for challenge-date logic (rule 6), and no client-side timezone conversion. The line is appended only
+when `challengeTimeZone` is known, and it sits inside the shared-mode branch, after the early
+`if(!endpoint)` return, so local mode never shows it. It reads as one more diagnostic fact in the
+same neutral sentence as the rest, not as a warning. `#diagnosticCode` and its copy handler,
+`challengeToday()`'s fallback order and `#syncDiagnostics`' show/hide rule are all untouched.
+index.html 139,080 → 139,166 bytes (+86; 86.4% of the 161,000-byte budget, well inside the ~500 this
+entry was projected to cost). Tests: the existing fetch-stubbed sync harness now returns a real
+`serverDate` and `timeZone` in its payload — extending the existing `payload` object rather than
+replacing it, so every assertion already in that case still passes — and asserts after a sync that
+`#diagnosticDetail` names the challenge day and the timezone, that the protocol line still leads,
+and that the endpoint host appears nowhere in it (entry 22's privacy rule); then clears `endpoint`
+and asserts local mode mentions neither. `static-check.mjs` gains `Challenge day: `. Deviations:
+(1) The entry gates the line on "both values are known"; the implementation gates on
+`challengeTimeZone` alone, because `challengeToday()` always returns a usable date — it falls back
+to `serverDate` and then to the device's local date — so gating on it too would only ever suppress
+the line when the timezone was already missing. (2) Rule 10 archiving: entry 34 was moved verbatim
+into `IMPROVEMENTS.md` after the archived entry 33 and its index line dropped; the lifted block was
+string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
+at the start of its own line) and entry 33 was confirmed intact and unsplit.
 
 ### Why
 `challengeToday()` follows the Sheet's timezone, falling back to `serverDate` and then to the device's local date, and both `serverDate` and `challengeTimeZone` are cached in `roadToSendShared:meta:{endpoint}` on every sync. Neither is ever displayed: `renderSync()` shows only the protocol version and `lastSyncedAt`. A crew member travelling — or anyone whose device clock has rolled past the Sheet's midnight — has no way to see why the today-card looks a day out.
