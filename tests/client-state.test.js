@@ -704,6 +704,13 @@ const checks = `(()=>{
   assert.ok(outCopy.indexOf(fmtDay('2026-07-01'))>=0,'the out-of-window copy names the window start');
   assert.ok(outCopy.indexOf(fmtDay('2026-07-31'))>=0,'the out-of-window copy names the window end');
 
+  // Entry 32: an in-flight save wins the ladder outright, so the line stops asserting what the entry
+  // WILL score while the request is still in the air. Every case above is called without a saving
+  // flag and is unaffected.
+  assert.equal(creditPreviewCopy({saving:true,type:'climb',hasTarget:true,inWindow:true,base:3,credit:3,reason:''}),'Saving…','a save in flight replaces the full-credit line');
+  assert.equal(creditPreviewCopy({saving:true,type:'climb',hasTarget:false,inWindow:false,base:3,credit:0,reason:'already logged',startDate:'2026-07-01',tripDate:'2026-07-31'}),'Saving…','and it wins over every other branch, however bad the draft looks');
+  assert.equal(creditPreviewCopy({saving:false,type:'climb',hasTarget:true,inWindow:true,base:3,credit:3,reason:''}),'Counts in full · +3 today','an explicit false is the same as absent');
+
   // Entry 22: the shared summary composes existing helpers and never leaks the crew's Sheet endpoint.
   location.href='https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you';
   assert.equal(publicUrl(),'https://example.test/app/','publicUrl drops both the hash and the sheet query param');

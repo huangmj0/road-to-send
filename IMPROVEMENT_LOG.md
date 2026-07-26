@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 31 — Say something when the export fails — Done — 2026-07-26
-- 32 — Show the save in the credit preview — Todo
+- 32 — Show the save in the credit preview — Done — 2026-07-26
 - 33 — Tap a category chip to start recording it — Todo
 - 34 — Show the note you wrote on a bounty — Todo
 - 35 — Say which day the app thinks it is — Todo
@@ -49,50 +48,30 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 31. Say something when the export fails
-
-Status: Done — 2026-07-26
-Notes: Commit `Say whether the export actually downloaded`. `exportData()`'s body is wrapped in a
-`try`, toasting `Export downloaded.` after the click lands and `Export failed — try a different
-browser.` on any throw; it never throws. The object URL is held in a `let url` and revoked in a
-`finally`, so both paths release it and a context that could not even construct the `Blob` has
-nothing to revoke and revokes nothing. The exported JSON is untouched: the same
-`{version, exportedAt, mode, config, activities}` keys in the same order, the same `null,2`
-formatting and the same `road-to-send-export.json` filename, because other tooling reads that file.
-index.html 137,944 → 138,066 bytes (+122; 85.8% of the 161,000-byte budget, well inside the ~400
-this entry was projected to cost). Tests: a new `test(...)` builds three fresh contexts from one factory
-— neither `Blob` nor a throwing `click()` exists in any current harness, so both stubs are additive
-rather than a weakened assertion. The working context asserts the success toast, that the download
-really fired, and that the URL was revoked; the blocked-`click()` context asserts the failure toast
-and that the URL is *still* revoked; the blocked-`Blob` context asserts the same failure toast and
-that nothing is revoked when there was nothing to revoke. `static-check.mjs` gains
-`Export downloaded\.`. Deviations: (1) The revoke moved into a `finally` rather than being written
-twice, which is what makes the "revoke on both paths" requirement true by construction instead of
-by repetition. (2) Rule 10 archiving: entry 30 was moved verbatim into `IMPROVEMENTS.md` after the
-archived entry 29 and its index line dropped; the lifted block was string-matched back out of the
-archive (exactly one occurrence, gone from the log, heading confirmed at the start of its own line)
-and entry 29 was confirmed intact and unsplit.
-
-### Why
-`exportData()` builds a `Blob`, calls `URL.createObjectURL`, clicks a synthetic anchor and revokes the URL, with no `try` anywhere and no toast on either outcome. `Blob` construction and `createObjectURL` both throw in restricted contexts and a synthetic `.click()` is a no-op in others, so the one documented recovery path in the app (P2, data ownership) can fail in total silence — leaving the user to conclude their data is gone rather than that the download was blocked.
-
-### Requirements
-- `src/app.js` — wrap `exportData()`'s body in a `try`/`catch`. Toast `Export downloaded.` on success and `Export failed — try a different browser.` on any throw. It never throws.
-- Keep the exported JSON byte-identical: the same `{version, exportedAt, mode, config, activities}` keys in the same order with the same `null,2` formatting. Other tooling reads this file.
-- Revoke the object URL on both paths.
-
-### Tests
-- `tests/client-state.test.js` — a **new** async `test(...)` whose context adds a `Blob` stub and an element factory whose `click()` throws (neither `Blob` nor `click` exists in any current harness, so both are additive, not a weakened assertion): `exportData()` does not throw and `#toast` reports the failure; with working stubs it reports the success message.
-- `tests/static-check.mjs` — **add** `assert.match(script,/Export downloaded\./)`.
-
-### Do not
-Change the export's JSON shape, key order or filename; add a network upload or a second export format; make `exportData()` throw; add a dependency for file saving (rule 8).
-
----
-
 ## 32. Show the save in the credit preview
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Let the credit preview admit a save is in flight`. `creditPreviewCopy()` opens its
+ladder with `if(o.saving)return'Saving…'`, so an in-flight save wins over every other branch, and
+`submitActivity()` calls `updateRecordPreview()` immediately after `saving=true` so the branch is
+actually reachable; the existing `finally` already restores the normal copy. `updateRecordPreview()`
+was already threading the module-level `saving` into its opts object — entry 21 shipped that half
+and recorded the unused parameter as its deviation 2 — so nothing changed there. `#creditPreview`,
+its live-region behaviour, `#recordMeter` and `#saveActivityBtn`'s label are all untouched.
+index.html 138,066 → 138,118 bytes (+52; 85.8% of the 161,000-byte budget, inside the ~300 this
+entry was projected to cost). Tests: harness-1 asserts the saving branch returns `Saving…` for an
+otherwise-perfect draft, that it still wins for a draft with no target, out of window and already
+logged, and that an explicit `saving:false` behaves exactly as its absence does; all six existing
+assertions in that block are called without the flag and return their current strings unchanged.
+Deviations: (1) The entry specifies the static guard as `Saving…` count `>=2` on the grounds that
+"the string already exists once for the button label". It exists **twice** already —
+`#saveActivityBtn` in `submitActivity()` and `#saveSetupBtn` in `saveSetup()` — so a `>=2` guard
+would have passed without this entry doing anything at all. It is written as `>=3` with a comment
+naming all three occurrences, which is the count that actually detects the preview branch.
+(2) Rule 10 archiving: entry 31 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+30 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 30 was
+confirmed intact and unsplit.
 
 ### Why
 `creditPreviewCopy(opts)` already accepts a documented `saving` flag and never branches on it — entry 21 shipped the parameter and recorded the gap as its deviation 2, because inventing the copy was outside that entry's scope. Nothing repaints `#creditPreview` during a save either: `submitActivity()` sets `saving=true` and updates only `#saveActivityBtn`'s label, while `updateRecordPreview()` runs in the `finally`. So the preview line goes on asserting what the entry *will* score for the whole time the request is in flight.

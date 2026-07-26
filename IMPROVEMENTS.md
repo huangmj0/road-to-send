@@ -1026,6 +1026,47 @@ Change what `categoryBreakdown()`, `personalRecords()` or `gradePyramid()` retur
 
 ---
 
+## 31. Say something when the export fails
+
+Status: Done — 2026-07-26
+Notes: Commit `Say whether the export actually downloaded`. `exportData()`'s body is wrapped in a
+`try`, toasting `Export downloaded.` after the click lands and `Export failed — try a different
+browser.` on any throw; it never throws. The object URL is held in a `let url` and revoked in a
+`finally`, so both paths release it and a context that could not even construct the `Blob` has
+nothing to revoke and revokes nothing. The exported JSON is untouched: the same
+`{version, exportedAt, mode, config, activities}` keys in the same order, the same `null,2`
+formatting and the same `road-to-send-export.json` filename, because other tooling reads that file.
+index.html 137,944 → 138,066 bytes (+122; 85.8% of the 161,000-byte budget, well inside the ~400
+this entry was projected to cost). Tests: a new `test(...)` builds three fresh contexts from one factory
+— neither `Blob` nor a throwing `click()` exists in any current harness, so both stubs are additive
+rather than a weakened assertion. The working context asserts the success toast, that the download
+really fired, and that the URL was revoked; the blocked-`click()` context asserts the failure toast
+and that the URL is *still* revoked; the blocked-`Blob` context asserts the same failure toast and
+that nothing is revoked when there was nothing to revoke. `static-check.mjs` gains
+`Export downloaded\.`. Deviations: (1) The revoke moved into a `finally` rather than being written
+twice, which is what makes the "revoke on both paths" requirement true by construction instead of
+by repetition. (2) Rule 10 archiving: entry 30 was moved verbatim into `IMPROVEMENTS.md` after the
+archived entry 29 and its index line dropped; the lifted block was string-matched back out of the
+archive (exactly one occurrence, gone from the log, heading confirmed at the start of its own line)
+and entry 29 was confirmed intact and unsplit.
+
+### Why
+`exportData()` builds a `Blob`, calls `URL.createObjectURL`, clicks a synthetic anchor and revokes the URL, with no `try` anywhere and no toast on either outcome. `Blob` construction and `createObjectURL` both throw in restricted contexts and a synthetic `.click()` is a no-op in others, so the one documented recovery path in the app (P2, data ownership) can fail in total silence — leaving the user to conclude their data is gone rather than that the download was blocked.
+
+### Requirements
+- `src/app.js` — wrap `exportData()`'s body in a `try`/`catch`. Toast `Export downloaded.` on success and `Export failed — try a different browser.` on any throw. It never throws.
+- Keep the exported JSON byte-identical: the same `{version, exportedAt, mode, config, activities}` keys in the same order with the same `null,2` formatting. Other tooling reads this file.
+- Revoke the object URL on both paths.
+
+### Tests
+- `tests/client-state.test.js` — a **new** async `test(...)` whose context adds a `Blob` stub and an element factory whose `click()` throws (neither `Blob` nor `click` exists in any current harness, so both are additive, not a weakened assertion): `exportData()` does not throw and `#toast` reports the failure; with working stubs it reports the success message.
+- `tests/static-check.mjs` — **add** `assert.match(script,/Export downloaded\./)`.
+
+### Do not
+Change the export's JSON shape, key order or filename; add a network upload or a second export format; make `exportData()` throw; add a dependency for file saving (rule 8).
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so
