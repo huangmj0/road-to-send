@@ -17,7 +17,7 @@ assert.match(html,/class="bottom-nav"[^>]+aria-label="Primary"/,'bottom navigati
 assert.match(html,/id="recordMeter"[^>]+aria-label=/,'record preview meter is accessible');
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'persistent sync diagnostics are announced');
 assert.match(html,/id="toast"[^>]+role="status"[^>]+aria-live="polite"/,'toast is announced');
-for(const title of ['identityTitle','proxyTitle','setupTitle','confirmTitle','personTitle'])assert.match(html,new RegExp(`role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="${title}"`),`${title} dialog is named`);
+for(const title of ['identityTitle','proxyTitle','setupTitle','confirmTitle','personTitle','weekReviewTitle'])assert.match(html,new RegExp(`role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="${title}"`),`${title} dialog is named`);
 assert.match(html,/aria-label="Close identity picker"/);
 assert.match(html,/aria-label="Close person picker"/);
 assert.match(html,/aria-label="Close shared setup"/);
@@ -26,6 +26,7 @@ assert.match(html,/id="confirmOk"[^>]*type="button"/,'the confirm dialog confirm
 assert.match(html,/id="confirmCancel"[^>]*type="button"/,'the confirm dialog cancels with a real button');
 assert.match(script,/function requestDelete\(/,'deleting an entry goes through the confirm request helper');
 assert.match(html,/aria-label="Close person details"/);
+assert.match(script,/function closeIfScrim\(/,'clicking the backdrop closes the dialog it belongs to');
 assert.match(script,/data-person="/,'leaderboard rows expose the climber name as a per-person hook');
 assert.match(script,/function openPersonCard\(/,'tapping a climber opens the per-person card');
 assert.match(script,/<button class="climber" type="button"[^>]*data-person=/,'the climber name is a real button, not a clickable row');
@@ -42,6 +43,49 @@ assert.deepEqual(scoring.grades,['V0','V1','V2','V3','V4','V5','V6','V7','V8','V
 const sharedConfig=(script.match(/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/g)||[]).length;
 assert.ok(sharedConfig>=2,'browser and Apps Script both read the shared scoring config');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
+// Saving… was already the label on two buttons (#saveActivityBtn and #saveSetupBtn) before this
+// entry, so the preview branch is the third occurrence — a >=2 guard could never have failed.
+assert.ok((script.match(/Saving…/g)||[]).length>=3,'the preview reports an in-flight save, on top of the two button labels');
+assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption');
+assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
+assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
+assert.match(html,/class="trend-scroll"[\s\S]*id="trendSummary"/,'the trend caption follows the scroll wrapper');
+assert.match(script,/function heatmapCaption\(/,'a pure helper builds the heatmap caption');
+assert.match(script,/function trendCaption\(/,'a pure helper builds the trend caption');
+assert.match(script,/Challenge day: /,'the diagnostics say which day the app is scoring against');
+assert.match(script,/Export downloaded\./,'a finished export says so out loud');
+assert.match(script,/<button class="cat-chip/,'each category chip is a real button');
+assert.match(script,/function prefillCategory\(/,'tapping a chip starts a recording for that category');
+assert.match(script,/function breakdownRow\(/,'one breakdown row shape serves the You panel and the person card');
+assert.match(script,/function pyramidRow\(/,'one pyramid row shape serves both');
+assert.match(script,/function recordsRow\(/,'one records row shape serves both');
+assert.equal((script.match(/class="breakdown-row"/g)||[]).length,1,'the breakdown row markup is written once');
+assert.equal((script.match(/class="pyramid-row"/g)||[]).length,1,'the pyramid row markup is written once');
+// records-row is also the Week in Review leader list's class, and that renderer is another entry's
+// surface, so the count here is the two owners of the shape: recordsRow() and renderWeekReview().
+assert.equal((script.match(/class="records-row"/g)||[]).length,2,'the You panel and the person card share one records row');
+assert.match(html,/id="personalShowMore"[^>]*type="button"/,'the You feed can show more');
+assert.match(html,/id="crewShowMore"[^>]*type="button"/,'the crew feed can show more');
+assert.match(script,/function showMoreFeed\(/,'one pager serves both feeds');
+// The clamp lives in showMoreFeed(), never inline at the call site, so the read-only assertion
+// below keeps matching a plain `,false)` argument rather than a nested Math.min(...).
+assert.match(script,/#activityList'\)\.innerHTML=activityMarkup\([^)]*,false\)/,'the crew feed is read-only');
+assert.match(html,/id="undoBar"[^>]*role="status"[^>]*aria-live="polite"/,'the undo bar announces itself politely');
+assert.match(html,/id="undoDelete"[^>]*type="button"/,'undo is a real button');
+assert.match(html,/id="undoDismiss"[^>]*type="button"/,'dismissing the undo bar is a real button');
+assert.match(html,/id="undoBar"[\s\S]*id="toast"/,'the undo bar sits above the toast in document order');
+assert.match(script,/function undoDelete\(/,'a named undo handler restores the row');
+assert.match(html,/\.undo-bar:not\(\.hide\)~\.toast\{bottom:160px\}/,'the toast lifts out of the undo bar rather than overlapping it');
+assert.match(html,/id="bountyWeekToggle"[^>]*type="button"[^>]*aria-expanded="false"/,'the week preview opens from a real button and starts closed');
+assert.match(html,/id="bountyWeek"/,'the week preview has a container');
+assert.match(html,/id="todayBounties"[\s\S]*id="bountyWeekToggle"[\s\S]*id="bountyWeek"/,'the preview sits under today bounties');
+assert.match(script,/function upcomingBounties\(/,'a pure helper computes the coming days');
+assert.match(script,/function shareProgress\(/,'the Share button goes through the system share sheet first');
+assert.match(script,/function writeStore\(/,'the shared storage helper exists');
+assert.equal((script.match(/localStorage\.setItem/g)||[]).length,1,'storage writes funnel through one helper');
+assert.ok((script.match(/pendingDelete=null/g)||[]).length>=3,'a dismissed confirm clears the pending delete, on top of the declaration and the confirmed path');
+assert.match(script,/function computeCreditsRaw\(/,'the raw scorer is separable from the memo that fronts it');
+assert.doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|fill|copyWithin)\(/,'logs is replaced, never mutated in place');
 assert.match(script,/Saved to the Sheet, but refresh failed\. Do not retry/,'confirmed saves are distinguished from refresh failures');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');

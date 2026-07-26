@@ -293,6 +293,41 @@ const checks = `(()=>{
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   logs=[];
 
+  // Entry 36: the captions state the per-datum facts that only ever lived in a title= attribute --
+  // invisible on touch. They are additive: both graphics keep their own container aria-label.
+  assert.equal(heatmapCaption([]),'','no days means no caption');
+  assert.equal(heatmapCaption([{date:'2026-07-01',points:0},{date:'2026-07-02',points:0}]),'','days with no points means no caption');
+  const oneDayCap=heatmapCaption([{date:'2026-07-01',points:1}]);
+  assert.ok(oneDayCap.indexOf('1 point ')>=0,'a single point is singular');
+  assert.ok(oneDayCap.indexOf('1 active day')>=0&&oneDayCap.indexOf('1 active days')<0,'and a single active day has no stray plural');
+  const capDays=heatmapCaption([{date:'2026-07-01',points:3},{date:'2026-07-02',points:0},{date:'2026-07-03',points:8}]);
+  assert.ok(capDays.indexOf(fmtDay('2026-07-03'))>=0,'the caption names the best day');
+  assert.ok(capDays.indexOf('8 points')>=0,'and what that day scored');
+  assert.ok(capDays.indexOf('2 active days')>=0,'and how many days were active');
+  assert.equal(trendCaption([]),'','no weeks means no caption');
+  assert.equal(trendCaption([{week:'2026-W27',label:'W1',points:0}]),'','weeks with no points means no caption');
+  const capWeeks=trendCaption([{week:'2026-W27',label:'W1',points:12},{week:'2026-W28',label:'W2',points:31},{week:'2026-W29',label:'W3',points:5}]);
+  assert.ok(capWeeks.indexOf('W2')>=0&&capWeeks.indexOf('31 points')>=0,'the trend caption names the best week and its total');
+  assert.ok(capWeeks.indexOf('this week 5 points')>=0,'and where the current week stands');
+  assert.ok(trendCaption([{week:'2026-W27',label:'W1',points:1}]).indexOf('1 point ')>=0,'a single point is singular here too');
+
+  // Entry 41: dailyBounties() hashes the date, so every future day's picks are already computable.
+  // Someone planning a Thursday session can now see what Thursday offers.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  const week=upcomingBounties('2026-07-10');
+  assert.equal(week.length,7,'a mid-challenge day previews the next seven days');
+  assert.equal(week[0].date,'2026-07-11','starting with tomorrow, not today');
+  assert.equal(week[6].date,'2026-07-17','through the seventh day out');
+  assert.ok(week.every(d=>d.bounties.length===CATEGORIES.length),'each day offers one bounty per category');
+  assert.equal(week[0].label,fmtDay('2026-07-11'),'each day is labelled the way the rest of the app labels dates');
+  assert.equal(week[0].bounties.map(b=>b.id).join(','),dailyBounties('2026-07-11').map(b=>b.id).join(','),'the picks are exactly what that day will actually offer');
+  assert.equal(upcomingBounties('2026-07-10')[3].bounties.map(b=>b.id).join(','),week[3].bounties.map(b=>b.id).join(','),'and the same date always yields the same picks');
+  // The walk stops at the trip date rather than running past the end of the challenge.
+  assert.equal(upcomingBounties('2026-07-28').length,3,'a day near the end previews only the days that remain');
+  assert.equal(upcomingBounties('2026-07-31').length,0,'and the last day previews nothing');
+  assert.equal(upcomingBounties('2026-08-04').length,0,'nor does a day past the end');
+  assert.equal(upcomingBounties('').length,0,'an unparseable day previews nothing');
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);
@@ -431,6 +466,19 @@ const checks = `(()=>{
   recordingFor='Maya';
   assert.equal(me,'Alex','temporary proxy target does not replace device owner');
 
+  // Entry 27: writeStore is the one place storage is written, and it reports rather than throws.
+  assert.equal(writeStore('roadToSendMe','Alex'),true,'a normal write reports success');
+  assert.equal(localStorage.getItem('roadToSendMe'),'Alex','and the value really landed');
+  const realStore=localStorage;
+  localStorage={getItem:key=>realStore.getItem(key),removeItem:key=>realStore.removeItem(key),setItem:()=>{throw Error('QuotaExceededError')}};
+  assert.equal(writeStore('roadToSendMe','Bo'),false,'a throwing setItem is reported, not raised');
+  assert.equal(persistLocal(),false,'and the failure is propagated by the callers that need it');
+  localStorage={getItem:key=>realStore.getItem(key),removeItem:key=>realStore.removeItem(key)};
+  assert.equal(writeStore('roadToSendMe','Bo'),false,'storage with no setItem at all is reported too');
+  localStorage=realStore;
+  assert.equal(localStorage.getItem('roadToSendMe'),'Alex','none of that disturbed the real store');
+  assert.equal(persistLocal(),true,'and a working store still reports success');
+
   // Pace toward the group goal: expected points scale linearly across the window.
   const paceSettings={startDate:'2026-07-01',tripDate:'2026-07-10',goal:100};
   assert.deepEqual(paceInfo(50,paceSettings,'2026-07-05'),{state:'on',diff:0,perDay:9},'exactly expected is on pace');
@@ -470,6 +518,34 @@ const checks = `(()=>{
   ];
   assert.equal(earnedThrough('2026-07-10'),3,'a future-dated entry is excluded from the through-today total');
   assert.equal(earnedThrough('2026-07-25'),5,'once its date has arrived the entry counts toward the rate');
+
+  // Entry 25: computeCredits memoizes the live (logs, config) pair only. Every way that pair can
+  // change is checked here with a case whose stale answer would be a DIFFERENT number, so a
+  // broken invalidation fails loudly instead of merely being slow.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[{id:'m1',name:'Mem',type:'climb',date:'2026-07-02',createdAt:'1'}];
+  assert.equal(computeCredits(logs).totals.get('mem'),3,'the first scan scores the live log');
+  assert.equal(computeCredits(logs).totals.get('mem'),3,'a repeat call with nothing changed agrees with itself');
+  logs=logs.concat([{id:'m2',name:'Mem',type:'exercise',date:'2026-07-02',createdAt:'2'}]);
+  assert.equal(computeCredits(logs).totals.get('mem'),5,'a replaced logs reference rescans');
+  logs.push({id:'m3',name:'Mem',type:'mobility',date:'2026-07-02',createdAt:'3'});
+  assert.equal(computeCredits(logs).totals.get('mem'),8,'an in-place push changes the length, so the len guard rescans');
+  logs.splice(2,1);
+  assert.equal(computeCredits(logs).totals.get('mem'),5,'an in-place splice changes the length, so the len guard rescans');
+  config={startDate:'2026-08-01',tripDate:'2026-08-31',goal:500,crew:[]};
+  assert.equal(computeCredits(logs).totals.get('mem'),undefined,'a replaced config rescans, so an out-of-window log scores nothing');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.equal(computeCredits(logs).totals.get('mem'),5,'putting the window back rescans again');
+  // A derived array never touches the memo: it neither reads a wrong answer nor evicts the live one.
+  const memoLive=computeCredits(logs);
+  assert.equal(computeCredits([...logs,{id:'m4',name:'Mem',type:'mobility',date:'2026-07-02',createdAt:'4'}]).totals.get('mem'),8,'a derived array is scored on its own terms');
+  assert.equal(computeCredits(logs),memoLive,'and leaves the live memo in place');
+  assert.equal(computeCredits(logs,{startDate:'2026-08-01',tripDate:'2026-08-31',goal:500,crew:[]}).totals.get('mem'),undefined,'explicit settings bypass the memo');
+  assert.equal(computeCredits(logs),memoLive,'and leave the live memo in place too');
+  logs=[
+    {id:'e1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
+    {id:'e2',name:'Alex',type:'exercise',date:'2026-07-20',createdAt:'1'},
+  ];
 
   // challengeToday only trusts serverDate while the sync that produced it is from the current local day.
   endpoint='https://sheet.example.test/exec';challengeTimeZone='Not/AZone';serverDate='2000-01-01';
@@ -663,6 +739,13 @@ const checks = `(()=>{
   assert.ok(outCopy.indexOf(fmtDay('2026-07-01'))>=0,'the out-of-window copy names the window start');
   assert.ok(outCopy.indexOf(fmtDay('2026-07-31'))>=0,'the out-of-window copy names the window end');
 
+  // Entry 32: an in-flight save wins the ladder outright, so the line stops asserting what the entry
+  // WILL score while the request is still in the air. Every case above is called without a saving
+  // flag and is unaffected.
+  assert.equal(creditPreviewCopy({saving:true,type:'climb',hasTarget:true,inWindow:true,base:3,credit:3,reason:''}),'Saving…','a save in flight replaces the full-credit line');
+  assert.equal(creditPreviewCopy({saving:true,type:'climb',hasTarget:false,inWindow:false,base:3,credit:0,reason:'already logged',startDate:'2026-07-01',tripDate:'2026-07-31'}),'Saving…','and it wins over every other branch, however bad the draft looks');
+  assert.equal(creditPreviewCopy({saving:false,type:'climb',hasTarget:true,inWindow:true,base:3,credit:3,reason:''}),'Counts in full · +3 today','an explicit false is the same as absent');
+
   // Entry 22: the shared summary composes existing helpers and never leaks the crew's Sheet endpoint.
   location.href='https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you';
   assert.equal(publicUrl(),'https://example.test/app/','publicUrl drops both the hash and the sheet query param');
@@ -808,6 +891,38 @@ const domChecks = `(()=>{
   render();
   assert.equal(crewHint.classList.contains('hide'),true,'the crew local hint hides when an endpoint is connected');
 
+  // Entry 25: one render() runs the raw scorer a FIXED number of times. Before the memo it was
+  // about one scan per helper plus one per leaderboard row; now every computeCredits(logs) call
+  // inside a render collapses onto a single scan. The remainder is the callers that deliberately
+  // pass a DERIVED array and so bypass the memo by design: earnedThrough() passes a date-filtered
+  // copy and updateRecordPreview() passes [...logs,draft]. If this delta moves, a new derived-array
+  // caller appeared inside render() — find it rather than editing the number.
+  endpoint='';me='Alex';recordingFor='Alex';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  const runsBefore=creditRuns;
+  render();
+  assert.equal(creditRuns-runsBefore,2,'one render scores the live log exactly twice');
+  const liveMemo=computeCredits(logs);
+  assert.equal(creditRuns-runsBefore,2,'reading the live pair again after a render costs no scan at all');
+  // The point of the memo is that this number is now a constant. Before it, weekTrend() ran inside
+  // leaders.map(), so the count grew with the crew; here a six-person crew costs exactly what a
+  // one-person crew costs.
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cass'},{name:'Dee'},{name:'Eli'},{name:'Fay'}]};
+  logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'r2',name:'Bo',type:'exercise',date:shift(-1),createdAt:'2'},{id:'r3',name:'Cass',type:'mobility',date:shift(-2),createdAt:'3'}];
+  render();
+  const runsCrewBefore=creditRuns;
+  render();
+  assert.equal(creditRuns-runsCrewBefore,2,'a six-person crew costs the same two scans as a one-person crew');
+  // updateRecordPreview() is the one render-path caller that passes a DERIVED array ([...logs,draft]),
+  // so it always pays its own scan and must never disturb the live memo.
+  const runsAfterRender=creditRuns;
+  updateRecordPreview();
+  assert.equal(creditRuns-runsAfterRender,1,'the preview array is scored on its own terms, never from the memo');
+  assert.equal(computeCredits(logs),computeCredits(logs),'the live pair still answers from one memoized object');
+  assert.notEqual(computeCredits(logs),liveMemo,'and that object is the current one, not the pre-crew answer');
+
   // Entry 10: the Personal records card hides until the person logs something, and its grade rows track graded climbs.
   endpoint='';me='Alex';recordingFor='Alex';
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
@@ -838,6 +953,49 @@ const domChecks = `(()=>{
   assert.equal(bountyRadio.checked,true,'claiming a bounty selects the Bounty activity type');
   assert.equal(claimSelect.value,claimId,'claiming a bounty preselects it in the Record dropdown');
   assert.equal(claimDateBox.classList.contains('hide'),true,'claiming a bounty snaps to today and closes the date picker');
+
+  // Entry 41: the preview is closed by default and renders nothing until it is opened.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(20),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const weekBox=document.querySelector('#bountyWeek'),weekToggle=document.querySelector('#bountyWeekToggle');
+  // setAttribute is a no-op in this stub, so the open state is asserted where it actually lives.
+  assert.equal(bountyWeekOpen,false,'the preview starts closed');
+  assert.equal(weekBox.innerHTML,'','and renders nothing at all until it is opened');
+  assert.equal(weekBox.classList.contains('hide'),true,'the container stays hidden');
+  toggleBountyWeek();
+  assert.equal(bountyWeekOpen,true,'tapping the toggle opens it');
+  assert.equal(weekBox.classList.contains('hide'),false,'and reveals the container');
+  assert.ok(weekBox.innerHTML.indexOf('bounty-day')>=0,'which now lists the coming days');
+  assert.equal(weekBox.innerHTML.indexOf('data-claim-bounty'),-1,'future days are plain rows, never claim buttons');
+  render();
+  assert.ok(weekBox.innerHTML.indexOf('bounty-day')>=0,'a repaint keeps an open preview open');
+  toggleBountyWeek();
+  assert.equal(bountyWeekOpen,false,'tapping again closes it');
+  assert.equal(weekBox.innerHTML,'','and it renders nothing again');
+
+  // Entry 34: a note written on a bounty claim round-trips to the Sheet and back, and until now was
+  // rendered to nobody — the bounty branch showed the title and stopped.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  const notedId=dailyBounties(challengeToday())[0].id,notedTitle=bountyById(notedId).title;
+  logs=[{id:'n1',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'felt strong today',date:shift(-1),createdAt:'1'}];
+  render();
+  const notedFeed=document.querySelector('#personalActivity');
+  assert.ok(notedFeed.innerHTML.indexOf(notedTitle)>=0,'the bounty still names itself');
+  assert.ok(notedFeed.innerHTML.indexOf('felt strong today')>=0,'and now shows the note that was written on it');
+  // The row already joins detail to date with the same separator, so assert the whole detail.
+  assert.ok(notedFeed.innerHTML.indexOf(notedTitle+' · felt strong today · '+fmtDay(shift(-1)))>=0,'the note joins the title the way the exercise and mobility rows join theirs');
+  logs=[{id:'n2',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,date:shift(-1),createdAt:'2'}];
+  render();
+  assert.equal(notedFeed.innerHTML.indexOf('felt strong today'),-1,'a bounty with no note carries no note');
+  assert.ok(notedFeed.innerHTML.indexOf(notedTitle+' · '+fmtDay(shift(-1)))>=0,'and renders exactly as it did before, title straight to date');
+  // The note is user-entered text arriving from a shared Sheet, so it stays escaped.
+  logs=[{id:'n3',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'<img src=x onerror=alert(1)>',date:shift(-1),createdAt:'3'}];
+  render();
+  assert.equal(notedFeed.innerHTML.indexOf('<img'),-1,'a note carrying markup is escaped, never injected');
+  assert.ok(notedFeed.innerHTML.indexOf('&lt;img')>=0,'and is shown as the text it is');
 
   // Entry 17: the today card names which categories are done and whether the balanced-day bonus is still live.
   me='Alex';recordingFor='Alex';endpoint='';
@@ -872,6 +1030,45 @@ const domChecks = `(()=>{
   assert.equal(meterHtml.split('filled').length-1,DAILY_MAX,'a balanced day fills every pip');
   assert.ok(meterHtml.indexOf('seg-bonus')>=0,'the bonus pips are identifiable');
 
+  // Entry 33: the chips are the one place the today card shows a missing category without offering
+  // the action that fixes it. Each chip is now a real button inside its listitem wrapper, and the
+  // chip counts above still hold because the wrapper class is chip-item, not a cat-chip variant.
+  assert.ok(catRow.innerHTML.indexOf('<button class="cat-chip')>=0,'each chip is a real button');
+  assert.ok(catRow.innerHTML.indexOf('role="listitem"')>=0,'and it sits inside its list item rather than replacing it');
+  assert.equal(catRow.innerHTML.indexOf('role="listitem"><button'),catRow.innerHTML.indexOf('role="listitem"'),'the button is nested, so the listitem keeps its semantics and the button keeps its own');
+  const chipRadio=document.querySelector('input[name="activityType"][value="exercise"]'),chipDateBox=document.querySelector('#dateFields');
+  chipRadio.checked=false;chipDateBox.classList.remove('hide');
+  // showTab() moves panels through querySelectorAll, which this stub returns empty from, so the
+  // active panel is not observable here. lastDeleted is: showTab() clears it (entry 28), so a
+  // cleared undo offer is the proof that the jump to the Record tab actually happened.
+  lastDeleted={entry:logs[0],index:0,label:'a climb'};
+  prefillCategory('exercise');
+  assert.equal(chipRadio.checked,true,'tapping a chip preselects that category on the Record form');
+  assert.equal(lastDeleted,null,'and it goes to the Record tab, the same jump claimBounty makes');
+  assert.equal(chipDateBox.classList.contains('hide'),true,'the date fields are reset the way a bounty claim resets them');
+  assert.equal(prefillCategory('not-a-category'),undefined,'an unknown category does nothing at all');
+  // An already-logged category stays tappable: logging it twice is legal and simply scores 0, so
+  // the affordance must not imply an error.
+  assert.equal(catRow.innerHTML.split('cat-chip done').length-1,CATEGORIES.length,'every category is done in this state');
+  assert.ok(catRow.innerHTML.indexOf('disabled')<0,'and none of the done chips is disabled');
+  showTab('you');
+
+  // Entry 36: the captions track their cards -- filled when the card is drawn, empty when hidden.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'h1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'h2',name:'Alex',type:'exercise',date:shift(-3),createdAt:'2'}];
+  render();
+  const heatCard=document.querySelector('#heatmapCard'),heatCap=document.querySelector('#heatmapSummary');
+  assert.equal(heatCard.classList.contains('hide'),false,'the heatmap card is showing');
+  assert.ok(heatCap.textContent.length>0,'so its caption says something');
+  assert.ok(heatCap.textContent.indexOf('active day')>=0,'and reports the active-day count');
+  const trendCard=document.querySelector('#weeklyTrendCard'),trendCap=document.querySelector('#trendSummary');
+  assert.equal(trendCard.classList.contains('hide'),false,'the trend card is showing');
+  assert.ok(trendCap.textContent.indexOf('Best week')===0,'so its caption names the best week');
+  logs=[];
+  render();
+  assert.equal(heatCap.textContent,'','a hidden heatmap card carries no caption');
+  assert.equal(trendCap.textContent,'','and neither does a hidden trend card');
 
   // Entry 18: the today card carries the personal countdown and the person share of the crew pace.
   me='Alex';recordingFor='Alex';endpoint='';
@@ -899,8 +1096,11 @@ const domChecks = `(()=>{
   const ownFeed=document.querySelector('#personalActivity'),crewFeed=document.querySelector('#activityList');
   assert.ok(ownFeed.innerHTML.indexOf('data-del=')>=0,'the You feed offers delete buttons for your own entries');
   assert.ok(ownFeed.innerHTML.indexOf('aria-label="Delete ')>=0,'each You-feed delete button names the entry it removes');
-  assert.ok(crewFeed.innerHTML.indexOf('data-del=')>=0,'the Crew feed keeps its delete buttons');
-  assert.ok(crewFeed.innerHTML.indexOf('aria-label="Delete ')>=0,'the Crew feed keeps its delete labels');
+  // Entry 29 inverted these two: the Crew feed used to render a delete button on every other
+  // person's entry, which is the affordance that entry removes. Asserted the other way round now,
+  // against the same rendered feed, so the old behaviour cannot come back unnoticed.
+  assert.equal(crewFeed.innerHTML.indexOf('data-del='),-1,'the Crew feed offers no delete buttons');
+  assert.equal(crewFeed.innerHTML.indexOf('aria-label="Delete '),-1,'and no delete labels either');
   const confirmDialog=document.querySelector('#confirmModal'),confirmBody=document.querySelector('#confirmBody');
   requestDelete(0,'d1','personal');
   assert.equal(confirmDialog.classList.contains('open'),true,'requesting a delete opens the in-app dialog instead of a native prompt');
@@ -914,6 +1114,93 @@ const domChecks = `(()=>{
   assert.equal(confirmDialog.classList.contains('open'),false,'confirming closes the dialog');
   performDelete();
   assert.equal(logs.length,beforeCount-1,'a second confirm with nothing pending deletes nothing');
+  // Entry 26: a dismissed confirm leaves no intent behind, and a confirmed one acts on the row it
+  // described rather than on a position that may since have come to mean something else.
+  me='Alex';recordingFor='Alex';endpoint='';
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'c1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'c2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'c3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
+  render();
+  requestDelete(1,'c2','personal');
+  assert.equal(confirmDialog.classList.contains('open'),true,'requesting a delete opens the dialog');
+  closeModal('confirmModal');
+  assert.equal(logs.length,3,'cancelling deletes nothing');
+  performDelete();
+  assert.equal(logs.length,3,'and a confirm that arrives after the cancel is a no-op, not a delayed delete');
+  // The middle of three rows, by identity: the other two survive in their original order.
+  requestDelete(1,'c2','personal');
+  performDelete();
+  assert.equal(logs.length,2,'confirming removes exactly one row');
+  assert.deepEqual(logs.map(x=>x.id),['c1','c3'],'the row that goes is the one the dialog described, and the rest keep their order');
+  // A row that has left logs between the request and the confirm is not replaced by a positional guess.
+  requestDelete(0,'c1','personal');
+  logs=logs.filter(x=>x.id!=='c1');
+  performDelete();
+  assert.deepEqual(logs.map(x=>x.id),['c3'],'a captured row that is already gone takes nothing with it');
+  assert.equal(confirmDialog.classList.contains('open'),false,'and the dialog still closes');
+
+  // Entry 28: a local delete offers itself back. performDelete()'s local branch contains no await,
+  // so its effects land synchronously and the bar can be inspected straight after the call.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'u3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
+  render();
+  const undoBar=document.querySelector('#undoBar'),undoTextEl=document.querySelector('#undoText');
+  assert.equal(undoBar.classList.contains('hide'),true,'nothing has been deleted, so the bar stays away');
+  requestDelete(1,'u2','personal');
+  performDelete();
+  assert.equal(undoBar.classList.contains('hide'),false,'a local delete offers an undo');
+  assert.ok(undoTextEl.textContent.indexOf('Deleted ')===0,'and the bar names what it is offering back');
+  assert.deepEqual(logs.map(x=>x.id),['u1','u3'],'the row is gone while the offer stands');
+  undoDelete();
+  assert.equal(logs.length,3,'undo restores the row');
+  assert.deepEqual(logs.map(x=>x.id),['u1','u2','u3'],'and puts it back at the index it came from, not on the end');
+  render();
+  assert.equal(undoBar.classList.contains('hide'),true,'the offer is spent once it is taken');
+  // Switching tabs puts the bar away, so it never outlives the action it describes.
+  requestDelete(0,'u1','personal');
+  performDelete();
+  assert.equal(undoBar.classList.contains('hide'),false,'a second delete offers again');
+  showTab('crew');
+  render();
+  assert.equal(undoBar.classList.contains('hide'),true,'moving to another tab puts the offer away');
+  showTab('you');
+  // Shared mode never offers undo at all: re-POSTing a deleted row would mint a new id.
+  logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  render();
+  requestDelete(1,'u2','personal');
+  performDelete();
+  assert.equal(undoBar.classList.contains('hide'),false,'still offered in local mode');
+  endpoint='https://sheet.example.test/exec';
+  renderUndo();
+  assert.equal(undoBar.classList.contains('hide'),true,'an endpoint appearing takes the offer away');
+  undoDelete();
+  assert.equal(logs.length,1,'and undo does nothing in shared mode even if it is called directly');
+  endpoint='';
+
+  // Entry 38: the feed caps were hard. Across a ten-week challenge the personal feed showed the
+  // last five entries and the crew feed the last twenty, with no way to see anything older.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;resetFeedLimits();
+  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  for(let i=0;i<8;i++)logs=logs.concat([{id:'p'+i,name:'Alex',type:'mobility',date:shift(-1),createdAt:String(i)}]);
+  render();
+  const pagedFeed=document.querySelector('#personalActivity'),moreBtn=document.querySelector('#personalShowMore');
+  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,5,'the personal feed opens at its default five');
+  assert.equal(moreBtn.classList.contains('hide'),false,'and offers the rest');
+  showMoreFeed('personal');
+  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,8,'showing more renders more');
+  assert.equal(moreBtn.classList.contains('hide'),true,'and the offer goes away once everything is shown');
+  // Growth is bounded by the data: paging past the end renders no phantom rows.
+  showMoreFeed('personal');
+  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,8,'paging past the end changes nothing');
+  assert.equal(personalFeedLimit,8,'and the limit never runs beyond the log');
+  // A feed that already fits never offers the button at all.
+  resetFeedLimits();
+  logs=[{id:'one',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(moreBtn.classList.contains('hide'),true,'a feed that already shows everything makes no offer');
+  assert.equal(document.querySelector('#crewShowMore').classList.contains('hide'),true,'and neither does the crew feed');
+
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
 
@@ -944,6 +1231,26 @@ const domChecks = `(()=>{
   assert.ok(personTitle.textContent.indexOf('Alex')>=0,'an unknown name leaves the open card untouched');
   closeModal('personModal');
   assert.equal(personModal.classList.contains('open'),false,'closing the dialog clears the open class');
+
+  // Entry 30: the You panel and the person card render the SAME row shape for the same person, and
+  // the You-panel bars are no longer silent decoration — they announce themselves like the card's.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  render();
+  openPersonCard('Alex');
+  const youBd=document.querySelector('#youBreakdown'),personBd=document.querySelector('#personBreakdown');
+  assert.ok(youBd.innerHTML.length>0,'the You breakdown has rows to compare');
+  assert.equal(youBd.innerHTML,personBd.innerHTML,'the same data renders the same row markup in both places');
+  assert.ok(youBd.innerHTML.indexOf('role="img"')>=0,'the You-panel bars are announced as graphics');
+  assert.ok(youBd.innerHTML.indexOf('aria-label="')>=0,'and each one carries its own text alternative');
+  assert.ok(youBd.innerHTML.indexOf('<i style="width:')>=0&&youBd.innerHTML.indexOf('aria-hidden="true"></i>')>=0,'while the decorative fill stays hidden');
+  const youPy=document.querySelector('#gradePyramid'),personPy=document.querySelector('#personPyramid');
+  assert.ok(youPy.innerHTML.length>0,'the You pyramid has rows to compare');
+  assert.equal(youPy.innerHTML,personPy.innerHTML,'the pyramid rows match too');
+  const youRec=document.querySelector('#recordsList'),personRec=document.querySelector('#personRecords');
+  assert.ok(youRec.innerHTML.indexOf('records-row')>=0&&personRec.innerHTML.indexOf('records-row')>=0,'both records lists render through the shared row');
+  closeModal('personModal');
 
   // Entry 21: a dead Save button explains itself, the in-flight flag survives a mid-save input
   // change, and the bounty hint carries the chosen bounty's description.
@@ -1001,7 +1308,7 @@ test('background sync respects the open date picker and refreshes stale caches',
   store.set('roadToSendEndpoint', 'https://sheet.example.test/exec');
   store.set('roadToSendMe', 'Alex');
   const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
-  const payload = {version: 11, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '', timeZone: ''};
+  const payload = {version: 11, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: dayShift(0), timeZone: 'America/Los_Angeles'};
   let gets = 0;
   const syncContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
@@ -1044,6 +1351,18 @@ test('background sync respects the open date picker and refreshes stale caches',
     lastSyncedAt=Date.now()-6*60*1000;
     fireDocumentEvent('visibilitychange');
     assert.equal(countGets(),before+1,'a stale cache refreshes on tab return');
+    // Entry 35: a crew member travelling, or anyone whose device clock has rolled past the Sheet's
+    // midnight, can now see which day the app is actually scoring against and whose midnight it is.
+    lastSyncedAt=Date.now();renderSync();
+    const detail=document.querySelector('#diagnosticDetail').textContent;
+    assert.ok(detail.indexOf('Challenge day: '+challengeToday())>=0,'the diagnostics name the challenge day the app is using');
+    assert.ok(detail.indexOf('America/Los_Angeles')>=0,'and the timezone that day comes from');
+    assert.ok(detail.indexOf('Protocol')===0,'the protocol line still leads');
+    assert.equal(detail.indexOf('sheet.example.test'),-1,'and the endpoint is still nowhere in the diagnostics');
+    endpoint='';renderSync();
+    const localDetail=document.querySelector('#diagnosticDetail').textContent;
+    assert.equal(localDetail.indexOf('Challenge day'),-1,'local mode says nothing about a challenge day');
+    assert.equal(localDetail.indexOf('America/Los_Angeles'),-1,'nor about a timezone it does not follow');
   })()`;
   await vm.runInNewContext(`${source}\n${syncChecks}`, syncContext, {filename: 'index.html'});
 });
@@ -1133,6 +1452,207 @@ test('copyText reports a successful clipboard write and keeps the crew link deli
     endpoint='';
   })()`;
   await vm.runInNewContext(`${source}\n${copyChecks}`, copyContext, {filename: 'index.html'});
+});
+
+test('a full disk never reports a saved entry as failed, and never traps the identity dialog', async () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const store = new Map();
+  const today = new Date().toISOString().slice(0, 10);
+  const storageContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: () => [],
+      addEventListener: (type, handler) => listeners.set(type, handler),
+      removeEventListener() {}, createElement: () => makeElement(),
+    },
+    // Safari private mode and an exhausted quota both throw here. Reads still work, which is why
+    // safeJson() was never the problem — every write in the app was the unguarded half.
+    fetch: async () => {throw Error('this harness makes no network calls')},
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: () => {throw Error('QuotaExceededError')}, removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const storageChecks = `(async()=>{
+    endpoint='';
+    config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};
+    logs=[];me='';recordingFor='';
+    document.querySelector('#identityMember').value='Alex';
+    document.querySelector('#identityModal').classList.add('open');
+    saveIdentity();
+    assert.equal(me,'Alex','a failed write still records the identity in memory');
+    assert.equal(document.querySelector('#identityModal').classList.contains('open'),false,'and the dialog closes instead of trapping the user behind an uncaught throw');
+    document.querySelector('#activityDate').value='${today}';
+    document.querySelector('#recordFor').value='Alex';
+    await submitActivity({preventDefault(){}});
+    assert.equal(logs.length,1,'the entry is in the log either way, so it must not be reported as lost');
+    assert.equal(document.querySelector('#toast').textContent,'Saved on this device only — storage is full.','the toast names the real failure instead of claiming the save failed');
+    assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save activity','and the button is handed back');
+  })()`;
+  await vm.runInNewContext(`${source}\n${storageChecks}`, storageContext, {filename: 'index.html'});
+});
+
+test('a blocked export says so instead of failing silently', async () => {
+  // Neither Blob nor a throwing click() exists in any other harness, so both stubs are additive.
+  const makeExportContext = ({clickThrows = false, blobThrows = false} = {}) => {
+    const elements = new Map();
+    const revoked = [];
+    const anchors = [];
+    return {
+      revoked, anchors,
+      context: {
+        assert, console, URL: Object.assign(function () {}, URL, {
+          createObjectURL: () => 'blob:road-to-send/1',
+          revokeObjectURL: value => revoked.push(value),
+        }),
+        URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+        location: {search: '', href: 'https://example.test/app/', hash: ''},
+        history: {replaceState() {}},
+        window: {scrollTo() {}},
+        Blob: function (parts) {if (blobThrows) throw Error('Blob is not available here'); this.parts = parts},
+        document: {
+          visibilityState: 'visible', activeElement: null,
+          querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+          querySelectorAll: () => [],
+          addEventListener() {}, removeEventListener() {},
+          createElement: () => {
+            const el = makeElement();
+            el.click = () => {if (clickThrows) throw Error('downloads are blocked'); anchors.push(el.href)};
+            return el;
+          },
+        },
+        fetch: async () => {throw Error('this harness makes no network calls')},
+        localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+        setTimeout() {}, clearTimeout() {},
+      },
+    };
+  };
+
+  const good = makeExportContext();
+  await vm.runInNewContext(`${source}\nexportData();`, good.context, {filename: 'index.html'});
+  assert.equal(good.context.document.querySelector('#toast').textContent, 'Export downloaded.', 'a working export reports success');
+  assert.deepEqual(good.anchors, ['blob:road-to-send/1'], 'and the download really fired');
+  assert.deepEqual(good.revoked, ['blob:road-to-send/1'], 'the object URL is revoked on the success path');
+
+  const blockedClick = makeExportContext({clickThrows: true});
+  await vm.runInNewContext(`${source}\nexportData();`, blockedClick.context, {filename: 'index.html'});
+  assert.equal(blockedClick.context.document.querySelector('#toast').textContent, 'Export failed — try a different browser.', 'a blocked download is reported, not swallowed');
+  assert.deepEqual(blockedClick.revoked, ['blob:road-to-send/1'], 'and the object URL is revoked on the failure path too');
+
+  const blockedBlob = makeExportContext({blobThrows: true});
+  await vm.runInNewContext(`${source}\nexportData();`, blockedBlob.context, {filename: 'index.html'});
+  assert.equal(blockedBlob.context.document.querySelector('#toast').textContent, 'Export failed — try a different browser.', 'a restricted context that cannot even build the Blob is reported the same way');
+  assert.deepEqual(blockedBlob.revoked, [], 'with nothing to revoke, nothing is revoked');
+});
+
+test('opening a dialog moves focus into it, and only the backdrop closes it', async () => {
+  // The shared makeElement() stubs focus as a no-op and returns [] from querySelectorAll, so none of
+  // this is observable in the existing harnesses. A richer factory in a fresh context is additive.
+  const focused = [];
+  const elements = new Map();
+  const makeFocusable = name => {
+    const el = makeElement();
+    el.name = name;
+    el.focus = () => focused.push(name);
+    el.offsetParent = {};
+    return el;
+  };
+  const okBtn = makeFocusable('confirmOk');
+  const cancelBtn = makeFocusable('confirmCancel');
+  const confirmModal = makeElement();
+  confirmModal.querySelectorAll = () => [cancelBtn, okBtn];
+  elements.set('#confirmModal', confirmModal);
+  const focusContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: () => [],
+      addEventListener() {}, removeEventListener() {}, createElement: () => makeElement(),
+    },
+    focusOrder: () => focused,
+    innerNode: () => okBtn,
+    theModal: () => confirmModal,
+    fetch: async () => {throw Error('this harness makes no network calls')},
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const focusChecks = `(()=>{
+    openModal('confirmModal');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the dialog opened');
+    assert.equal(focusOrder().join(','),'confirmCancel','focus lands on the dialog first focusable element, not on the destructive one');
+    // A click inside the dialog is not a dismissal.
+    closeIfScrim({target:innerNode()},'confirmModal');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'a click on something inside the dialog leaves it open');
+    // A click on the backdrop itself is.
+    closeIfScrim({target:theModal()},'confirmModal');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'a click on the backdrop closes it');
+    closeIfScrim({target:theModal()},'confirmModal');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'and closing an already-closed dialog is harmless');
+  })()`;
+  await vm.runInNewContext(`${source}\n${focusChecks}`, focusContext, {filename: 'index.html'});
+});
+
+test('the share sheet is tried first, and a dismissed one is not a failure', async () => {
+  const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
+  const makeShareContext = share => {
+    const elements = new Map();
+    const written = [];
+    const shared = [];
+    const navigator = {clipboard: {writeText: value => {written.push(String(value)); return Promise.resolve()}}};
+    if (share) navigator.share = payload => {shared.push(payload); return share()};
+    return {
+      written, shared,
+      context: {
+        assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+        location: {search: '', href: 'https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you', hash: '#you'},
+        history: {replaceState() {}},
+        window: {scrollTo() {}},
+        navigator,
+        document: {
+          visibilityState: 'visible', activeElement: null,
+          querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+          querySelectorAll: () => [],
+          addEventListener() {}, removeEventListener() {}, createElement: () => makeElement(),
+        },
+        fetch: async () => {throw Error('this harness makes no network calls')},
+        localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+        setTimeout() {}, clearTimeout() {},
+      },
+    };
+  };
+  const setup = `me='Alex';recordingFor='Alex';endpoint='';config={startDate:'${dayShift(-5)}',tripDate:'${dayShift(5)}',goal:500,crew:[{name:'Alex'}]};logs=[{id:'x1',name:'Alex',type:'climb',date:'${dayShift(-1)}',createdAt:'1'}];`;
+  const abort = () => {const error = Error('user dismissed the sheet'); error.name = 'AbortError'; return Promise.reject(error)};
+
+  const native = makeShareContext(() => Promise.resolve());
+  await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, native.context, {filename: 'index.html'});
+  assert.equal(native.shared.length, 1, 'a working share sheet is used');
+  assert.equal(native.written.length, 0, 'and nothing reaches the clipboard behind it');
+  assert.ok(native.shared[0].text.indexOf('Alex') >= 0, 'the shared payload is the summary text');
+  assert.equal(native.shared[0].text.indexOf('sheet='), -1, 'and it still excludes the crew endpoint');
+
+  const noShare = makeShareContext(null);
+  await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, noShare.context, {filename: 'index.html'});
+  assert.equal(noShare.written.length, 1, 'with no share sheet at all, the clipboard fallback runs');
+  assert.equal(noShare.context.document.querySelector('#toast').textContent, 'Progress copied — paste it anywhere.', 'and says so');
+
+  const dismissed = makeShareContext(abort);
+  await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, dismissed.context, {filename: 'index.html'});
+  assert.equal(dismissed.shared.length, 1, 'the sheet was opened');
+  assert.equal(dismissed.written.length, 0, 'a dismissed sheet is a completed action: nothing is copied');
+  assert.equal(dismissed.context.document.querySelector('#toast').textContent, '', 'and nothing is said -- no error toast, no second prompt');
+
+  const broken = makeShareContext(() => Promise.reject(Error('share is not allowed here')));
+  await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, broken.context, {filename: 'index.html'});
+  assert.equal(broken.written.length, 1, 'a genuine share failure falls back to the clipboard');
+  assert.equal(broken.context.document.querySelector('#toast').textContent, 'Progress copied — paste it anywhere.', 'and reports the copy');
 });
 
 console.log('Client state and scoring tests passed.');
