@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 21 — Record tab: show the bounty's description, and make the submit guard real — Done — 2026-07-26
-- 22 — Share my progress: one clipboard helper, and stop a denied copy failing setup — Todo
+- 22 — Share my progress: one clipboard helper, and stop a denied copy failing setup — Done — 2026-07-26
 
 Entries 1–14 shipped and now live in `IMPROVEMENTS.md` under "v11 pass — frontend enhancement queue (entries 1–14)", together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. Entry numbers never restart.
 
@@ -28,48 +27,40 @@ Entries 1–14 shipped and now live in `IMPROVEMENTS.md` under "v11 pass — fro
 
 ---
 
-## 21. Record tab: show the bounty's description, and make the submit guard real
-
-Status: Done — 2026-07-26
-Notes: Commit `Show the bounty description and make the submit guard real`. Module-level `let
-saving=false`; `submitActivity` returns early when it is set, sets it before its `try` and clears it
-in `finally`; `#saveActivityBtn.disabled` gained `saving ||` as its first term and no input was
-disabled. `creditPreviewCopy(opts)` extracts the ladder verbatim and adds the no-target and
-out-of-window states; `#bountyHint` (with `aria-describedby` on the select, the existing
-`<label for="bountySelect">` untouched) shows the chosen bounty's `description`; `#hardestGrade`
-resets only in the success block. Deviations: (1) the hint is written with `textContent`, not
-`esc()` + `textContent` — `textContent` already escapes, and wrapping in `esc()` would render
-literal `&#39;` in the many descriptions containing apostrophes and would break the specified
-`#bountyHint.textContent === description` assertion. (2) `creditPreviewCopy` accepts the documented
-opts object including `saving`, but does not branch on it: the entry specifies no copy for the
-in-flight state and inventing one is out of scope, so the message keeps its last value while the
-button is disabled. index.html 133,052 → 133,957 bytes (85.9% of the 156,000-byte budget); `BUDGET`
-untouched.
-
-### Why
-`populateBountySelect()` renders each `<option>` as icon + title + points and **never** the `description` from `scoring.json` — descriptions appear only in the You-tab bounty cards — so on the Record tab you pick a bounty by name alone. Worse, double-submit protection is defeatable: `submitActivity()` disables `#saveActivityBtn`, but `updateRecordPreview()` ends by recomputing `disabled` from the draft alone, and it is bound to `change` on the type radios, `#hardestGrade`, `#bountySelect` and `#activityDate` — none of which are disabled during the save — so changing the grade mid-POST re-enables Save. There is no in-flight flag. Two smaller papercuts: with a date outside the challenge window the button is disabled while `#creditPreview` still reads "Counts in full · +N today", a dead button with no explanation; and after a successful save `#hardestGrade` keeps its previous value while every other field resets.
-
-### Requirements
-- `src/app.js` — add a module-level `let saving = false`. `submitActivity` returns immediately when `saving` is true, sets `saving = true` before its `try`, and clears it in `finally`. `updateRecordPreview` becomes `…disabled = saving || !target || !dateInChallenge(draft.date) || (type === 'bounty' && !draft.bountyId)`. That single added term is the fix — do **not** try to fix this by disabling more inputs.
-- New pure helper `creditPreviewCopy(opts)` → string, taking a plain object (`{type, hasTarget, inWindow, bountyId, base, credit, reason, startDate, tripDate, saving}`) so it is testable with no DOM. Extract today's message ladder into it and add the two missing states: `!inWindow` → `Outside the challenge window (Jul 1 – Jul 31) · pick a date in range` (dates via `fmtDay()`), and `!hasTarget` → `Choose who you are to save this.` Preserve every existing string exactly for the states that already work (full credit, `already logged`, bounty unchosen, weekly cap) so the harness-2 preview assertions keep passing.
-- Bounty description: add `<small id="bountyHint" class="hint"></small>` inside `#bountyFields`, **after** `#bountySelect`, and give the select `aria-describedby="bountyHint"`. `updateRecordPreview()` — which already runs on `#bountySelect` change — sets its text from the selected bounty's `description` via `esc()`, and empties it when nothing is selected. **Keep** the existing `<label id="bountySelectLabel" for="bountySelect">`: `static-check.mjs` asserts a `<label for="bountySelect">`, and the label already carries the day context.
-- After a successful save, reset `#hardestGrade` to `''` alongside the existing `#activityNote`/`#bountySelect` resets, inside the same success block — never in the `catch`, because a failed save must keep the draft intact.
-- `src/styles.css` — one rule for `#bountyHint` (block, `margin-top`, `--muted`, small line-height) reusing existing tokens. All edits live in the `record` panel, so no You/Crew order assertion is involved.
-
-### Tests
-- `tests/client-state.test.js` harness-1 `checks` literal (no backticks, no `${` — build expected strings with `+`): `creditPreviewCopy` for full credit, `already logged`, bounty-not-chosen, bounty over the weekly cap, no target, and out-of-window — the last asserting the message names **both** window dates.
-- `tests/client-state.test.js` harness-2 `domChecks` literal: with the date picker open and `#activityDate` set outside `config`'s window, `updateRecordPreview()` → `#creditPreview.textContent` starts with `Outside the challenge window` and `#saveActivityBtn.disabled === true`; back in range → enabled. Then `saving = true; updateRecordPreview()` → still disabled with an otherwise valid draft; `saving = false; updateRecordPreview()` → enabled. That pair is the in-flight regression test. Select the Bounty radio, call `populateBountySelect()`, set `#bountySelect.value` to `dailyBounties(challengeToday())[0].id`, `updateRecordPreview()` → `#bountyHint.textContent` equals that bounty's `description`; clear the value → `#bountyHint.textContent === ''`.
-- `tests/static-check.mjs` — **add**: `#bountyHint` exists; `#bountySelect` carries `aria-describedby="bountyHint"`; the existing `<label for="bountySelect">` assertion still passes; the bounty-catalog assertions over `scoring.json` are untouched.
-
-### Do not
-Put descriptions inside `<option>` text — unstyleable, verbose in the closed select, and it bloats the artifact; remove or replace the `<label for="bountySelect">` with `aria-describedby`; disable the type radios, date or grade inputs during a save (the `saving` flag is the guard); reset `#hardestGrade` on a failed save; touch `src/scoring.json` (the descriptions already exist there) or the weekly-cap math; add a localStorage key.
-
----
-
 ## 22. Share my progress: one clipboard helper, and stop a denied copy failing setup
 
-Status: Todo
-Notes:
+Status: Done — 2026-07-26
+Notes: Commit `Share your progress through one clipboard helper`. `copyText(text, okMessage)` is
+the only place the clipboard is written: it guards on a missing `navigator`/`clipboard`/`writeText`,
+`await`s the write inside a `try`, toasts `okMessage` and returns `true`, and on any rejection
+toasts `Copy failed — copy it manually.` and returns `false` — it never throws. `copyCrewLink()`,
+`copyScript()` and the `#diagnosticCode` handler all route through it, and `copyCrewLink()` returns
+the boolean. `saveSetup()` keeps the save and `loadRemote()` inside its `try` and now reads
+`const copied = await copyCrewLink()`, toasting `Shared setup saved. Crew link copied.` or
+`Shared setup saved. Copy the crew link from setup.`; `#setupErrors` stays hidden either way.
+`publicUrl()` returns `location.href` with the hash cleared and the `sheet` param deleted;
+`copyCrewLink()` builds on it and re-adds `sheet` deliberately. `shareSummary(nameLower, today =
+challengeToday())` composes only `totalsModel().sorted` (name, total, rank), `challengeProgress()`,
+`categoryBreakdown()`, `streakInfo()`, `personalRecords().hardest` and `publicUrl()`; a person with
+no credited points gets the two-line "Just getting started" variant and a blank or unknown name
+returns `''`. `#shareBtn` sits in the You panel's `.page-head` inside a new `.head-actions` wrapper
+next to `#changeMeBtn`, is wired in `init()` to `copyText(shareSummary(…), 'Progress copied — paste
+it anywhere.')`, and `render()` both hides and disables it when no profile is selected. index.html
+133,957 → 135,867 bytes (87.1% of the 156,000-byte budget, inside the ~3,000 this entry was
+projected to cost); `BUDGET` untouched. Deviations: (1) `copyText` cannot write
+`navigator?.clipboard?.writeText` as the guard — `navigator` is undeclared in the test harnesses and
+optional chaining still throws `ReferenceError` on an undeclared identifier, so the guard reads
+`typeof navigator === 'undefined' ? null : navigator` and the single literal
+`navigator.clipboard.writeText` the architectural guard counts lives on the `await` line. (2) The
+Share button is both hidden (`hide`) and `disabled` rather than one or the other; the entry allows
+either and doing both keeps the stub-harness assertion honest for each. (3) `.head-actions` is one
+new wrapper `div` so the two head buttons group at the right of the `space-between` `.page-head`
+instead of being spread apart; the CSS is the spacing rule the entry allows plus `min-height:44px`
+on both buttons. (4) Two extra `static-check.mjs` assertions (`function copyText(`,
+`function publicUrl(`) accompany the required ones; nothing existing was retargeted. (5) Rule 10
+archiving: entry 21 was moved verbatim into `IMPROVEMENTS.md` after the archived entry 20 and its
+index line dropped; the lifted block was string-matched back out of the archive (exactly one
+occurrence, gone from the log) and entry 20 was confirmed intact and unsplit.
 
 ### Why
 There is no way to share or brag about progress — `exportData()` only downloads raw JSON — and there are three hand-rolled `navigator.clipboard.writeText` call sites with **no shared helper and no `try`/`catch`**: `copyCrewLink()`, `copyScript()`, and the inline `#diagnosticCode` handler. That missing catch is a real bug: `saveSetup()` `await`s `copyCrewLink()` **inside its `try`**, so a rejected clipboard write (insecure context, denied permission) lands in the `catch` and paints `#setupErrors` as though setup itself had failed — even though the config was saved to the Sheet and the endpoint persisted.

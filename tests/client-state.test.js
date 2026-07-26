@@ -662,6 +662,36 @@ const checks = `(()=>{
   assert.equal(outCopy.indexOf('Outside the challenge window'),0,'an out-of-window date explains why Save is dead');
   assert.ok(outCopy.indexOf(fmtDay('2026-07-01'))>=0,'the out-of-window copy names the window start');
   assert.ok(outCopy.indexOf(fmtDay('2026-07-31'))>=0,'the out-of-window copy names the window end');
+
+  // Entry 22: the shared summary composes existing helpers and never leaks the crew's Sheet endpoint.
+  location.href='https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you';
+  assert.equal(publicUrl(),'https://example.test/app/','publicUrl drops both the hash and the sheet query param');
+  endpoint='https://sheet.example.test/exec';
+  const shareMonday=weekKey(challengeToday()),shareDay=n=>{const d=parseDateOnly(shareMonday);d.setDate(d.getDate()+n);return localDate(d)};
+  config={startDate:shareDay(-7),tripDate:shareDay(7),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[
+    {id:'sh1',name:'Alex',type:'climb',hardestGrade:'V6',date:shareDay(0),createdAt:'1'},
+    {id:'sh2',name:'Alex',type:'exercise',date:shareDay(0),createdAt:'2'},
+    {id:'sh3',name:'Alex',type:'mobility',date:shareDay(0),createdAt:'3'},
+  ];
+  const shareRow=totalsModel().sorted.find(x=>x.name==='Alex'),shareProg=challengeProgress(shareDay(0)),shareStreak=streakInfo('alex',shareDay(0)),shareText=shareSummary('alex',shareDay(0));
+  assert.ok(shareText.indexOf('Alex')>=0,'the summary names the person');
+  assert.ok(shareText.indexOf('Day '+shareProg.day)>=0,'the day line comes from challengeProgress');
+  assert.ok(shareText.indexOf(String(shareRow.total)+' pts')>=0,'the total comes from the totalsModel row');
+  assert.ok(shareText.indexOf('#1')>=0,'the rank comes from the totalsModel ordering');
+  assert.ok(shareText.indexOf(String(shareStreak.current)+' day streak')>=0,'the streak comes from streakInfo');
+  assert.ok(shareText.indexOf('V6')>=0,'a graded climber shares their hardest send from personalRecords');
+  assert.ok(shareText.indexOf(publicUrl())>=0,'the summary ends on the public app link');
+  assert.equal(shareText.indexOf('sheet='),-1,'the shared text never carries the sheet query param');
+  assert.equal(shareText.indexOf('sheet.example.test'),-1,'the shared text never names the Apps Script endpoint host');
+  const shareStarter=shareSummary('bo',shareDay(0));
+  assert.ok(shareStarter.indexOf('Just getting started')>=0,'a climber with no credited points gets the short variant');
+  assert.ok(shareStarter.length<shareText.length,'the short variant really is shorter');
+  assert.equal(shareStarter.indexOf('sheet.example.test'),-1,'the short variant is just as private');
+  assert.equal(shareSummary('',shareDay(0)),'','a blank name shares nothing');
+  assert.equal(shareSummary('   ',shareDay(0)),'','a whitespace name shares nothing');
+  assert.equal(shareSummary('Nobody',shareDay(0)),'','an unknown name shares nothing');
+  endpoint='';
   logs=[];
 })()`;
 
@@ -948,6 +978,15 @@ const domChecks = `(()=>{
   assert.equal(hintEl.textContent,'','clearing the choice empties the hint');
   typeRadio.value='climb';
 
+  // Entry 22: Share only offers itself once a profile is chosen.
+  const shareBtnEl=document.querySelector('#shareBtn');
+  me='Alex';recordingFor='Alex';render();
+  assert.equal(shareBtnEl.classList.contains('hide'),false,'a chosen profile can share its progress');
+  assert.equal(shareBtnEl.disabled,false,'a chosen profile leaves Share enabled');
+  me='';recordingFor='';render();
+  assert.equal(shareBtnEl.classList.contains('hide'),true,'no profile hides the Share button');
+  assert.equal(shareBtnEl.disabled,true,'no profile disables the Share button');
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 
@@ -1007,6 +1046,93 @@ test('background sync respects the open date picker and refreshes stale caches',
     assert.equal(countGets(),before+1,'a stale cache refreshes on tab return');
   })()`;
   await vm.runInNewContext(`${source}\n${syncChecks}`, syncContext, {filename: 'index.html'});
+});
+
+// Entry 22 regression lock: saveSetup() awaits copyCrewLink() inside its try, so a rejected
+// clipboard write used to land in the catch and paint #setupErrors as if setup had failed —
+// even though the config was already on the Sheet and the endpoint had persisted.
+test('a denied clipboard copy never reports shared setup as failed', async () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const store = new Map();
+  const posted = [];
+  const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
+  const crewConfig = {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]};
+  const payload = {version: 11, features: [], activities: [], config: crewConfig, configErrors: [], serverDate: '', timeZone: ''};
+  const participantRow = {querySelector: () => ({value: 'Alex'})};
+  const setupContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    navigator: {clipboard: {writeText: () => Promise.reject(Error('denied'))}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: selector => selector === '.participant-row' ? [participantRow] : [],
+      addEventListener: (type, handler) => listeners.set(type, handler),
+      removeEventListener() {}, createElement: () => makeElement(),
+    },
+    postedActions: () => posted.join(','),
+    fetch: async (url, options = {}) => {
+      if (options.method === 'POST') {posted.push(JSON.parse(options.body).action); return {ok: true, json: async () => ({ok: true, config: JSON.parse(JSON.stringify(crewConfig))})}}
+      return {ok: true, json: async () => JSON.parse(JSON.stringify(payload))};
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const setupChecks = `(async()=>{
+    document.querySelector('#endpoint').value='https://sheet.example.test/exec';
+    document.querySelector('#challengeStart').value='${crewConfig.startDate}';
+    document.querySelector('#tripDate').value='${crewConfig.tripDate}';
+    document.querySelector('#groupGoalInput').value='500';
+    await saveSetup();
+    assert.equal(endpoint,'https://sheet.example.test/exec','the endpoint persisted even though the clipboard refused');
+    assert.equal(localStorage.getItem('roadToSendEndpoint'),'https://sheet.example.test/exec','the endpoint reached localStorage');
+    assert.equal(postedActions(),'saveConfig','the config was saved to the Sheet exactly once');
+    assert.equal(document.querySelector('#setupErrors').classList.contains('hide'),true,'a denied copy never paints the setup error box');
+    assert.equal(document.querySelector('#toast').textContent,'Shared setup saved. Copy the crew link from setup.','the toast reports a saved setup with an uncopied link');
+    assert.equal(document.querySelector('#saveSetupBtn').disabled,false,'the Save button is released either way');
+  })()`;
+  await vm.runInNewContext(`${source}\n${setupChecks}`, setupContext, {filename: 'index.html'});
+});
+
+test('copyText reports a successful clipboard write and keeps the crew link deliberate', async () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const store = new Map();
+  const written = [];
+  const copyContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    navigator: {clipboard: {writeText: value => {written.push(String(value)); return Promise.resolve()}}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: () => [],
+      addEventListener: (type, handler) => listeners.set(type, handler),
+      removeEventListener() {}, createElement: () => makeElement(),
+    },
+    lastWritten: () => written[written.length - 1],
+    fetch: async () => {throw Error('this harness makes no network calls')},
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const copyChecks = `(async()=>{
+    const ok=await copyText('hello','Progress copied — paste it anywhere.');
+    assert.equal(ok,true,'a resolved clipboard write reports true');
+    assert.equal(lastWritten(),'hello','the text reaches the clipboard');
+    assert.equal(document.querySelector('#toast').textContent,'Progress copied — paste it anywhere.','a successful copy toasts the caller message');
+    endpoint='https://sheet.example.test/exec';
+    assert.equal(await copyCrewLink(),true,'the crew link copy hands back the helper result');
+    assert.ok(lastWritten().indexOf('sheet=')>=0,'the crew link deliberately still carries the sheet param');
+    assert.equal(lastWritten().indexOf('#you'),-1,'the crew link still drops the tab hash');
+    assert.equal(document.querySelector('#toast').textContent,'Crew link copied.','a copied crew link keeps its own toast');
+    endpoint='';
+  })()`;
+  await vm.runInNewContext(`${source}\n${copyChecks}`, copyContext, {filename: 'index.html'});
 });
 
 console.log('Client state and scoring tests passed.');
