@@ -1011,6 +1011,45 @@ const domChecks = `(()=>{
   assert.deepEqual(logs.map(x=>x.id),['c3'],'a captured row that is already gone takes nothing with it');
   assert.equal(confirmDialog.classList.contains('open'),false,'and the dialog still closes');
 
+  // Entry 28: a local delete offers itself back. performDelete()'s local branch contains no await,
+  // so its effects land synchronously and the bar can be inspected straight after the call.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'u3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
+  render();
+  const undoBar=document.querySelector('#undoBar'),undoTextEl=document.querySelector('#undoText');
+  assert.equal(undoBar.classList.contains('hide'),true,'nothing has been deleted, so the bar stays away');
+  requestDelete(1,'u2','personal');
+  performDelete();
+  assert.equal(undoBar.classList.contains('hide'),false,'a local delete offers an undo');
+  assert.ok(undoTextEl.textContent.indexOf('Deleted ')===0,'and the bar names what it is offering back');
+  assert.deepEqual(logs.map(x=>x.id),['u1','u3'],'the row is gone while the offer stands');
+  undoDelete();
+  assert.equal(logs.length,3,'undo restores the row');
+  assert.deepEqual(logs.map(x=>x.id),['u1','u2','u3'],'and puts it back at the index it came from, not on the end');
+  render();
+  assert.equal(undoBar.classList.contains('hide'),true,'the offer is spent once it is taken');
+  // Switching tabs puts the bar away, so it never outlives the action it describes.
+  requestDelete(0,'u1','personal');
+  performDelete();
+  assert.equal(undoBar.classList.contains('hide'),false,'a second delete offers again');
+  showTab('crew');
+  render();
+  assert.equal(undoBar.classList.contains('hide'),true,'moving to another tab puts the offer away');
+  showTab('you');
+  // Shared mode never offers undo at all: re-POSTing a deleted row would mint a new id.
+  logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  render();
+  requestDelete(1,'u2','personal');
+  performDelete();
+  assert.equal(undoBar.classList.contains('hide'),false,'still offered in local mode');
+  endpoint='https://sheet.example.test/exec';
+  renderUndo();
+  assert.equal(undoBar.classList.contains('hide'),true,'an endpoint appearing takes the offer away');
+  undoDelete();
+  assert.equal(logs.length,1,'and undo does nothing in shared mode even if it is called directly');
+  endpoint='';
+
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
 

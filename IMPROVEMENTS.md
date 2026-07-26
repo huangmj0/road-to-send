@@ -812,6 +812,67 @@ Change the shared-mode delete request body or its `action:'delete'` id semantics
 
 ---
 
+## 27. One guarded localStorage write
+
+Status: Done — 2026-07-26
+Notes: Commit `Funnel every storage write through one guarded helper`. `writeStore(key,value)`
+guards the global the way `copyText()` does (`typeof localStorage === 'undefined' ? null :
+localStorage`, because optional chaining still throws `ReferenceError` on an undeclared identifier
+in the harnesses), returns `false` when storage is missing, has no `setItem`, or throws, returns
+`true` on a successful write, and never throws. All **eleven** `localStorage.setItem` occurrences
+now route through it, so the architectural guard counts exactly one — the single literal on
+`writeStore`'s own write line. `persistLocal()` and `persistShared()` now attempt every write
+before reporting (`const a=…,b=…;return a&&b`, never a short-circuit that would skip the second
+key) and hand back a boolean. `submitActivity()` carries `storageFailed=!persistLocal()` in its
+local branch and heads its toast ladder with `Saved on this device only — storage is full.`, so the
+entry that is already in `logs` is never reported as a failed save; `render()` and `showTab('you')`
+run before the toast as they always did. `saveIdentity()` closes its dialog and repaints regardless
+of the write result, because nothing between the write and `closeModal()` can throw any more. No
+key was added, renamed or reshaped, and `safeJson()`'s read behaviour is untouched (rule 4).
+index.html 136,407 → 136,672 bytes (+265; 84.9% of the 161,000-byte budget, inside the ~800 this
+entry was projected to cost). Tests: harness-1 swaps `localStorage` for a stub whose `setItem`
+throws and asserts `writeStore()` returns `false` without raising and that `persistLocal()`
+propagates it, then for a stub with no `setItem` at all, then restores the real store and confirms
+neither the stored value nor the success path was disturbed. A new async `test(...)` runs the whole
+failure in one piece: with every write throwing, `saveIdentity()` still sets `me` and still closes
+`#identityModal` — the dialog no longer traps the user behind an uncaught throw — and a local-mode
+`submitActivity()` leaves the row in `logs`, toasts the storage message rather than `Save failed`,
+and hands the Save button back. `static-check.mjs` gains `function writeStore\(` and the
+`localStorage.setItem` count guard. Deviations: (1) The entry lists five functions to convert —
+`persistLocal()`, `persistShared()`, `saveIdentity()`, `maybeShowWeekReview()` and `saveSetup()` —
+which is eight of the eleven call sites. The other three are in `loadInitialState()` (the `?sheet=`
+endpoint write and the one-time `roadToSendConfigV8` → `roadToSendConfigV9` migration write) and in
+`createProfile()` (`roadToSendMe`). They had to be converted too or the entry's own
+`length === 1` guard could not pass. Converting the migration write does not migrate anything new
+and changes no key or shape — rule 4's "only the existing one-time migration writes
+`roadToSendConfigV9`" still describes exactly one write; a failed migration simply retries on the
+next load, where before it threw out of `loadInitialState()` entirely. (2) `persistShared()`
+returns `false` on the early `if(!endpoint)` return rather than `undefined`, so its result is a
+boolean on every path; no caller reads it today. (3) Rule 10 archiving: entry 26 was moved verbatim
+into `IMPROVEMENTS.md` after the archived entry 25 and its index line dropped; the lifted block was
+string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
+at the start of its own line) and entry 25 was confirmed intact and unsplit.
+
+### Why
+`safeJson()` wraps every read in a `try`, but every write is bare: `persistLocal()`, `persistShared()`, `saveIdentity()`, `maybeShowWeekReview()` and `saveSetup()` all call `localStorage.setItem` unguarded. In Safari private mode and on quota exhaustion those throw, and two paths then fail badly. In local mode `submitActivity()` appends to `logs` and calls `persistLocal()` inside its `try`, so a throw is caught and toasted as `Save failed` — but the entry is already in the in-memory `logs` and `render()` was skipped, so it appears on the next repaint having never been persisted. And `saveIdentity()` has no `try` at all, so a throw escapes the click handler and `closeModal`/`render` never run, leaving the identity dialog stuck open. This is the shape of bug entry 22 fixed for the clipboard: an unguarded side effect reported as a failure of the thing around it.
+
+### Requirements
+- `src/app.js` — new `function writeStore(key,value)` returning `true` on success and `false` when storage is missing or `setItem` throws. It never throws. Guard the global the way `copyText()` does (`typeof localStorage === 'undefined' ? null : localStorage`); optional chaining still throws `ReferenceError` on an undeclared identifier in the harnesses (entry 22, deviation 1).
+- Route **every** `localStorage.setItem` call through it: `persistLocal()`, `persistShared()`, `saveIdentity()`, `maybeShowWeekReview()`, `saveSetup()`.
+- Keep `submitActivity()`'s local branch honest: if `persistLocal()` reports a failed write, still `render()` and toast `Saved on this device only — storage is full.` rather than `Save failed`, because the entry is in `logs` either way.
+- `saveIdentity()` closes its dialog and repaints regardless of the write result.
+- No new localStorage key, and no change to any existing key or stored value shape (rule 4).
+
+### Tests
+- `tests/client-state.test.js` — a **new** async `test(...)` modelled on the existing clipboard cases, with a `localStorage` stub whose `setItem` throws: `saveIdentity()` still closes `#identityModal` (its `classList` no longer contains `open`) and sets `me`; a local-mode `submitActivity()` leaves the new row in `logs` and toasts the storage message rather than `Save failed`.
+- `tests/client-state.test.js` harness-1: `writeStore()` returns `false` without throwing when `setItem` throws, and `true` on a normal write.
+- `tests/static-check.mjs` — **add** `assert.match(script,/function writeStore\(/)` and an architectural guard `assert.equal((script.match(/localStorage\.setItem/g)||[]).length,1,'storage writes funnel through one helper')`.
+
+### Do not
+Add a localStorage key, change a stored value's shape, or migrate anything (rule 4); make `writeStore` throw or re-throw; collapse a genuine network `Save failed` into the storage message; change `safeJson()`'s read behaviour or its fallbacks.
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so
