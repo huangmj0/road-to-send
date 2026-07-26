@@ -654,35 +654,19 @@ entries 19–22 to add ~18,000 and they added 10,447), this queue's projection (
 25–41), the landing figure near 148,500, and the ~12,500 cushion that leaves. The standing
 instruction is kept and restated against the new number: if the queue again lands well under its
 projection, the next budget entry lowers `BUDGET` toward the real figure. The always-printed
-size/percent line and the failure message are byte-identical. No file under `src/` was touched, so `npm run build` was a no-op and
-`index.html` is unchanged at 135,867 bytes — now 84.4% of the 161,000-byte budget. Deviations:
-(1) This entry is the first of a parallel-orchestration pass: seventeen entries are being authored
-by subagents working concurrently in separate worktrees, and landed one commit at a time by an
-orchestrator that owns `IMPROVEMENT_LOG.md` and `IMPROVEMENTS.md` outright. Implementers therefore
-leave their `Status:` on `Todo` and hand back a `Notes:` paragraph, and the orchestrator applies
-rule 10's status, notes, index and archiving edits in the same commit as the implementation — the
-bookkeeping rule 10 describes is honoured, but by the integrator rather than the implementer,
-because `tests/docs-check.mjs`'s at-most-one-`Done` invariant cannot survive two implementers
-writing this file at once. (2) For the same reason entries land in dependency order rather than
-the strict top-to-bottom order the "Before you start" rule gives: every function in `src/app.js`
-occupies one physical line, so two entries touching `render()` or `init()` are an unmergeable
-same-line conflict, and the landing order is chosen so no two concurrent authors own a line.
-Each entry still gets its own commit, its own `Done` status and serial verbatim archiving.
-(3) **This entry was implemented twice, in parallel, and reconciled at merge.** PR #32 landed the
-same entry on `main` while this pass was already working past it, having taken the same first
-`Todo` from the same queue — the selection rule cannot prevent that on its own once two sessions run
-at once. Both arrived at `BUDGET = 161000` and at the same arithmetic (measured start 135,867,
-~+12,600 projected, landing near 148,500, ~12,500 of cushion, standing instruction kept), so there
-was no substantive disagreement to settle: the merge keeps `main`'s already-reviewed comment
-wording verbatim rather than churning a merged file to substitute equivalent prose, and this
-`Notes:` block is amended to describe what actually sits in the file. The per-entry itemisation of
-the projection that this pass's draft carried is therefore not in `tests/size-check.mjs`; the
-measured deltas it would have provided are recorded per entry in `Notes:` (rule 10) regardless.
-(4) Rule 10 archiving: entry 22 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+size/percent line and the failure message are byte-identical. No file under `src/` was touched, so
+`npm run build` was a no-op and `index.html` is unchanged at 135,867 bytes — now 84.4% of the
+161,000-byte budget. Deviations: (1) This entry was implemented twice, independently: once here and
+once in PR #32, each taking the same first `Todo` from the same queue. Both reached
+`BUDGET = 161000` with the same arithmetic, so there was no substantive disagreement to settle. The
+merge kept PR #32's comment wording rather than churning an already-reviewed file to substitute
+equivalent prose — so the text now in `tests/size-check.mjs` is that one, not the wording of the
+commit named above, while the archiving of entry 22 and the log bookkeeping are this commit's.
+(2) Rule 10 archiving: entry 22 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
 21 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
 one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 21 was
-confirmed intact and unsplit. `main` archived entry 22 to the same position independently, and the
-two archived blocks are identical, so the merge carries exactly one copy.
+confirmed intact and unsplit. PR #32 archived entry 22 to the same position independently and the
+two blocks are identical, so exactly one copy survives the merge.
 
 ### Why
 `tests/size-check.mjs` caps `index.html` at `BUDGET = 156000`, a figure entry 23 derived from a projection that has since been measured and missed: it expected entries 19–22 to add ~18,000 bytes and land near 143,500, but they added 10,447 and landed at 135,867 (87.1%). The comment at `tests/size-check.mjs:8-13` therefore carries a standing instruction — "If the queue lands under that, lower `BUDGET` back toward the real figure: a cap that only ratchets upward stops being a guard" — and rule 3 says the number moves only in an entry that explains it. Entries 25–41 below project ~+12,600 bytes (landing near 148,500), so the honest move is neither to leave stale arithmetic in place nor to ratchet silently, but to restate the cap against a measured start and a written projection.
