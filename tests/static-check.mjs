@@ -45,6 +45,12 @@ assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyr
 // Saving… was already the label on two buttons (#saveActivityBtn and #saveSetupBtn) before this
 // entry, so the preview branch is the third occurrence — a >=2 guard could never have failed.
 assert.ok((script.match(/Saving…/g)||[]).length>=3,'the preview reports an in-flight save, on top of the two button labels');
+assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption');
+assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
+assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
+assert.match(html,/class="trend-scroll"[\s\S]*id="trendSummary"/,'the trend caption follows the scroll wrapper');
+assert.match(script,/function heatmapCaption\(/,'a pure helper builds the heatmap caption');
+assert.match(script,/function trendCaption\(/,'a pure helper builds the trend caption');
 assert.match(script,/Challenge day: /,'the diagnostics say which day the app is scoring against');
 assert.match(script,/Export downloaded\./,'a finished export says so out loud');
 assert.match(script,/<button class="cat-chip/,'each category chip is a real button');

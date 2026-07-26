@@ -1205,6 +1205,50 @@ Change the note's storage, length limit or POST body; render notes for climb ent
 
 ---
 
+## 35. Say which day the app thinks it is
+
+Status: Done — 2026-07-26
+Notes: Commit `Say which day the app is scoring against`. `renderSync()` appends
+` Challenge day: 2026-07-26 · America/Los_Angeles.` to `#diagnosticDetail` after the protocol and
+last-sync sentence, reading `challengeToday()` and the cached `challengeTimeZone` — no `new Date()`
+for challenge-date logic (rule 6), and no client-side timezone conversion. The line is appended only
+when `challengeTimeZone` is known, and it sits inside the shared-mode branch, after the early
+`if(!endpoint)` return, so local mode never shows it. It reads as one more diagnostic fact in the
+same neutral sentence as the rest, not as a warning. `#diagnosticCode` and its copy handler,
+`challengeToday()`'s fallback order and `#syncDiagnostics`' show/hide rule are all untouched.
+index.html 139,080 → 139,166 bytes (+86; 86.4% of the 161,000-byte budget, well inside the ~500 this
+entry was projected to cost). Tests: the existing fetch-stubbed sync harness now returns a real
+`serverDate` and `timeZone` in its payload — extending the existing `payload` object rather than
+replacing it, so every assertion already in that case still passes — and asserts after a sync that
+`#diagnosticDetail` names the challenge day and the timezone, that the protocol line still leads,
+and that the endpoint host appears nowhere in it (entry 22's privacy rule); then clears `endpoint`
+and asserts local mode mentions neither. `static-check.mjs` gains `Challenge day: `. Deviations:
+(1) The entry gates the line on "both values are known"; the implementation gates on
+`challengeTimeZone` alone, because `challengeToday()` always returns a usable date — it falls back
+to `serverDate` and then to the device's local date — so gating on it too would only ever suppress
+the line when the timezone was already missing. (2) Rule 10 archiving: entry 34 was moved verbatim
+into `IMPROVEMENTS.md` after the archived entry 33 and its index line dropped; the lifted block was
+string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
+at the start of its own line) and entry 33 was confirmed intact and unsplit.
+
+### Why
+`challengeToday()` follows the Sheet's timezone, falling back to `serverDate` and then to the device's local date, and both `serverDate` and `challengeTimeZone` are cached in `roadToSendShared:meta:{endpoint}` on every sync. Neither is ever displayed: `renderSync()` shows only the protocol version and `lastSyncedAt`. A crew member travelling — or anyone whose device clock has rolled past the Sheet's midnight — has no way to see why the today-card looks a day out.
+
+### Requirements
+- `src/app.js` — `renderSync()` appends the challenge date and timezone to `#diagnosticDetail`, reading `Challenge day: 2026-07-26 · America/Los_Angeles`, only when both values are known and an `endpoint` is set.
+- Reuse `challengeToday()` and the cached `challengeTimeZone`; never call `new Date()` for challenge-date logic (rule 6).
+- Leave `#diagnosticCode` and its copy handler exactly as they are — it routes through `copyText()` per entry 22.
+- The line is diagnostic, not an error: it must not render as a warning, and must not appear in local mode.
+
+### Tests
+- `tests/client-state.test.js` — extend the existing fetch-stubbed harness: after a sync returning a `timeZone` and `serverDate`, `#diagnosticDetail`'s `textContent` contains both; in local mode it contains neither.
+- `tests/static-check.mjs` — **add** `assert.match(script,/Challenge day: /)`.
+
+### Do not
+Change `challengeToday()`'s fallback order or `#syncDiagnostics`' show/hide rule; add a timezone picker or any client-side timezone conversion; surface the endpoint URL anywhere (entry 22's privacy rule); touch the diagnostic error codes.
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so

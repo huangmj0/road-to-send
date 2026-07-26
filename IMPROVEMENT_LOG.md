@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 35 — Say which day the app thinks it is — Done — 2026-07-26
-- 36 — Caption the heatmap and the trend chart — Todo
+- 36 — Caption the heatmap and the trend chart — Done — 2026-07-26
 - 37 — Focus the dialog you just opened — Todo
 - 38 — Show more of the feed — Todo
 - 40 — Share through the system share sheet — Todo
@@ -45,53 +44,35 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 35. Say which day the app thinks it is
-
-Status: Done — 2026-07-26
-Notes: Commit `Say which day the app is scoring against`. `renderSync()` appends
-` Challenge day: 2026-07-26 · America/Los_Angeles.` to `#diagnosticDetail` after the protocol and
-last-sync sentence, reading `challengeToday()` and the cached `challengeTimeZone` — no `new Date()`
-for challenge-date logic (rule 6), and no client-side timezone conversion. The line is appended only
-when `challengeTimeZone` is known, and it sits inside the shared-mode branch, after the early
-`if(!endpoint)` return, so local mode never shows it. It reads as one more diagnostic fact in the
-same neutral sentence as the rest, not as a warning. `#diagnosticCode` and its copy handler,
-`challengeToday()`'s fallback order and `#syncDiagnostics`' show/hide rule are all untouched.
-index.html 139,080 → 139,166 bytes (+86; 86.4% of the 161,000-byte budget, well inside the ~500 this
-entry was projected to cost). Tests: the existing fetch-stubbed sync harness now returns a real
-`serverDate` and `timeZone` in its payload — extending the existing `payload` object rather than
-replacing it, so every assertion already in that case still passes — and asserts after a sync that
-`#diagnosticDetail` names the challenge day and the timezone, that the protocol line still leads,
-and that the endpoint host appears nowhere in it (entry 22's privacy rule); then clears `endpoint`
-and asserts local mode mentions neither. `static-check.mjs` gains `Challenge day: `. Deviations:
-(1) The entry gates the line on "both values are known"; the implementation gates on
-`challengeTimeZone` alone, because `challengeToday()` always returns a usable date — it falls back
-to `serverDate` and then to the device's local date — so gating on it too would only ever suppress
-the line when the timezone was already missing. (2) Rule 10 archiving: entry 34 was moved verbatim
-into `IMPROVEMENTS.md` after the archived entry 33 and its index line dropped; the lifted block was
-string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
-at the start of its own line) and entry 33 was confirmed intact and unsplit.
-
-### Why
-`challengeToday()` follows the Sheet's timezone, falling back to `serverDate` and then to the device's local date, and both `serverDate` and `challengeTimeZone` are cached in `roadToSendShared:meta:{endpoint}` on every sync. Neither is ever displayed: `renderSync()` shows only the protocol version and `lastSyncedAt`. A crew member travelling — or anyone whose device clock has rolled past the Sheet's midnight — has no way to see why the today-card looks a day out.
-
-### Requirements
-- `src/app.js` — `renderSync()` appends the challenge date and timezone to `#diagnosticDetail`, reading `Challenge day: 2026-07-26 · America/Los_Angeles`, only when both values are known and an `endpoint` is set.
-- Reuse `challengeToday()` and the cached `challengeTimeZone`; never call `new Date()` for challenge-date logic (rule 6).
-- Leave `#diagnosticCode` and its copy handler exactly as they are — it routes through `copyText()` per entry 22.
-- The line is diagnostic, not an error: it must not render as a warning, and must not appear in local mode.
-
-### Tests
-- `tests/client-state.test.js` — extend the existing fetch-stubbed harness: after a sync returning a `timeZone` and `serverDate`, `#diagnosticDetail`'s `textContent` contains both; in local mode it contains neither.
-- `tests/static-check.mjs` — **add** `assert.match(script,/Challenge day: /)`.
-
-### Do not
-Change `challengeToday()`'s fallback order or `#syncDiagnostics`' show/hide rule; add a timezone picker or any client-side timezone conversion; surface the endpoint URL anywhere (entry 22's privacy rule); touch the diagnostic error codes.
-
----
-
 ## 36. Caption the heatmap and the trend chart
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Caption the heatmap and the trend chart`. `#heatmapSummary` sits inside
+`#heatmapCard` after `#youHeatmap`, and `#trendSummary` inside `#weeklyTrendCard` after the
+`.trend-scroll` wrapper — after the wrapper, so the existing `.trend-scroll` → `#weeklyTrend`
+adjacency assertion is untouched. Both are plain text set with `textContent`. Two pure helpers,
+`heatmapCaption(days)` and `trendCaption(rows)`, build the strings from exactly what `heatmapDays()`
+and `weeklyTrend()` already return — the heatmap caption names the best day (via `fmtDay()`, rule 6)
+and the active-day count, the trend caption the best week and the current one. They are set inside
+`renderHeatmap()` and `renderTrend()`, beside the `card.classList.toggle('hide',…)` decision, which
+is the only place that can honour "empty when the card is hidden". Both existing container
+`aria-label`s are kept, no day is enumerated into a label, and the `title` attributes stay. index.html
+139,166 → 140,112 bytes (+946; 87.0% of the 161,000-byte budget, inside the ~1,500 this entry was
+projected to cost). Tests: harness-1 covers both helpers against crafted days and weeks, including
+the empty case, an all-zero case, and single-day/single-point cases that would expose a stray plural.
+Harness-2 asserts both captions are non-empty when their cards are shown and empty once the logs are
+cleared and the cards hide. `static-check.mjs` gains presence assertions for both ids, both order
+assertions, and a presence assertion for each helper; the existing `.trend-scroll{overflow-x:auto}`
+and adjacency assertions still pass. Deviations: (1) The entry's markup says `class="muted"`, but
+**`.muted` has no rule in `src/styles.css`** — it exists only as the CSS custom property `--muted`.
+The existing muted-caption class is `.hint`, so both captions use `class="hint"`, which is what the
+entry's own requirement ("reuse the existing muted-caption styling; add at most a spacing rule")
+asks for, and no CSS was added at all. (2) `trendCaption()` gates on any week having points rather
+than on the row count alone, matching `renderTrend()`'s own `empty` test, so the caption and the card
+appear and disappear together. (3) Rule 10 archiving: entry 35 was moved verbatim into
+`IMPROVEMENTS.md` after the archived entry 34 and its index line dropped; the lifted block was
+string-matched back out of the archive (exactly one occurrence, gone from the log, heading confirmed
+at the start of its own line) and entry 34 was confirmed intact and unsplit.
 
 ### Why
 Both graphics already carry `role="img"` with a summarising `aria-label` — `#youHeatmap` announces its active-day and point totals, `#weeklyTrend` its per-week list — so the container level is covered and this entry must not redo it. What is missing is per-datum detail for everyone else: each heatmap cell and each trend column keeps its numbers in a `title=` attribute on an `aria-hidden="true"` element, which never appears on touch, is invisible on a phone, and is the only place that individual day's or week's figure exists.

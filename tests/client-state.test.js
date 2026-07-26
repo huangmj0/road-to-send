@@ -293,6 +293,24 @@ const checks = `(()=>{
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   logs=[];
 
+  // Entry 36: the captions state the per-datum facts that only ever lived in a title= attribute --
+  // invisible on touch. They are additive: both graphics keep their own container aria-label.
+  assert.equal(heatmapCaption([]),'','no days means no caption');
+  assert.equal(heatmapCaption([{date:'2026-07-01',points:0},{date:'2026-07-02',points:0}]),'','days with no points means no caption');
+  const oneDayCap=heatmapCaption([{date:'2026-07-01',points:1}]);
+  assert.ok(oneDayCap.indexOf('1 point ')>=0,'a single point is singular');
+  assert.ok(oneDayCap.indexOf('1 active day')>=0&&oneDayCap.indexOf('1 active days')<0,'and a single active day has no stray plural');
+  const capDays=heatmapCaption([{date:'2026-07-01',points:3},{date:'2026-07-02',points:0},{date:'2026-07-03',points:8}]);
+  assert.ok(capDays.indexOf(fmtDay('2026-07-03'))>=0,'the caption names the best day');
+  assert.ok(capDays.indexOf('8 points')>=0,'and what that day scored');
+  assert.ok(capDays.indexOf('2 active days')>=0,'and how many days were active');
+  assert.equal(trendCaption([]),'','no weeks means no caption');
+  assert.equal(trendCaption([{week:'2026-W27',label:'W1',points:0}]),'','weeks with no points means no caption');
+  const capWeeks=trendCaption([{week:'2026-W27',label:'W1',points:12},{week:'2026-W28',label:'W2',points:31},{week:'2026-W29',label:'W3',points:5}]);
+  assert.ok(capWeeks.indexOf('W2')>=0&&capWeeks.indexOf('31 points')>=0,'the trend caption names the best week and its total');
+  assert.ok(capWeeks.indexOf('this week 5 points')>=0,'and where the current week stands');
+  assert.ok(trendCaption([{week:'2026-W27',label:'W1',points:1}]).indexOf('1 point ')>=0,'a single point is singular here too');
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);
@@ -996,6 +1014,23 @@ const domChecks = `(()=>{
   assert.equal(catRow.innerHTML.split('cat-chip done').length-1,CATEGORIES.length,'every category is done in this state');
   assert.ok(catRow.innerHTML.indexOf('disabled')<0,'and none of the done chips is disabled');
   showTab('you');
+
+  // Entry 36: the captions track their cards -- filled when the card is drawn, empty when hidden.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'h1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'h2',name:'Alex',type:'exercise',date:shift(-3),createdAt:'2'}];
+  render();
+  const heatCard=document.querySelector('#heatmapCard'),heatCap=document.querySelector('#heatmapSummary');
+  assert.equal(heatCard.classList.contains('hide'),false,'the heatmap card is showing');
+  assert.ok(heatCap.textContent.length>0,'so its caption says something');
+  assert.ok(heatCap.textContent.indexOf('active day')>=0,'and reports the active-day count');
+  const trendCard=document.querySelector('#weeklyTrendCard'),trendCap=document.querySelector('#trendSummary');
+  assert.equal(trendCard.classList.contains('hide'),false,'the trend card is showing');
+  assert.ok(trendCap.textContent.indexOf('Best week')===0,'so its caption names the best week');
+  logs=[];
+  render();
+  assert.equal(heatCap.textContent,'','a hidden heatmap card carries no caption');
+  assert.equal(trendCap.textContent,'','and neither does a hidden trend card');
 
   // Entry 18: the today card carries the personal countdown and the person share of the crew pace.
   me='Alex';recordingFor='Alex';endpoint='';
