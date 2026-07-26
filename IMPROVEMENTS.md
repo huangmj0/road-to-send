@@ -1067,6 +1067,49 @@ Change the export's JSON shape, key order or filename; add a network upload or a
 
 ---
 
+## 32. Show the save in the credit preview
+
+Status: Done — 2026-07-26
+Notes: Commit `Let the credit preview admit a save is in flight`. `creditPreviewCopy()` opens its
+ladder with `if(o.saving)return'Saving…'`, so an in-flight save wins over every other branch, and
+`submitActivity()` calls `updateRecordPreview()` immediately after `saving=true` so the branch is
+actually reachable; the existing `finally` already restores the normal copy. `updateRecordPreview()`
+was already threading the module-level `saving` into its opts object — entry 21 shipped that half
+and recorded the unused parameter as its deviation 2 — so nothing changed there. `#creditPreview`,
+its live-region behaviour, `#recordMeter` and `#saveActivityBtn`'s label are all untouched.
+index.html 138,066 → 138,118 bytes (+52; 85.8% of the 161,000-byte budget, inside the ~300 this
+entry was projected to cost). Tests: harness-1 asserts the saving branch returns `Saving…` for an
+otherwise-perfect draft, that it still wins for a draft with no target, out of window and already
+logged, and that an explicit `saving:false` behaves exactly as its absence does; all six existing
+assertions in that block are called without the flag and return their current strings unchanged.
+Deviations: (1) The entry specifies the static guard as `Saving…` count `>=2` on the grounds that
+"the string already exists once for the button label". It exists **twice** already —
+`#saveActivityBtn` in `submitActivity()` and `#saveSetupBtn` in `saveSetup()` — so a `>=2` guard
+would have passed without this entry doing anything at all. It is written as `>=3` with a comment
+naming all three occurrences, which is the count that actually detects the preview branch.
+(2) Rule 10 archiving: entry 31 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+30 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 30 was
+confirmed intact and unsplit.
+
+### Why
+`creditPreviewCopy(opts)` already accepts a documented `saving` flag and never branches on it — entry 21 shipped the parameter and recorded the gap as its deviation 2, because inventing the copy was outside that entry's scope. Nothing repaints `#creditPreview` during a save either: `submitActivity()` sets `saving=true` and updates only `#saveActivityBtn`'s label, while `updateRecordPreview()` runs in the `finally`. So the preview line goes on asserting what the entry *will* score for the whole time the request is in flight.
+
+### Requirements
+- `src/app.js` — add a `saving` branch **first** in `creditPreviewCopy()`'s ladder, returning `Saving…`. All six existing harness assertions call it without `saving`, so their results are unchanged.
+- Call `updateRecordPreview()` immediately after `saving=true` in `submitActivity()` so the branch is reachable, and let the existing `finally` restore the normal copy.
+- `updateRecordPreview()` passes the module-level `saving` through in its opts object.
+- No change to `#creditPreview`'s element or its live-region behaviour, and none to the `#recordMeter` beside it.
+
+### Tests
+- `tests/client-state.test.js` harness-1: `creditPreviewCopy({saving:true, …})` returns the saving copy whatever the other options say, and every existing assertion in that block still returns its current string.
+- `tests/static-check.mjs` — **add** `assert.ok((script.match(/Saving…/g)||[]).length>=2,'the preview reports an in-flight save')`; the string already exists once for the button label, so assert a count rather than presence.
+
+### Do not
+Change any other branch of `creditPreviewCopy()` or its option names; add a second `aria-live` region to the Record tab; alter the `saving` double-submit guard entry 21 shipped; change `#saveActivityBtn`'s label text.
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so

@@ -952,6 +952,28 @@ const domChecks = `(()=>{
   assert.equal(meterHtml.split('filled').length-1,DAILY_MAX,'a balanced day fills every pip');
   assert.ok(meterHtml.indexOf('seg-bonus')>=0,'the bonus pips are identifiable');
 
+  // Entry 33: the chips are the one place the today card shows a missing category without offering
+  // the action that fixes it. Each chip is now a real button inside its listitem wrapper, and the
+  // chip counts above still hold because the wrapper class is chip-item, not a cat-chip variant.
+  assert.ok(catRow.innerHTML.indexOf('<button class="cat-chip')>=0,'each chip is a real button');
+  assert.ok(catRow.innerHTML.indexOf('role="listitem"')>=0,'and it sits inside its list item rather than replacing it');
+  assert.equal(catRow.innerHTML.indexOf('role="listitem"><button'),catRow.innerHTML.indexOf('role="listitem"'),'the button is nested, so the listitem keeps its semantics and the button keeps its own');
+  const chipRadio=document.querySelector('input[name="activityType"][value="exercise"]'),chipDateBox=document.querySelector('#dateFields');
+  chipRadio.checked=false;chipDateBox.classList.remove('hide');
+  // showTab() moves panels through querySelectorAll, which this stub returns empty from, so the
+  // active panel is not observable here. lastDeleted is: showTab() clears it (entry 28), so a
+  // cleared undo offer is the proof that the jump to the Record tab actually happened.
+  lastDeleted={entry:logs[0],index:0,label:'a climb'};
+  prefillCategory('exercise');
+  assert.equal(chipRadio.checked,true,'tapping a chip preselects that category on the Record form');
+  assert.equal(lastDeleted,null,'and it goes to the Record tab, the same jump claimBounty makes');
+  assert.equal(chipDateBox.classList.contains('hide'),true,'the date fields are reset the way a bounty claim resets them');
+  assert.equal(prefillCategory('not-a-category'),undefined,'an unknown category does nothing at all');
+  // An already-logged category stays tappable: logging it twice is legal and simply scores 0, so
+  // the affordance must not imply an error.
+  assert.equal(catRow.innerHTML.split('cat-chip done').length-1,CATEGORIES.length,'every category is done in this state');
+  assert.ok(catRow.innerHTML.indexOf('disabled')<0,'and none of the done chips is disabled');
+  showTab('you');
 
   // Entry 18: the today card carries the personal countdown and the person share of the crew pace.
   me='Alex';recordingFor='Alex';endpoint='';

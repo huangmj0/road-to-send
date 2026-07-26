@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 32 — Show the save in the credit preview — Done — 2026-07-26
-- 33 — Tap a category chip to start recording it — Todo
+- 33 — Tap a category chip to start recording it — Done — 2026-07-26
 - 34 — Show the note you wrote on a bounty — Todo
 - 35 — Say which day the app thinks it is — Todo
 - 36 — Caption the heatmap and the trend chart — Todo
@@ -48,52 +47,41 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 32. Show the save in the credit preview
-
-Status: Done — 2026-07-26
-Notes: Commit `Let the credit preview admit a save is in flight`. `creditPreviewCopy()` opens its
-ladder with `if(o.saving)return'Saving…'`, so an in-flight save wins over every other branch, and
-`submitActivity()` calls `updateRecordPreview()` immediately after `saving=true` so the branch is
-actually reachable; the existing `finally` already restores the normal copy. `updateRecordPreview()`
-was already threading the module-level `saving` into its opts object — entry 21 shipped that half
-and recorded the unused parameter as its deviation 2 — so nothing changed there. `#creditPreview`,
-its live-region behaviour, `#recordMeter` and `#saveActivityBtn`'s label are all untouched.
-index.html 138,066 → 138,118 bytes (+52; 85.8% of the 161,000-byte budget, inside the ~300 this
-entry was projected to cost). Tests: harness-1 asserts the saving branch returns `Saving…` for an
-otherwise-perfect draft, that it still wins for a draft with no target, out of window and already
-logged, and that an explicit `saving:false` behaves exactly as its absence does; all six existing
-assertions in that block are called without the flag and return their current strings unchanged.
-Deviations: (1) The entry specifies the static guard as `Saving…` count `>=2` on the grounds that
-"the string already exists once for the button label". It exists **twice** already —
-`#saveActivityBtn` in `submitActivity()` and `#saveSetupBtn` in `saveSetup()` — so a `>=2` guard
-would have passed without this entry doing anything at all. It is written as `>=3` with a comment
-naming all three occurrences, which is the count that actually detects the preview branch.
-(2) Rule 10 archiving: entry 31 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
-30 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
-one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 30 was
-confirmed intact and unsplit.
-
-### Why
-`creditPreviewCopy(opts)` already accepts a documented `saving` flag and never branches on it — entry 21 shipped the parameter and recorded the gap as its deviation 2, because inventing the copy was outside that entry's scope. Nothing repaints `#creditPreview` during a save either: `submitActivity()` sets `saving=true` and updates only `#saveActivityBtn`'s label, while `updateRecordPreview()` runs in the `finally`. So the preview line goes on asserting what the entry *will* score for the whole time the request is in flight.
-
-### Requirements
-- `src/app.js` — add a `saving` branch **first** in `creditPreviewCopy()`'s ladder, returning `Saving…`. All six existing harness assertions call it without `saving`, so their results are unchanged.
-- Call `updateRecordPreview()` immediately after `saving=true` in `submitActivity()` so the branch is reachable, and let the existing `finally` restore the normal copy.
-- `updateRecordPreview()` passes the module-level `saving` through in its opts object.
-- No change to `#creditPreview`'s element or its live-region behaviour, and none to the `#recordMeter` beside it.
-
-### Tests
-- `tests/client-state.test.js` harness-1: `creditPreviewCopy({saving:true, …})` returns the saving copy whatever the other options say, and every existing assertion in that block still returns its current string.
-- `tests/static-check.mjs` — **add** `assert.ok((script.match(/Saving…/g)||[]).length>=2,'the preview reports an in-flight save')`; the string already exists once for the button label, so assert a count rather than presence.
-
-### Do not
-Change any other branch of `creditPreviewCopy()` or its option names; add a second `aria-live` region to the Record tab; alter the `saving` double-submit guard entry 21 shipped; change `#saveActivityBtn`'s label text.
-
----
-
 ## 33. Tap a category chip to start recording it
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Make the category chips start the recording they describe`. Each chip is now
+`<button class="cat-chip …" type="button" data-cat="{type}">` nested **inside** its existing
+`role="listitem"` wrapper, which is a new `<span class="chip-item">` — the chip cannot itself be the
+list item, because `role="listitem"` on a button destroys the button semantics, and `#todayCategories`
+keeps `role="list"` as `static-check.mjs` asserts. `prefillCategory(type)` mirrors `claimBounty()`'s
+steps rather than copying its body: it looks the radio up first and returns if there is none, then
+`setDefaultRecordDate()`, collapses `#dateFields` and resets `#dateToggle`, checks the radio,
+`showTab('record')` and `updateRecordPreview()`. One delegated `#todayCategories` listener sits
+beside the `#todayBounties` one in `init()`. No new module state, no fourth chip state, and no new
+copy in `#todayRemaining`. Already-logged chips stay tappable and undisabled: logging a category
+twice is legal and simply scores 0, so the affordance must not imply an error. `src/styles.css`
+gains one appended line — `.chip-item{display:inline-flex}`, the button reset the chip needs
+(`font-family:inherit`, `cursor:pointer`), a `:focus-visible` outline and an `:active` background;
+`.cat-chip` already carried `min-height:44px` (rule 7). index.html 138,118 → 139,049 bytes (+931;
+86.4% of the 161,000-byte budget, inside the ~1,200 this entry was projected to cost). Tests:
+harness-2's three existing chip assertions count occurrences of `cat-chip` and `cat-chip done`, and
+they still hold **because the wrapper class is `chip-item`, not a `cat-chip` variant** — a wrapper
+named `cat-chip-item` would have silently inflated every one of those counts. Saying so here so a
+later pass does not "fix" them. New assertions cover the button markup, the nesting order, the
+preselect, and that no done chip is disabled. `static-check.mjs` gains
+`<button class="cat-chip` and `function prefillCategory\(`. Deviations: (1) The entry's test asks
+that `prefillCategory('exercise')` "leaves the Record panel active", which is not observable in
+harness 2: `showTab()` moves panels through `document.querySelectorAll('[data-panel]')` and the stub
+returns `[]` from it. The jump is asserted through an effect that *is* observable — `showTab()`
+clears `lastDeleted` (entry 28), so a seeded undo offer being gone proves the tab change ran — plus
+`#dateFields` gaining `hide`, which is the date reset the entry asks `prefillCategory` to mirror.
+A comment in the harness records why. (2) A harness-local `const typeRadio` collided with entry 21's
+declaration in the same IIFE scope and was renamed `chipRadio`; nothing of entry 21's was touched.
+(3) Rule 10 archiving: entry 32 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+31 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 31 was
+confirmed intact and unsplit.
 
 ### Why
 Entry 17 shipped `#todayCategories` as status chips and explicitly left interaction for later — "a tap-to-preselect path duplicates entry 14's claim flow and the card's own Record CTA, so leave it for a later entry". Entry 14 has since shipped exactly that flow for bounties, where `claimBounty(id)` jumps to Record pre-filled, so the pattern now exists. The chips are the one place in the today-card that shows a missing category without offering the action that fixes it.

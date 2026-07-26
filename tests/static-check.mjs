@@ -46,6 +46,8 @@ assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyr
 // entry, so the preview branch is the third occurrence — a >=2 guard could never have failed.
 assert.ok((script.match(/Saving…/g)||[]).length>=3,'the preview reports an in-flight save, on top of the two button labels');
 assert.match(script,/Export downloaded\./,'a finished export says so out loud');
+assert.match(script,/<button class="cat-chip/,'each category chip is a real button');
+assert.match(script,/function prefillCategory\(/,'tapping a chip starts a recording for that category');
 assert.match(script,/function breakdownRow\(/,'one breakdown row shape serves the You panel and the person card');
 assert.match(script,/function pyramidRow\(/,'one pyramid row shape serves both');
 assert.match(script,/function recordsRow\(/,'one records row shape serves both');
