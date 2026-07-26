@@ -1400,6 +1400,54 @@ Add a filter, sort control or search box in this entry; persist the expanded lim
 
 ---
 
+## 40. Share through the system share sheet
+
+Status: Done — 2026-07-26
+Notes: Commit `Share progress through the system share sheet when there is one`. New
+`async function shareProgress()` sits behind `#shareBtn`: it builds the text once with
+`shareSummary()`, returns early on an empty summary, guards the global the way `copyText()` does
+(`typeof navigator === 'undefined' ? null : navigator`, since optional chaining still throws
+`ReferenceError` on an undeclared identifier in the harnesses), and `await`s `navigator.share({text})`
+inside a `try` when it exists. **A dismissed sheet does nothing at all**: `AbortError` returns
+without touching the clipboard, without a toast and without a second prompt, because closing the
+sheet is a completed action rather than a failure. Only a missing API or a non-abort rejection
+reaches the `copyText()` fallback. `shareSummary()` and `publicUrl()` are unchanged, so the shared
+text still excludes the `sheet` param and every other person's data, and the single
+`navigator.clipboard.writeText` call site stays inside `copyText()` — entry 22's architectural guard
+still reads 1. index.html 141,564 → 141,849 bytes (+285; 88.1% of the 161,000-byte budget, inside
+the ~1,000 this entry was projected to cost). Tests: a new `test(...)` covers all four contexts from
+one factory — `navigator.share` resolving (the sheet is used, nothing reaches the clipboard, and the
+payload carries the name but not `sheet=`), `navigator.share` absent (the fallback copies and
+toasts), rejecting with an `AbortError` (the sheet opened, nothing was copied, `#toast` stayed
+empty), and rejecting otherwise (the fallback runs). `static-check.mjs` gains
+`function shareProgress\(` and the clipboard count guard still passes. Deviations: (1)
+`shareProgress()` returns early when `shareSummary()` yields `''` — a blank or unknown profile —
+rather than opening an empty share sheet or copying an empty string. (2) The `#shareBtn` listener is
+now `shareProgress` directly rather than an arrow wrapper, since the handler takes no arguments.
+(3) Rule 10 archiving: entry 38 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
+37 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
+one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 37 was
+confirmed intact and unsplit.
+
+### Why
+Entry 22 built `shareSummary()`, routed `#shareBtn` through `copyText()`, and deferred the native path in as many words: "`navigator.share` — a permission-gated async path that still needs the clipboard fallback and is not observable in the stub harness, so propose it separately." On a phone, which is what this app is built for, copying to the clipboard means opening another app and pasting; the system share sheet is one tap to any destination.
+
+### Requirements
+- `src/app.js` — new `async function shareProgress()` behind `#shareBtn`: when `navigator.share` exists, `await` it with the `shareSummary()` text inside a `try`; when it is missing, or on a genuine rejection, fall back to `copyText(shareSummary(…), 'Progress copied — paste it anywhere.')`. It never throws.
+- Guard the global the way `copyText()` does (`typeof navigator === 'undefined' ? null : navigator`); optional chaining throws `ReferenceError` on an undeclared identifier in the harnesses (entry 22, deviation 1).
+- A **dismissed** share sheet is a completed action, not a failure: `navigator.share` rejects with an `AbortError` when the user closes it, and that path must do nothing at all — no clipboard fallback, no error toast, no second prompt. Only a missing API or a non-abort rejection reaches the fallback.
+- `shareSummary()` and `publicUrl()` are unchanged, so the shared text still excludes the `sheet` param and every other person's data.
+- The single `navigator.clipboard.writeText` call site stays inside `copyText()` (entry 22's architectural guard).
+
+### Tests
+- `tests/client-state.test.js` — a **new** async `test(...)` covering four contexts: `navigator.share` resolving (nothing reaches the clipboard), `navigator.share` absent (the fallback copies and toasts), `navigator.share` rejecting with an `AbortError` (nothing happens at all), and `navigator.share` rejecting otherwise (the fallback runs). Assert on the recorded clipboard writes and `#toast`'s `textContent`.
+- `tests/static-check.mjs` — **add** `assert.match(script,/function shareProgress\(/)`, keeping `assert.equal((script.match(/navigator\.clipboard\.writeText/g)||[]).length,1)` passing.
+
+### Do not
+Share a file, URL list or any payload beyond the summary text; include the `sheet` param, the endpoint or another person's data; treat a dismissed share sheet as a failure or follow it with a second prompt; add a second clipboard write; make `shareProgress()` throw.
+
+---
+
 ## v11 pass — shipped without a log entry (backfill B1–B5)
 
 Five feature commits reached the live site without a queue entry. They are recorded here as stubs so

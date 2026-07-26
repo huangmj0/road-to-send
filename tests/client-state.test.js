@@ -311,6 +311,23 @@ const checks = `(()=>{
   assert.ok(capWeeks.indexOf('this week 5 points')>=0,'and where the current week stands');
   assert.ok(trendCaption([{week:'2026-W27',label:'W1',points:1}]).indexOf('1 point ')>=0,'a single point is singular here too');
 
+  // Entry 41: dailyBounties() hashes the date, so every future day's picks are already computable.
+  // Someone planning a Thursday session can now see what Thursday offers.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  const week=upcomingBounties('2026-07-10');
+  assert.equal(week.length,7,'a mid-challenge day previews the next seven days');
+  assert.equal(week[0].date,'2026-07-11','starting with tomorrow, not today');
+  assert.equal(week[6].date,'2026-07-17','through the seventh day out');
+  assert.ok(week.every(d=>d.bounties.length===CATEGORIES.length),'each day offers one bounty per category');
+  assert.equal(week[0].label,fmtDay('2026-07-11'),'each day is labelled the way the rest of the app labels dates');
+  assert.equal(week[0].bounties.map(b=>b.id).join(','),dailyBounties('2026-07-11').map(b=>b.id).join(','),'the picks are exactly what that day will actually offer');
+  assert.equal(upcomingBounties('2026-07-10')[3].bounties.map(b=>b.id).join(','),week[3].bounties.map(b=>b.id).join(','),'and the same date always yields the same picks');
+  // The walk stops at the trip date rather than running past the end of the challenge.
+  assert.equal(upcomingBounties('2026-07-28').length,3,'a day near the end previews only the days that remain');
+  assert.equal(upcomingBounties('2026-07-31').length,0,'and the last day previews nothing');
+  assert.equal(upcomingBounties('2026-08-04').length,0,'nor does a day past the end');
+  assert.equal(upcomingBounties('').length,0,'an unparseable day previews nothing');
+
   // Rotating bounties are deterministic and offer one per category.
   const today=dailyBounties('2026-07-16');
   assert.equal(today.length,3);
@@ -936,6 +953,27 @@ const domChecks = `(()=>{
   assert.equal(bountyRadio.checked,true,'claiming a bounty selects the Bounty activity type');
   assert.equal(claimSelect.value,claimId,'claiming a bounty preselects it in the Record dropdown');
   assert.equal(claimDateBox.classList.contains('hide'),true,'claiming a bounty snaps to today and closes the date picker');
+
+  // Entry 41: the preview is closed by default and renders nothing until it is opened.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(20),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  render();
+  const weekBox=document.querySelector('#bountyWeek'),weekToggle=document.querySelector('#bountyWeekToggle');
+  // setAttribute is a no-op in this stub, so the open state is asserted where it actually lives.
+  assert.equal(bountyWeekOpen,false,'the preview starts closed');
+  assert.equal(weekBox.innerHTML,'','and renders nothing at all until it is opened');
+  assert.equal(weekBox.classList.contains('hide'),true,'the container stays hidden');
+  toggleBountyWeek();
+  assert.equal(bountyWeekOpen,true,'tapping the toggle opens it');
+  assert.equal(weekBox.classList.contains('hide'),false,'and reveals the container');
+  assert.ok(weekBox.innerHTML.indexOf('bounty-day')>=0,'which now lists the coming days');
+  assert.equal(weekBox.innerHTML.indexOf('data-claim-bounty'),-1,'future days are plain rows, never claim buttons');
+  render();
+  assert.ok(weekBox.innerHTML.indexOf('bounty-day')>=0,'a repaint keeps an open preview open');
+  toggleBountyWeek();
+  assert.equal(bountyWeekOpen,false,'tapping again closes it');
+  assert.equal(weekBox.innerHTML,'','and it renders nothing again');
 
   // Entry 34: a note written on a bounty claim round-trips to the Sheet and back, and until now was
   // rendered to nobody — the bounty branch showed the title and stopped.

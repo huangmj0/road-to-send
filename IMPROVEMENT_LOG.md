@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 40 — Share through the system share sheet — Done — 2026-07-26
-- 41 — Preview the week's bounties — Todo
+- 41 — Preview the week's bounties — Done — 2026-07-26
 
 Entries 1–14 shipped and now live in `IMPROVEMENTS.md` under "v11 pass — frontend enhancement queue (entries 1–14)", together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. Entry numbers never restart.
 
@@ -41,57 +40,43 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 40. Share through the system share sheet
-
-Status: Done — 2026-07-26
-Notes: Commit `Share progress through the system share sheet when there is one`. New
-`async function shareProgress()` sits behind `#shareBtn`: it builds the text once with
-`shareSummary()`, returns early on an empty summary, guards the global the way `copyText()` does
-(`typeof navigator === 'undefined' ? null : navigator`, since optional chaining still throws
-`ReferenceError` on an undeclared identifier in the harnesses), and `await`s `navigator.share({text})`
-inside a `try` when it exists. **A dismissed sheet does nothing at all**: `AbortError` returns
-without touching the clipboard, without a toast and without a second prompt, because closing the
-sheet is a completed action rather than a failure. Only a missing API or a non-abort rejection
-reaches the `copyText()` fallback. `shareSummary()` and `publicUrl()` are unchanged, so the shared
-text still excludes the `sheet` param and every other person's data, and the single
-`navigator.clipboard.writeText` call site stays inside `copyText()` — entry 22's architectural guard
-still reads 1. index.html 141,564 → 141,849 bytes (+285; 88.1% of the 161,000-byte budget, inside
-the ~1,000 this entry was projected to cost). Tests: a new `test(...)` covers all four contexts from
-one factory — `navigator.share` resolving (the sheet is used, nothing reaches the clipboard, and the
-payload carries the name but not `sheet=`), `navigator.share` absent (the fallback copies and
-toasts), rejecting with an `AbortError` (the sheet opened, nothing was copied, `#toast` stayed
-empty), and rejecting otherwise (the fallback runs). `static-check.mjs` gains
-`function shareProgress\(` and the clipboard count guard still passes. Deviations: (1)
-`shareProgress()` returns early when `shareSummary()` yields `''` — a blank or unknown profile —
-rather than opening an empty share sheet or copying an empty string. (2) The `#shareBtn` listener is
-now `shareProgress` directly rather than an arrow wrapper, since the handler takes no arguments.
-(3) Rule 10 archiving: entry 38 was moved verbatim into `IMPROVEMENTS.md` after the archived entry
-37 and its index line dropped; the lifted block was string-matched back out of the archive (exactly
-one occurrence, gone from the log, heading confirmed at the start of its own line) and entry 37 was
-confirmed intact and unsplit.
-
-### Why
-Entry 22 built `shareSummary()`, routed `#shareBtn` through `copyText()`, and deferred the native path in as many words: "`navigator.share` — a permission-gated async path that still needs the clipboard fallback and is not observable in the stub harness, so propose it separately." On a phone, which is what this app is built for, copying to the clipboard means opening another app and pasting; the system share sheet is one tap to any destination.
-
-### Requirements
-- `src/app.js` — new `async function shareProgress()` behind `#shareBtn`: when `navigator.share` exists, `await` it with the `shareSummary()` text inside a `try`; when it is missing, or on a genuine rejection, fall back to `copyText(shareSummary(…), 'Progress copied — paste it anywhere.')`. It never throws.
-- Guard the global the way `copyText()` does (`typeof navigator === 'undefined' ? null : navigator`); optional chaining throws `ReferenceError` on an undeclared identifier in the harnesses (entry 22, deviation 1).
-- A **dismissed** share sheet is a completed action, not a failure: `navigator.share` rejects with an `AbortError` when the user closes it, and that path must do nothing at all — no clipboard fallback, no error toast, no second prompt. Only a missing API or a non-abort rejection reaches the fallback.
-- `shareSummary()` and `publicUrl()` are unchanged, so the shared text still excludes the `sheet` param and every other person's data.
-- The single `navigator.clipboard.writeText` call site stays inside `copyText()` (entry 22's architectural guard).
-
-### Tests
-- `tests/client-state.test.js` — a **new** async `test(...)` covering four contexts: `navigator.share` resolving (nothing reaches the clipboard), `navigator.share` absent (the fallback copies and toasts), `navigator.share` rejecting with an `AbortError` (nothing happens at all), and `navigator.share` rejecting otherwise (the fallback runs). Assert on the recorded clipboard writes and `#toast`'s `textContent`.
-- `tests/static-check.mjs` — **add** `assert.match(script,/function shareProgress\(/)`, keeping `assert.equal((script.match(/navigator\.clipboard\.writeText/g)||[]).length,1)` passing.
-
-### Do not
-Share a file, URL list or any payload beyond the summary text; include the `sheet` param, the endpoint or another person's data; treat a dismissed share sheet as a failure or follow it with a second prompt; add a second clipboard write; make `shareProgress()` throw.
-
----
-
 ## 41. Preview the week's bounties
 
-Status: Todo
+Status: Done — 2026-07-26
+Notes: Commit `Preview the bounties the rest of the week will offer`. Pure helper
+`upcomingBounties(today,days=7)` walks forward from `today` with `parseDateOnly()`/`localDate()`,
+returning `{date,label,bounties}` per day from `dailyBounties()` and `fmtDay()`; it starts at
+**tomorrow**, stops at `config.tripDate`, and returns `[]` for an unparseable day. No `new Date()`
+for challenge dates (rule 6) — the only `new Date(start)` is a copy of an already-parsed date used
+to step the walk. `#bountyWeekToggle` (a `type="button"` carrying `aria-expanded`, `aria-controls`)
+and the `#bountyWeek` container sit under `#todayBounties` and `#bountyCapHint`, above
+`#personalActivity`, so the existing `data-panel="you"` → `id="todayBounties"` →
+`id="personalActivity"` chain is intact. It is **closed by default and renders nothing until
+opened**: `renderBountyWeek()` empties the container whenever it is closed. Each future day shows
+`fmtDay()`'s label and its three bounties as plain rows — no claim buttons, since claiming stays
+same-day through entry 14's `claimBounty()`, which the backend enforces regardless. `src/styles.css`
+gains one appended line reusing the existing bounty visual language, with `min-height:44px` on the
+toggle (rule 7) and no animation at all, so there is nothing for the `prefers-reduced-motion`
+kill-switch to suppress. No modal, so `static-check.mjs`'s dialog-naming array is untouched.
+index.html 141,849 → 144,001 bytes (+2,152; 89.4% of the 161,000-byte budget, close to the ~2,500
+this entry was projected to cost). Tests: harness-1 covers the helper — seven days from a
+mid-challenge date starting at tomorrow, one bounty per category per day, labels matching `fmtDay()`,
+picks identical to `dailyBounties()` for that date, the same date always yielding the same picks,
+three days left near the trip date, nothing on the last day or past it, and nothing for a blank
+date. Harness-2 asserts the container is empty and hidden until the toggle runs, that opening lists
+the days without a single `data-claim-bounty`, that a repaint keeps an open preview open, and that
+closing empties it again. `static-check.mjs` gains presence assertions for both ids, `aria-expanded`
+on the toggle, an order assertion, and `function upcomingBounties\(`. Deviations: (1) The open/closed
+state is a module-level `bountyWeekOpen` rather than being read back out of the toggle's
+`aria-expanded` attribute. The first draft read the DOM, which is both fragile and untestable —
+`setAttribute` is a no-op and `getAttribute` always returns `null` in the stub harness — so the flag
+is the source of truth and `renderBountyWeek()` writes `aria-expanded` from it. (2)
+`renderBountyWeek()` is called from the top of `renderBounties()`, so an open preview stays fresh
+across repaints and a day rollover; it renders nothing while closed, so this costs nothing in the
+common case (rule 6). (3) Rule 10 archiving: entry 40 was moved verbatim into `IMPROVEMENTS.md`
+after the archived entry 38 and its index line dropped; the lifted block was string-matched back out
+of the archive (exactly one occurrence, gone from the log, heading confirmed at the start of its own
+line) and entry 38 was confirmed intact and unsplit.
 
 ### Why
 `dailyBounties(date)` picks three bounties per day by hashing the date across the catalog, so the rotation is deterministic and every future day's picks are already computable on the client. The app only ever renders today's three. Someone planning a gym session on Thursday cannot see what Thursday offers, even though the answer is a pure function call away — and browsing the whole catalog would be worse, since most of it is unclaimable on any given day.
