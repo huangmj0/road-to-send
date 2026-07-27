@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync} from 'node:fs';
+import {readFileSync,existsSync,readdirSync} from 'node:fs';
 import {buildHtml} from '../scripts/build.mjs';
 import {parseEntries,queueIndex} from '../scripts/log-model.mjs';
 
@@ -32,9 +32,25 @@ const keys=[...new Set(app.match(/roadToSend[A-Za-z0-9_]*/g)||[])].sort();
 assert.ok(keys.length>=5,'src/app.js reads the roadToSend localStorage keys');
 for(const key of keys)assert.ok(rule4.includes(key),`${key} is used in src/app.js but missing from rule 4's frozen-key list`);
 
-// The archive holds the shipped queue, verbatim.
-assert.match(improvements,/^## v11 pass — frontend enhancement queue \(entries 1–14\)$/m,'IMPROVEMENTS.md carries the v11 archive heading');
-assert.match(improvements,/^## 1\. Per-category breakdown card \(You tab\)$/m,'IMPROVEMENTS.md carries the archived entry 1');
+// The archive holds the shipped queue, verbatim, split across docs/archive/ so that looking one
+// entry up is a bounded read. IMPROVEMENTS.md is the index over those files and holds no entries
+// itself — a single file that grows by an entry per iteration is the thing this replaced.
+// Raising ARCHIVE_CAP is the wrong fix when a pass file fills up: start the next pass file. A cap
+// that only ratchets upward stops being a guard (the same rule tests/size-check.mjs states).
+const ARCHIVE_CAP=90000;
+const archiveDir=at('docs/archive/');
+const archives=readdirSync(archiveDir).filter(name=>name.endsWith('.md')).sort();
+assert.ok(archives.length,'the shipped entries live in docs/archive/');
+for(const name of archives){
+  assert.ok(improvements.includes(`docs/archive/${name}`),`docs/archive/${name} has a section in the IMPROVEMENTS.md index`);
+  const bytes=readFileSync(new URL(name,archiveDir)).length;
+  assert.ok(bytes<=ARCHIVE_CAP,`docs/archive/${name} is ${bytes} bytes, over the ${ARCHIVE_CAP}-byte cap: start the next pass file and point the index at it — do not raise the cap`);
+}
+assert.ok(!/^## \d+\. /m.test(improvements),'IMPROVEMENTS.md is the index over docs/archive/, not a place entries are pasted back into');
+
+// Spot-check that the split moved the entries rather than dropping them.
+assert.match(readFileSync(at('docs/archive/entries-1-14.md'),'utf8'),/^## 1\. Per-category breakdown card \(You tab\)$/m,'docs/archive/entries-1-14.md carries the archived entry 1');
+assert.match(readFileSync(at('docs/archive/entries-25-40.md'),'utf8'),/^## 40\. Share through the system share sheet$/m,'docs/archive/entries-25-40.md carries the archived entry 40');
 
 // CLAUDE.md orients agent sessions and points at the queue rather than restating it.
 assert.ok(existsSync(at('CLAUDE.md')),'a repo-root CLAUDE.md orients agent sessions');

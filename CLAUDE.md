@@ -14,7 +14,9 @@ shared Google Sheet and from their browsers' localStorage. `index.html` is the d
   anyone else's `In progress`. If nothing is `Todo`, stop and report "queue empty — no Todo entries".
 - One entry = one commit. Set `Status: In progress — <date>` first, and `Status: Done — <date>` plus
   the commit subject and any deviations in `Notes:` in the same commit as the implementation.
-- `IMPROVEMENTS.md` is the shipped archive, not a queue — never work from it.
+- Shipped entries live under `docs/archive/`, split by pass and indexed by `IMPROVEMENTS.md`. That
+  is the archive, not a queue — never work from it, and when you do need to look something up, read
+  the one pass file that holds it.
 
 ## Working rules
 
