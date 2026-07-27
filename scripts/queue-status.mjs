@@ -75,6 +75,37 @@ if (previous) {
   }
 }
 
+// The check above reads the log in the working tree, so it only sees an in-flight entry while the
+// tree is still on that entry's branch. A loop running for hours does not get to assume that — a
+// container restart, a resumed session or a subagent worktree all put the tree back on main, where
+// the in-flight entry still reads Todo and would be worked a second time.
+//
+// So ask the remote as well: any branch not yet merged into origin/main whose log marks an entry
+// Done that main still shows as Todo is an entry someone is already holding. This is content-based
+// like the check above, so it depends on no branch-naming convention.
+if (!unmerged) {
+  const held = heldOnRemote(new Set(todo.map(entry => entry.n)));
+  if (held) unmerged = `entry ${held.n} ("${held.title}") is already Done on ${held.ref}, which is not merged into origin/main`;
+}
+
+function heldOnRemote(todoNumbers) {
+  if (!todoNumbers.size) return null;
+  const refs = git('for-each-ref', '--format=%(refname)', 'refs/remotes/origin');
+  if (refs.status !== 0) return null;
+  for (const ref of refs.stdout.split('\n').map(line => line.trim()).filter(Boolean)) {
+    if (ref === 'refs/remotes/origin/HEAD' || ref === 'refs/remotes/origin/main') continue;
+    // Already merged: whatever it holds is on main, so it is nobody's in-flight work.
+    if (git('merge-base', '--is-ancestor', ref, 'origin/main').status === 0) continue;
+    // A branch with no log, or one that predates the file, is simply not an entry branch.
+    const log = git('show', `${ref}:IMPROVEMENT_LOG.md`);
+    if (log.status !== 0) continue;
+    for (const entry of parseEntries(log.stdout)) {
+      if (entry.state === 'Done' && todoNumbers.has(entry.n)) return {n: entry.n, title: entry.title, ref: ref.replace('refs/remotes/', '')};
+    }
+  }
+  return null;
+}
+
 if (unmerged) {
   console.log(`head:  ${unmerged}`);
   console.log('\nSTOP — wait for the previous entry to merge. Do not start a second entry on top of it.');

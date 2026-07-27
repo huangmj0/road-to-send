@@ -10,12 +10,35 @@ second thing to drift, which is the same reason `CLAUDE.md` refuses to restate t
 
 ## Usage
 
-Run `/entry` in a looping agent — for example `/loop` with dynamic pacing, or `/loop 45m`. Each
-invocation does exactly one entry and stops.
+Run `/loop /drain` with dynamic pacing. `/drain` is one loop tick: it checks the queue, hands the
+actual work to a subagent, and picks the next wake-up. To work a single entry by hand instead, run
+`/entry` directly — it does exactly one entry and stops.
 
-Prefer dynamic pacing or a long interval. Every iteration is a real feature commit, so a short
-interval mostly wakes into "the previous pull request is still open". That is harmless — the first
-thing `/entry` does is check — but it is wasted work.
+Prefer dynamic pacing or a long interval. Every iteration is a real feature commit awaiting review,
+so a short interval mostly wakes into "the previous pull request is still open". That is harmless —
+the first thing either command does is check — but it is wasted work.
+
+## Why the loop delegates
+
+`/loop` fires into the **same session**, so everything an iteration reads stays in context for
+every iteration after it. Worked inline, one entry costs tens of thousands of tokens — `src/app.js`
+alone is 78 KB — and a handful of them exhaust the window. That is the same rot the split test
+suites and the split archive were meant to stop, arriving by a different route.
+
+So `/drain` reads almost nothing. It runs `npm run queue`, branches on the exit code, and delegates
+the entry itself to a subagent that starts cold and dies when it finishes, reporting back six
+fixed lines: entry, PR, CI, bytes, deviations, status. Those six lines are all the orchestrator
+keeps, which is what lets one session run many iterations.
+
+`/drain` delegates by naming the `entry` and `refill` skills rather than restating them, so the
+loop body still lives in exactly one place. `tests/docs-check.mjs` asserts it names both.
+
+## When the queue runs dry
+
+On exit 3, `/drain` runs `/refill` in a subagent — but only after checking that no queue proposal
+is already open, since a refill PR has to be merged by a human before any entry can run and two
+open proposals cannot both land. It tells you the PR is waiting, then idles on a long interval and
+resumes on its own once you merge. It never proposes a second queue.
 
 ## What the loop branches on
 
