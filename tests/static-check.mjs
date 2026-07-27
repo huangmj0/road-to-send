@@ -1,3 +1,13 @@
+// Presence, source order and accessibility assertions against the built index.html. This is
+// where aria-* coverage belongs — the element stub in tests/harness.js cannot see an attribute
+// set from JS, so the client-state suites cannot assert it.
+//
+// TRAP — ADD assertions here; never relax, retarget or delete one:
+//   * Several assertions pin DOM *source order*, so moving an element in
+//     src/index.template.html breaks a check that names neither element helpfully.
+//   * Several match exact compact CSS text — `.trend-scroll{overflow-x:auto}`,
+//     `@media(prefers-color-scheme:dark)` with no space. Reformatting src/styles.css breaks
+//     them, again with an unhelpful message.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
