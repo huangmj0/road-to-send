@@ -64,6 +64,15 @@ assert.match(readFileSync(entryCommand,'utf8'),/npm run queue/,'.claude/commands
 const refillCommand=at('.claude/commands/refill.md');
 assert.ok(existsSync(refillCommand),'refuelling the queue lives in .claude/commands/refill.md, separate from the run that implements entries');
 assert.match(readFileSync(refillCommand,'utf8'),/IMPROVEMENT_LOG\.md.*nothing else/,'.claude/commands/refill.md keeps a refill PR to IMPROVEMENT_LOG.md alone, so proposing work and shipping it stay separate runs');
+// The loop orchestrator delegates to the two commands by name rather than restating them, which is
+// the only reason the loop body still lives in one place. If it stopped naming them it would have
+// started carrying its own copy.
+const drainCommand=at('.claude/commands/drain.md');
+assert.ok(existsSync(drainCommand),'the loop tick lives in .claude/commands/drain.md');
+const drain=readFileSync(drainCommand,'utf8');
+for(const skill of ['entry','refill'])assert.match(drain,new RegExp('`'+skill+'` skill'),`.claude/commands/drain.md delegates to the ${skill} skill by name instead of restating it`);
+assert.match(drain,/npm run queue/,'.claude/commands/drain.md branches on npm run queue');
+
 const loopDoc=readFileSync(at('docs/loop-prompt.md'),'utf8');
 assert.ok(!loopDoc.includes('```'),'docs/loop-prompt.md points at .claude/commands/entry.md instead of carrying a second copy of the prompt in a fenced block');
 assert.match(loopDoc,/\.claude\/commands\/entry\.md/,'docs/loop-prompt.md names where the prompt actually lives');
