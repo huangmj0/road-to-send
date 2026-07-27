@@ -801,6 +801,31 @@ const checks = `(()=>{
   assert.equal(nasty.indexOf('<img src=x>'),-1,'a note is escaped, never injected as markup');
   assert.ok(nasty.indexOf('&lt;img src=x&gt;')>=0,'the escaped note is still readable');
 
+  // Entry 43: filterByType() is the whole of the You feed's category filter. It narrows and
+  // nothing else — ordering and limiting stay activityMarkup()'s job, so a filter that quietly
+  // sorted would double up on work already done and change what the feed shows.
+  const feedItems=[{id:'a',type:'climb',date:'2026-01-01'},{id:'b',type:'exercise',date:'2026-01-05'},{id:'c',type:'mobility',date:'2026-01-02'},{id:'d',type:'climb',date:'2026-01-04'},{id:'e',type:'bounty',date:'2026-01-03'}];
+  const idsOf=list=>list.map(x=>x.id).join(',');
+  assert.equal(idsOf(filterByType(feedItems,'all')),'a,b,c,d,e','the All filter returns every item');
+  assert.equal(idsOf(filterByType(feedItems,'')),'a,b,c,d,e','an empty type returns every item');
+  assert.equal(idsOf(filterByType(feedItems)),'a,b,c,d,e','a missing type returns every item');
+  assert.equal(idsOf(filterByType(feedItems,'climb')),'a,d','a category returns only its own items');
+  assert.equal(idsOf(filterByType(feedItems,'exercise')),'b','each category narrows to itself');
+  assert.equal(idsOf(filterByType(feedItems,'mobility')),'c','including mobility');
+  assert.equal(idsOf(filterByType(feedItems,'bounty')),'e','and a bounty row is reachable by its own type');
+  assert.equal(filterByType([{id:'a',type:'climb'}],'mobility').length,0,'a type nobody logged returns an empty list');
+  assert.equal(filterByType([],'climb').length,0,'and an empty feed stays empty');
+  // The unfiltered items arrive newest-last here on purpose: if filterByType() sorted, the ids
+  // below would come back reordered rather than in the order they were handed over.
+  assert.equal(idsOf(filterByType(feedItems,'all')),idsOf(feedItems),'the All filter never reorders what it is given');
+  assert.equal(idsOf(filterByType([feedItems[3],feedItems[0]],'climb')),'d,a','and a narrowed list keeps its incoming order');
+  // The chip faces come from the shared scoring config, never from a hard-coded label list.
+  const chips=feedChips();
+  assert.equal(chips.length,CATEGORIES.length+1,'there is one chip per category plus All');
+  assert.equal(chips[0].type,'all','All leads the row');
+  assert.equal(idsOf(chips.slice(1).map(c=>({id:c.type}))),CATEGORIES.join(','),'the rest are the configured categories, in config order');
+  assert.ok(chips.slice(1).every(c=>c.label===CAT_LABELS[c.type]&&c.icon===TYPE_ICONS[c.type]),'each chip face is read from the scoring config');
+
   endpoint='';
   logs=[];
 })()`;
