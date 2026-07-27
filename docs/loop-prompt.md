@@ -1,93 +1,67 @@
-# Loop prompt: executing the improvement log
+# Running the improvement loop
 
-`IMPROVEMENT_LOG.md` is a queue. This file is the prompt that drains it — one entry per
-invocation, one entry per commit, one entry per pull request.
+`IMPROVEMENT_LOG.md` is a queue. A loop drains it — one entry per invocation, one entry per commit,
+one entry per pull request.
+
+**The prompt itself lives in `.claude/commands/entry.md`**, not here. This file is the operator's
+guide to running it. Keeping the prompt in exactly one place is deliberate: a second copy is a
+second thing to drift, which is the same reason `CLAUDE.md` refuses to restate the rules block.
+`tests/docs-check.mjs` asserts this file carries no fenced block, so the copy cannot creep back.
 
 ## Usage
 
-Paste the prompt below into a looping agent (for example `/loop` with dynamic pacing, or
-`/loop 45m`). Each invocation does exactly one entry and stops.
+Run `/entry` in a looping agent — for example `/loop` with dynamic pacing, or `/loop 45m`. Each
+invocation does exactly one entry and stops.
 
-Pick a long interval or dynamic pacing rather than a short one. Every iteration is a real
-feature commit, so a short interval mostly wakes into "the previous pull request is still
-open" — which is harmless, because the prompt's first check stops and reports the blocker,
-but it is wasted work.
+Prefer dynamic pacing or a long interval. Every iteration is a real feature commit, so a short
+interval mostly wakes into "the previous pull request is still open". That is harmless — the first
+thing `/entry` does is check — but it is wasted work.
 
-**Review the first two iterations by hand.** Entry 15 rewrites the log the loop reads from,
-and entry 16 rewrites the test runner the loop depends on. If either lands wrong, every later
-iteration inherits it.
+## What the loop branches on
 
-## Why iterations serialize on merge
+`npm run queue` is the whole control surface. It refreshes `origin/main`, reports the queue in a
+few lines, and exits with the code the loop acts on:
 
-Entries overlap in the files they touch: 17 and 18 both edit the today-card, and 19 and 20
-both extend the same dialog-accessibility array in `tests/static-check.mjs`. Two open branches
-would conflict, so the prompt refuses to start an entry while a previous one is unmerged.
+- `0` — a `Todo` entry is next, named on the `next:` line. Work it.
+- `3` — queue empty. Run `/refill` to propose new entries, or stop.
+- `4` — the previous entry is not on `origin/main` yet. Stop and wait for the merge; a long wakeup.
+- `5` — an entry is stuck `In progress` from a run that died. Needs a human.
 
-## The prompt
+Run it by hand any time you want to know where things stand. `--no-fetch` reports against the local
+ref; passing a path reads that file instead of the live queue, which is how the exit codes are
+exercised in testing.
 
-```
-Work exactly ONE entry from IMPROVEMENT_LOG.md in huangmj0/road-to-send, then stop.
+### Why exit 4 exists
 
-## Before you start
+Entries overlap in the files they touch — 17 and 18 both edited the today-card, 19 and 20 both
+extended the same dialog-accessibility array in `tests/static-check.mjs` — so two open branches
+conflict. An earlier version of this guard looked for an open PR from a branch named
+`claude/entry-<N>-<slug>`. No branch in this repository's history has ever used that prefix, so it
+matched nothing, and the loop was free to stack entries on unmerged work — which it did. Exit 4
+instead asks git whether the previous entry's recorded commit subject is on `origin/main`. That
+depends on no naming convention, so it cannot drift the same way.
 
-1. `git fetch origin main` and start from the latest `origin/main`. Never branch from a
-   stale local `main` — it has been 37 commits behind before.
-2. Check for an open PR from a previous iteration (branch prefix `claude/entry-`). If one
-   exists and is not merged, STOP and report which PR is blocking. Do not stack a second
-   entry on top of unmerged work: entries 17 and 18 both edit the today-card, and 19 and 20
-   both extend the same dialog-a11y array in tests/static-check.mjs, so parallel branches
-   will conflict.
-3. Read the rules block at the top of IMPROVEMENT_LOG.md in full before touching anything.
+This is why rule 10's `Notes:` format is load-bearing: the entry records ``Commit `<subject>`.``
+and the next iteration reads it back.
 
-## Pick the entry
+## Refuelling
 
-Take the FIRST entry, top to bottom, whose `Status:` is `Todo`. Skip `Done`, `Blocked`, and
-any `In progress`. Do not cherry-pick, reorder, or batch entries — the sequence is
-load-bearing (16 adds the byte budget the feature entries are measured against; 18 consumes
-a helper 17 introduces; 20 places a modal after the one 19 adds).
+When the queue drains, `/refill` proposes new entries in a pull request that touches **only**
+`IMPROVEMENT_LOG.md`. It never implements what it proposes — a human reads the queue and merges it,
+and the next `/entry` picks it up. Keeping those two runs apart is the gate on what gets built into
+an app real people use.
 
-If no entry is `Todo`: STOP and report "queue empty — no Todo entries". Do not invent work,
-re-do a `Done` entry, or reopen anything.
+## Review the first iterations by hand
 
-## Implement it
+Read the diff on the first two pull requests a fresh queue produces before letting the loop run
+unattended. An entry that reshapes the log, the test runner, or the rules is inherited by every
+later iteration, so a bad one compounds.
 
-- Set `Status: In progress — <today>` as your first action.
-- Do exactly what that entry's `### Requirements` says, and nothing its `### Do not` forbids.
-- An entry may carve itself out of rules 2 and 8 in its own `### Requirements`. Honour that
-  carve-out — do NOT go `Blocked` on rules 2/8 for an entry that grants itself one. Absent an
-  explicit carve-out they are hard limits: src/app.js, src/index.template.html, src/styles.css
-  and tests only.
-- Reuse the existing helpers the entry names. Never fork scoring math, never call `new Date()`
-  for challenge dates (use `challengeToday()`), never add a localStorage key, a dependency,
-  or a network request.
-- If the entry genuinely cannot be done inside its own rules, set `Status: Blocked — <reason>`,
-  commit that, and stop. Do not bend the rules to finish.
+## Where guidance lives
 
-## Two traps that have bitten before
+Guidance sits with the thing it governs, so an iteration reads only what its work touches:
 
-- tests/static-check.mjs asserts DOM *source order* and exact compact CSS text
-  (`.trend-scroll{overflow-x:auto}`, `@media(prefers-color-scheme:dark)` with no space).
-  ADD new assertions; never relax or retarget an existing one. Reformatting CSS breaks tests
-  with an unhelpful message.
-- In tests/client-state.test.js the element stub's `setAttribute` is a no-op and `getAttribute`
-  always returns `null`, so aria-* set from JS is NOT observable — assert textContent/innerHTML
-  there and cover aria-* in static-check.mjs. Element listeners are no-ops and elements have no
-  `closest`, so delegated handlers cannot be fired: expose every new interaction as a named
-  top-level function. New assertions live inside backtick template literals — no backticks and
-  no `${` in added test code; build strings with `+`.
-
-## Verify
-
-Run `npm run build` then `npm test`. All suites must pass; never weaken an assertion. The
-runner reports every suite before exiting, so read the PASS/FAIL summary, not just the first
-failure. `check:generated` is read-only: if it fails, run `npm run build` and commit
-index.html together with your src/ changes.
-
-## Ship
-
-- Set `Status: Done — <today>` and put the commit subject plus any deviations in `Notes:`,
-  in the SAME commit as the implementation.
-- One entry = one commit. Branch `claude/entry-<N>-<slug>`, push with `-u origin`, open a
-  DRAFT PR describing the entry, its tests, and anything you deviated on.
-- Report the entry number, the PR URL, and CI status. Then stop — do not start the next entry.
-```
+- **The rules** — the numbered block at the top of `IMPROVEMENT_LOG.md`. Read in full, every entry.
+- **Repository conventions** — `AGENTS.md`.
+- **Harness traps** — a header comment in the test file they apply to, read only when editing it.
+- **The loop body** — `.claude/commands/entry.md`.

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {buildHtml} from '../scripts/build.mjs';
+import {parseEntries,queueIndex} from '../scripts/log-model.mjs';
 
 const at=name=>new URL('../'+name,import.meta.url);
 const log=readFileSync(at('IMPROVEMENT_LOG.md'),'utf8');
@@ -9,23 +10,18 @@ const app=readFileSync(at('src/app.js'),'utf8');
 const lines=log.split('\n');
 
 // Every "## N." entry carries a Status: line in one of the four documented states.
-const STATUS=/^Status: (Todo|In progress — \d{4}-\d{2}-\d{2}|Done — \d{4}-\d{2}-\d{2}|Blocked — \S.*)$/;
-const entries=[];
-lines.forEach((line,i)=>{
-  const head=/^## (\d+)\. (.+)$/.exec(line);
-  if(!head)return;
-  const status=lines.slice(i+1,i+4).find(x=>x.trim());
-  assert.ok(status&&STATUS.test(status),`entry ${head[1]} has a Status: line reading Todo, In progress — date, Done — date, or Blocked — reason (saw ${JSON.stringify(status)})`);
-  entries.push({n:Number(head[1]),title:head[2],status});
-});
+// The parser is shared with scripts/queue-status.mjs so the loop reads the queue exactly
+// the way this check validates it; the assertion below still lives here.
+const entries=parseEntries(log);
+for(const entry of entries)assert.ok(entry.valid,`entry ${entry.n} has a Status: line reading Todo, In progress — date, Done — date, or Blocked — reason (saw ${JSON.stringify(entry.status)})`);
 assert.ok(entries.length,'IMPROVEMENT_LOG.md still lists numbered entries');
 
 // Shipped work belongs in IMPROVEMENTS.md, so the queue keeps at most the entry finished in this commit.
-const done=entries.filter(e=>e.status.startsWith('Status: Done'));
+const done=entries.filter(e=>e.state==='Done');
 assert.ok(done.length<=1,`shipped work belongs in IMPROVEMENTS.md: at most the entry completed in the current commit may be Done in IMPROVEMENT_LOG.md, but ${done.length} are (${done.map(e=>e.n).join(', ')}). Move the finished ones, heading through separator and verbatim, to the archive (rule 10)`);
 
 // The queue index at the top names every live entry.
-const index=log.slice(log.indexOf('## Queue index'),log.indexOf('## Rules for implementers'));
+const index=queueIndex(log);
 assert.ok(index,'IMPROVEMENT_LOG.md opens with a queue index');
 for(const entry of entries)assert.ok(index.includes(`- ${entry.n} — `),`entry ${entry.n} has a line in the queue index`);
 
@@ -43,6 +39,15 @@ assert.match(improvements,/^## 1\. Per-category breakdown card \(You tab\)$/m,'I
 // CLAUDE.md orients agent sessions and points at the queue rather than restating it.
 assert.ok(existsSync(at('CLAUDE.md')),'a repo-root CLAUDE.md orients agent sessions');
 assert.match(readFileSync(at('CLAUDE.md'),'utf8'),/IMPROVEMENT_LOG\.md/,'CLAUDE.md points at IMPROVEMENT_LOG.md');
+
+// The loop body lives in exactly one place. docs/loop-prompt.md is the operator guide and used to
+// carry a fenced copy of the prompt as well; two copies drift, so the fence may not come back.
+const entryCommand=at('.claude/commands/entry.md');
+assert.ok(existsSync(entryCommand),'the loop body lives in .claude/commands/entry.md');
+assert.match(readFileSync(entryCommand,'utf8'),/npm run queue/,'.claude/commands/entry.md orients on npm run queue before starting an entry');
+const loopDoc=readFileSync(at('docs/loop-prompt.md'),'utf8');
+assert.ok(!loopDoc.includes('```'),'docs/loop-prompt.md points at .claude/commands/entry.md instead of carrying a second copy of the prompt in a fenced block');
+assert.match(loopDoc,/\.claude\/commands\/entry\.md/,'docs/loop-prompt.md names where the prompt actually lives');
 
 // The live site is only published from a green tree, and only the app is published.
 const pages=readFileSync(at('.github/workflows/pages.yml'),'utf8');

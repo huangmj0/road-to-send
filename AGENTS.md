@@ -6,6 +6,7 @@ This is an intentionally self-contained static application. The editable sources
 
 ## Build, Test, and Development Commands
 
+- `npm run queue` reports the state of `IMPROVEMENT_LOG.md` — counts, the next `Todo` entry, any entry still awaiting archiving — and refreshes `origin/main` to check that the previously completed entry actually landed there. Its exit code is what a loop iteration branches on: `0` clear to start, `3` queue empty, `4` the previous entry is unmerged so a second entry must not be stacked on it, `5` an entry is stuck `In progress`. `--no-fetch` reports against the local ref; a path argument reads that file instead of the live queue.
 - `npm run build` regenerates `index.html` from `src/`. Run it after any `src/` change and commit the regenerated artifact alongside the source edits.
 - `npm test` runs `scripts/run-tests.mjs`, which runs every suite — the generated-artifact check plus the behavioral, backend-contract, static, documentation, and bundle-size checks — without short-circuiting, prints a `PASS`/`FAIL` line per suite, and exits non-zero if any failed. Run it before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml` runs it again in a `verify` job that gates the deploy job, which publishes only `index.html` to GitHub Pages on pushes to `main`.
 - `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to exercise browser behavior.

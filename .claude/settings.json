@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npm run queue)",
+      "Bash(npm run queue --silent)",
+      "Bash(npm run check:generated)",
+      "Bash(npm test)",
+      "Bash(node scripts/queue-status.mjs:*)",
+      "Bash(node tests/:*)",
+      "Bash(git fetch:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push -u origin:*)"
+    ]
+  }
+}
