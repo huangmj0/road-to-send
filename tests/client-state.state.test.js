@@ -778,6 +778,29 @@ const checks = `(()=>{
   assert.equal(shareSummary('',shareDay(0)),'','a blank name shares nothing');
   assert.equal(shareSummary('   ',shareDay(0)),'','a whitespace name shares nothing');
   assert.equal(shareSummary('Nobody',shareDay(0)),'','an unknown name shares nothing');
+
+  // Entry 42: activityMarkup() branches three ways on type. The bounty and fall-through branches
+  // appended x.note; the climb branch rendered the grade and dropped it, so a note written against
+  // a climb was stored, synced and exported but never shown back.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  const climbRow=(extra)=>{
+    const base={id:'c1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'};
+    for(const k in extra)base[k]=extra[k];
+    logs=[base];
+    return activityMarkup(logs,10,false);
+  };
+  const noted=climbRow({hardestGrade:'V4',note:'crimpy'});
+  assert.ok(noted.indexOf('crimpy')>=0,'a note written on a climb reaches the feed row');
+  assert.ok(noted.indexOf('V4 · crimpy')>=0,'the grade comes first and the note follows it');
+  const noteOnly=climbRow({note:'long session'});
+  assert.ok(noteOnly.indexOf(CAT_LABELS.climb+' · long session')>=0,'a climb with no grade still shows its note');
+  const bare=climbRow({hardestGrade:'V4'});
+  assert.ok(bare.indexOf('V4')>=0,'a climb with no note still shows its grade');
+  assert.equal(bare.indexOf('V4 · ·'),-1,'a climb with no note gains no stray separator');
+  const nasty=climbRow({hardestGrade:'V4',note:'<img src=x>'});
+  assert.equal(nasty.indexOf('<img src=x>'),-1,'a note is escaped, never injected as markup');
+  assert.ok(nasty.indexOf('&lt;img src=x&gt;')>=0,'the escaped note is still readable');
+
   endpoint='';
   logs=[];
 })()`;
