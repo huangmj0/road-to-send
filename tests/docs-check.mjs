@@ -61,6 +61,9 @@ assert.match(readFileSync(at('CLAUDE.md'),'utf8'),/IMPROVEMENT_LOG\.md/,'CLAUDE.
 const entryCommand=at('.claude/commands/entry.md');
 assert.ok(existsSync(entryCommand),'the loop body lives in .claude/commands/entry.md');
 assert.match(readFileSync(entryCommand,'utf8'),/npm run queue/,'.claude/commands/entry.md orients on npm run queue before starting an entry');
+const refillCommand=at('.claude/commands/refill.md');
+assert.ok(existsSync(refillCommand),'refuelling the queue lives in .claude/commands/refill.md, separate from the run that implements entries');
+assert.match(readFileSync(refillCommand,'utf8'),/IMPROVEMENT_LOG\.md.*nothing else/,'.claude/commands/refill.md keeps a refill PR to IMPROVEMENT_LOG.md alone, so proposing work and shipping it stay separate runs');
 const loopDoc=readFileSync(at('docs/loop-prompt.md'),'utf8');
 assert.ok(!loopDoc.includes('```'),'docs/loop-prompt.md points at .claude/commands/entry.md instead of carrying a second copy of the prompt in a fenced block');
 assert.match(loopDoc,/\.claude\/commands\/entry\.md/,'docs/loop-prompt.md names where the prompt actually lives');
