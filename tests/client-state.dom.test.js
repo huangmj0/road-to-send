@@ -417,6 +417,41 @@ const domChecks = `(()=>{
   assert.equal(moreBtn.classList.contains('hide'),true,'a feed that already shows everything makes no offer');
   assert.equal(document.querySelector('#crewShowMore').classList.contains('hide'),true,'and neither does the crew feed');
 
+  // Entry 43: the You feed narrows to one category. Element listeners are no-ops in this stub
+  // and elements have no closest(), so the chip handler setFeedType() is called directly.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;feedType='all';resetFeedLimits();
+  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'f1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'f2',name:'Alex',type:'exercise',date:shift(-2),createdAt:'2'},{id:'f3',name:'Alex',type:'mobility',date:shift(-3),createdAt:'3'},{id:'f4',name:'Alex',type:'climb',date:shift(-4),createdAt:'4'}];
+  render();
+  const filterFeed=document.querySelector('#personalActivity'),filterChips=document.querySelector('#feedFilter');
+  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,4,'the You feed opens showing every category');
+  assert.equal(filterChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="true"')>=0,true,'All is the pressed chip by default');
+  setFeedType('climb');
+  assert.equal(feedType,'climb','the choice lives in module state, not read back out of the DOM');
+  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,2,'selecting a category narrows the feed to that category');
+  assert.equal(filterFeed.innerHTML.indexOf(CAT_LABELS.exercise)>=0,false,'and the other categories drop out');
+  assert.equal(filterChips.innerHTML.indexOf('data-feed-type="climb" aria-pressed="true"')>=0,true,'the chosen chip is the pressed one');
+  assert.equal(filterChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="false"')>=0,true,'and All un-presses');
+  setFeedType('mobility');
+  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,1,'switching to another category shows that one');
+  setFeedType('all');
+  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,4,'selecting All restores every row');
+  // Entry 38's show-more count is per-filter: carried across, it would open a narrow filter
+  // already expanded, or hide rows the new filter has plenty of.
+  logs=[];
+  for(let i=0;i<8;i++)logs=logs.concat([{id:'h'+i,name:'Alex',type:'climb',date:shift(-1),createdAt:String(i)}]);
+  render();
+  showMoreFeed('personal');
+  assert.equal(personalFeedLimit,8,'the show-more count grows under the current filter');
+  setFeedType('mobility');
+  assert.equal(personalFeedLimit,5,'switching filters resets the show-more limit');
+  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,0,'and a category with nothing logged shows no rows');
+  setFeedType('all');
+  assert.equal(personalFeedLimit,5,'returning to All resets it again');
+  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,5,'and reopens at the default five');
+  // The filter is deliberately not remembered: it is module state, so a reload starts at All.
+  assert.equal(feedType,'all','the filter ends where it started, with nothing persisted');
+
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
 

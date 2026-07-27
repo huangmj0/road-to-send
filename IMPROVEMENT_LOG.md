@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 42 — Show the note you wrote on a climb — Done — 2026-07-27
-- 43 — Filter your own feed by category — Todo
+- 43 — Filter your own feed by category — Done — 2026-07-27
 - 44 — Filter the Crew feed with the same chips — Todo
 - 45 — Chart your own weeks on the You tab — Todo
 - 46 — List the bounties you have claimed — Todo
@@ -46,49 +45,48 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 42. Show the note you wrote on a climb
-
-Status: Done — 2026-07-27
-Notes: Commit `Show the note you wrote on a climb`. One segment added to the `climb` branch of
-`activityMarkup()`'s three-way `detail` expression — `${x.note?' · '+esc(x.note):''}`, the same
-shape and the same `esc()` the bounty and fall-through branches already use, placed after the
-grade so the row reads `Climbing · V4 · crimpy · Jul 5`. The branch structure is unchanged (the
-entry forbade restructuring it), no template or CSS change, and `render()` gains no work — this is
-string concatenation inside a map that already ran. index.html 144,001 → 144,032 bytes (+31, 89.5%
-of the 161,000-byte budget; the entry projected ~300, so the pass has more headroom than estimated).
-Tests: six assertions in `tests/client-state.state.test.js` — the note reaches the row, the grade
-precedes it, a climb with a note but no grade still shows the note, a climb with a grade but no
-note keeps rendering exactly as before, no stray separator appears, and a note containing markup is
-escaped rather than injected. Verified the assertions fail against the pre-fix source and pass
-after it, so they lock the bug rather than merely describing it. Deviations: (1) `activityMarkup()`
-was covered in the DOM suite by entry 34, but the entry specified the state suite; it is reachable
-there because it touches no document, so the assertions call it directly with no `render()` and no
-stub — a smaller test for the same behaviour. (2) Rule 10 archiving: entry 41 was moved verbatim
-into `docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks current) and its index
-line dropped; the lifted block was string-matched back out of the archive — exactly one occurrence,
-gone from the log, heading at the start of its own line — and the archive file held no prior entry,
-so nothing above it could be split.
-
-### Why
-`activityMarkup()` builds each feed row's `detail` string with a three-way branch on `x.type`. The bounty branch appends `x.note` and the fall-through branch (exercise, mobility) appends `x.note`, but the `climb` branch renders `CAT_LABELS.climb` plus the grade and drops the note on the floor. So a note typed against a climb — the category people most want to annotate — is saved, synced, exported, and never shown back. The Record tab offers the field, and the feed silently swallows it.
-
-### Requirements
-- `src/app.js` — in `activityMarkup()`, the `climb` branch appends the note the same way the other two branches already do, escaped through `esc()` and separated by the same ` · ` the other branches use. Keep the grade segment ahead of the note.
-- Do not restructure the three-way branch into something cleverer; this is a one-segment addition to one branch, and rule 6 keeps `render()` cheap.
-- No template or CSS change — the row markup and its styling are unchanged.
-
-### Tests
-- `tests/client-state.state.test.js`: a climb logged with a note renders the note in its row; a climb with a grade and a note renders both, grade first; a climb with no note renders exactly what it renders today (no stray separator); a note containing `<` is escaped.
-- No `tests/static-check.mjs` change — nothing new appears in the built markup.
-
-### Do not
-Add the note to the leaderboard, the person card, or any summary; change what `exportData()` writes; change `CAT_LABELS`; touch `src/scoring.json` (rule 2).
-
----
-
 ## 43. Filter your own feed by category
 
-Status: Todo
+Status: Done — 2026-07-27
+Notes: Commit `Filter your own feed by category`. `filterByType(items,type)` is a one-line pure
+helper that returns `items` itself for a falsy or `'all'` type and otherwise `items.filter()` on
+`x.type` — it does not sort, slice or re-key, so `activityMarkup(items,limit,allowDelete)` stays
+the single place ordering and limiting happen, and delete still works through the filter because
+`activityMarkup()` derives `data-del` from `logs.indexOf(x)` rather than the position in the list
+it was handed. `feedChips()` builds the chip faces from `CATEGORIES`/`CAT_LABELS`
+(`SCORING.categoryLabels`) and `TYPE_ICONS`, so nothing is hard-coded but the word "All";
+`renderFeedChips()` writes them into the new `#feedFilter` container, and `setFeedType(type)`
+validates against `CATEGORIES`, returns early when unchanged, calls `resetFeedLimits()` and
+re-renders through `render()`. The selected type is module-level `feedType` (default `'all'`,
+declared beside the feed limits), never read back out of the DOM. `render()` gains one call and one
+`filterByType()` pass over the already-computed `myLogs`; `hasMyLogs` still comes from the
+unfiltered list, so the empty state and the feed's `hide` toggle behave exactly as before.
+Template: one `<div id="feedFilter" class="cat-chips feed-filter" role="group" aria-label=…>`
+between `#youEmptyState` and `#personalActivity`, which leaves the
+`data-panel="you"` → `#todayBounties` → `#personalActivity` → `.stat-grid` chain intact. CSS is
+four selectors reusing the existing `.cat-chip` pill (min-height 44px, rule 7) with the pressed
+state expressed as `[aria-pressed="true"]` — CSS only, so the `prefers-reduced-motion` kill-switch
+applies. index.html 144,032 → 145,443 bytes (+1,411, 90.3% of the 161,000-byte budget). Tests: 15
+assertions in `tests/client-state.state.test.js` covering `filterByType()` (all/empty/missing type,
+each category including `bounty`, a type nobody logged, an empty feed, and two order assertions on
+deliberately unsorted input) plus four on `feedChips()` reading its faces from the scoring config;
+17 in `tests/client-state.dom.test.js` for the rendered feed narrowing, restoring, the pressed chip
+flipping, and the show-more limit resetting across a filter change; seven in
+`tests/static-check.mjs` for the container id, `role="group"`, the chip button shape with
+`aria-pressed`, the two helper names, the `resetFeedLimits()` call site and the CSS pressed rule,
+plus a source-order assertion `#youEmptyState` → `#feedFilter` → `#personalActivity`. Verified the
+suite bites by mutating the built source three ways — `filterByType()` returning `items`
+unconditionally, `setFeedType()` skipping `resetFeedLimits()`, and `render()` dropping
+`renderFeedChips()` — each of which failed, so the assertions lock the behaviour rather than
+describing it. Deviations: (1) the entry's chip-row wording put the row "below `#youEmptyState`",
+which is where it sits, so it is visible even when the user has no activity yet; hiding it would be
+behaviour the entry did not ask for and did not test, so it was left visible. (2) `feedChips()` is
+a second small helper the entry did not name, extracted only so the chip faces are assertable
+without a document; `renderFeedChips()` remains the sole writer of the container. (3) Rule 10
+archiving: entry 42 was moved verbatim into `docs/archive/entries-41-onward.md` (the file
+`IMPROVEMENTS.md` marks current) and its index line dropped; the lifted block was string-matched
+back out of the archive — exactly one occurrence, gone from the log, heading at the start of its
+own line — and entry 41 above it was confirmed intact and unsplit.
 
 ### Why
 The You feed lists every activity newest-first, and entry 38 made it show more of itself. Someone who wants to see just their climbs — to check what grades they have been logging, or find the session they wrote a note about — has to scroll past exercise and mobility rows to do it. The category totals already exist on the same tab in `categoryBreakdown()`, so the app knows the split; it just will not narrow the list to it.

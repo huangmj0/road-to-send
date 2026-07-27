@@ -66,3 +66,43 @@ line) and entry 38 was confirmed intact and unsplit.
 Render claim buttons for future days or change `claimBounty()`'s same-day rule; list the whole catalog; change `dailyBounties()`, `hashText()` or anything in `src/scoring.json` (rule 2); add a modal or a new nav route; open the preview by default.
 
 ---
+
+## 42. Show the note you wrote on a climb
+
+Status: Done — 2026-07-27
+Notes: Commit `Show the note you wrote on a climb`. One segment added to the `climb` branch of
+`activityMarkup()`'s three-way `detail` expression — `${x.note?' · '+esc(x.note):''}`, the same
+shape and the same `esc()` the bounty and fall-through branches already use, placed after the
+grade so the row reads `Climbing · V4 · crimpy · Jul 5`. The branch structure is unchanged (the
+entry forbade restructuring it), no template or CSS change, and `render()` gains no work — this is
+string concatenation inside a map that already ran. index.html 144,001 → 144,032 bytes (+31, 89.5%
+of the 161,000-byte budget; the entry projected ~300, so the pass has more headroom than estimated).
+Tests: six assertions in `tests/client-state.state.test.js` — the note reaches the row, the grade
+precedes it, a climb with a note but no grade still shows the note, a climb with a grade but no
+note keeps rendering exactly as before, no stray separator appears, and a note containing markup is
+escaped rather than injected. Verified the assertions fail against the pre-fix source and pass
+after it, so they lock the bug rather than merely describing it. Deviations: (1) `activityMarkup()`
+was covered in the DOM suite by entry 34, but the entry specified the state suite; it is reachable
+there because it touches no document, so the assertions call it directly with no `render()` and no
+stub — a smaller test for the same behaviour. (2) Rule 10 archiving: entry 41 was moved verbatim
+into `docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks current) and its index
+line dropped; the lifted block was string-matched back out of the archive — exactly one occurrence,
+gone from the log, heading at the start of its own line — and the archive file held no prior entry,
+so nothing above it could be split.
+
+### Why
+`activityMarkup()` builds each feed row's `detail` string with a three-way branch on `x.type`. The bounty branch appends `x.note` and the fall-through branch (exercise, mobility) appends `x.note`, but the `climb` branch renders `CAT_LABELS.climb` plus the grade and drops the note on the floor. So a note typed against a climb — the category people most want to annotate — is saved, synced, exported, and never shown back. The Record tab offers the field, and the feed silently swallows it.
+
+### Requirements
+- `src/app.js` — in `activityMarkup()`, the `climb` branch appends the note the same way the other two branches already do, escaped through `esc()` and separated by the same ` · ` the other branches use. Keep the grade segment ahead of the note.
+- Do not restructure the three-way branch into something cleverer; this is a one-segment addition to one branch, and rule 6 keeps `render()` cheap.
+- No template or CSS change — the row markup and its styling are unchanged.
+
+### Tests
+- `tests/client-state.state.test.js`: a climb logged with a note renders the note in its row; a climb with a grade and a note renders both, grade first; a climb with no note renders exactly what it renders today (no stray separator); a note containing `<` is escaped.
+- No `tests/static-check.mjs` change — nothing new appears in the built markup.
+
+### Do not
+Add the note to the leaderboard, the person card, or any summary; change what `exportData()` writes; change `CAT_LABELS`; touch `src/scoring.json` (rule 2).
+
+---
