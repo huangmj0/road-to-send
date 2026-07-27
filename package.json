@@ -4,6 +4,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check:generated": "node scripts/check-generated.mjs",
+    "queue": "node scripts/queue-status.mjs",
     "test": "node scripts/run-tests.mjs"
   }
 }
