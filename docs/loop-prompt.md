@@ -3,16 +3,21 @@
 `IMPROVEMENT_LOG.md` is a queue. A loop drains it — one entry per invocation, one entry per commit,
 one entry per pull request.
 
-**The prompt itself lives in `.claude/commands/entry.md`**, not here. This file is the operator's
-guide to running it. Keeping the prompt in exactly one place is deliberate: a second copy is a
-second thing to drift, which is the same reason `CLAUDE.md` refuses to restate the rules block.
-`tests/docs-check.mjs` asserts this file carries no fenced block, so the copy cannot creep back.
+The executable workflows do not live here. Claude Code uses `.claude/commands/`; Codex uses the
+repository skills under `.agents/skills/`. This file is the shared operator guide. Keeping full
+prompts out of the guide is deliberate: another embedded copy is another thing to drift, which is
+the same reason `CLAUDE.md` and `AGENTS.md` point to the authoritative rules block rather than
+restating it. `tests/docs-check.mjs` asserts this file carries no fenced prompt.
 
 ## Usage
 
-Run `/loop /drain` with dynamic pacing. `/drain` is one loop tick: it checks the queue, hands the
-actual work to a subagent, and picks the next wake-up. To work a single entry by hand instead, run
-`/entry` directly — it does exactly one entry and stops.
+In Claude Code, run `/loop /drain` with dynamic pacing. `/drain` is one loop tick. To work a single
+entry by hand, run `/entry`.
+
+In Codex, invoke `$road-to-send-drain` for one context-light tick or `$road-to-send-entry` to work
+one entry directly. Codex's drain skill never sleeps: an outer automation, scheduler, or human
+operator owns the next tick. Invoke `$road-to-send-refill` directly only when you intentionally want
+to propose the next queue.
 
 Prefer dynamic pacing or a long interval. Every iteration is a real feature commit awaiting review,
 so a short interval mostly wakes into "the previous pull request is still open". That is harmless —
@@ -25,20 +30,20 @@ every iteration after it. Worked inline, one entry costs tens of thousands of to
 alone is 78 KB — and a handful of them exhaust the window. That is the same rot the split test
 suites and the split archive were meant to stop, arriving by a different route.
 
-So `/drain` reads almost nothing. It runs `npm run queue`, branches on the exit code, and delegates
-the entry itself to a subagent that starts cold and dies when it finishes, reporting back six
-fixed lines: entry, PR, CI, bytes, deviations, status. Those six lines are all the orchestrator
+So the drain workflow reads almost nothing. It runs `npm run queue`, branches on the exit code, and
+delegates the entry itself to a subagent that starts cold and dies when it finishes, reporting back
+six fixed lines: entry, PR, CI, bytes, deviations, status. Those six lines are all the orchestrator
 keeps, which is what lets one session run many iterations.
 
-`/drain` delegates by naming the `entry` and `refill` skills rather than restating them, so the
-loop body still lives in exactly one place. `tests/docs-check.mjs` asserts it names both.
+Each drain implementation delegates by naming its own entry and refill workflow rather than
+restating either one. `tests/docs-check.mjs` asserts both agent surfaces preserve that boundary.
 
 ## When the queue runs dry
 
-On exit 3, `/drain` runs `/refill` in a subagent — but only after checking that no queue proposal
+On exit 3, the drain workflow delegates a refill — but only after checking that no queue proposal
 is already open, since a refill PR has to be merged by a human before any entry can run and two
-open proposals cannot both land. It tells you the PR is waiting, then idles on a long interval and
-resumes on its own once you merge. It never proposes a second queue.
+open proposals cannot both land. It tells you the PR is waiting, then stops or idles until the
+outer runner invokes it again. It never proposes a second queue.
 
 ## What the loop branches on
 
@@ -87,4 +92,6 @@ Guidance sits with the thing it governs, so an iteration reads only what its wor
 - **The rules** — the numbered block at the top of `IMPROVEMENT_LOG.md`. Read in full, every entry.
 - **Repository conventions** — `AGENTS.md`.
 - **Harness traps** — a header comment in the test file they apply to, read only when editing it.
-- **The loop body** — `.claude/commands/entry.md`.
+- **Claude Code workflows** — `.claude/commands/entry.md`, `refill.md`, and `drain.md`.
+- **Codex workflows** — `.agents/skills/road-to-send-entry/`,
+  `road-to-send-refill/`, and `road-to-send-drain/`.

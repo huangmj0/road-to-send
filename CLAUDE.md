@@ -32,3 +32,5 @@ a third thing to drift. The short version:
 - The loop body is `.claude/commands/entry.md` (`/entry`); `docs/loop-prompt.md` explains how to run
   it. Harness traps live in a header comment in the test file they apply to — read it before adding
   assertions there.
+- Codex mirrors this orientation in `AGENTS.md` and exposes equivalent repository skills under
+  `.agents/skills/`; changes to the loop should keep both agent surfaces aligned.
