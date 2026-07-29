@@ -52,12 +52,17 @@ assert.ok(!/^## \d+\. /m.test(improvements),'IMPROVEMENTS.md is the index over d
 assert.match(readFileSync(at('docs/archive/entries-1-14.md'),'utf8'),/^## 1\. Per-category breakdown card \(You tab\)$/m,'docs/archive/entries-1-14.md carries the archived entry 1');
 assert.match(readFileSync(at('docs/archive/entries-25-40.md'),'utf8'),/^## 40\. Share through the system share sheet$/m,'docs/archive/entries-25-40.md carries the archived entry 40');
 
-// CLAUDE.md orients agent sessions and points at the queue rather than restating it.
+// Both agent surfaces orient sessions and point at the queue rather than restating it.
 assert.ok(existsSync(at('CLAUDE.md')),'a repo-root CLAUDE.md orients agent sessions');
 assert.match(readFileSync(at('CLAUDE.md'),'utf8'),/IMPROVEMENT_LOG\.md/,'CLAUDE.md points at IMPROVEMENT_LOG.md');
+assert.ok(existsSync(at('AGENTS.md')),'a repo-root AGENTS.md orients Codex sessions');
+const agents=readFileSync(at('AGENTS.md'),'utf8');
+assert.match(agents,/https:\/\/huangmj0\.github\.io\/road-to-send\//,'AGENTS.md warns that the app is live');
+assert.match(agents,/Start with `npm run queue`/,'AGENTS.md puts the queue guard before log-driven work');
+assert.match(agents,/\.agents\/skills\//,'AGENTS.md points Codex at the repository skills');
 
-// The loop body lives in exactly one place. docs/loop-prompt.md is the operator guide and used to
-// carry a fenced copy of the prompt as well; two copies drift, so the fence may not come back.
+// Each agent surface owns one executable copy of its workflows. docs/loop-prompt.md is only the
+// shared operator guide; it used to carry another fenced prompt, so the fence may not come back.
 const entryCommand=at('.claude/commands/entry.md');
 assert.ok(existsSync(entryCommand),'the loop body lives in .claude/commands/entry.md');
 assert.match(readFileSync(entryCommand,'utf8'),/npm run queue/,'.claude/commands/entry.md orients on npm run queue before starting an entry');
@@ -73,9 +78,25 @@ const drain=readFileSync(drainCommand,'utf8');
 for(const skill of ['entry','refill'])assert.match(drain,new RegExp('`'+skill+'` skill'),`.claude/commands/drain.md delegates to the ${skill} skill by name instead of restating it`);
 assert.match(drain,/npm run queue/,'.claude/commands/drain.md branches on npm run queue');
 
+const codexSkill=name=>at(`.agents/skills/${name}/SKILL.md`);
+const codexMetadata=name=>readFileSync(at(`.agents/skills/${name}/agents/openai.yaml`),'utf8');
+const codexEntry=readFileSync(codexSkill('road-to-send-entry'),'utf8');
+assert.match(codexEntry,/name: road-to-send-entry/,'the Codex entry skill has discoverable metadata');
+assert.match(codexEntry,/npm run queue/,'the Codex entry skill orients on npm run queue before starting an entry');
+const codexRefill=readFileSync(codexSkill('road-to-send-refill'),'utf8');
+assert.match(codexRefill,/IMPROVEMENT_LOG\.md` and nothing else/,'the Codex refill skill keeps proposal and implementation in separate runs');
+const codexDrain=readFileSync(codexSkill('road-to-send-drain'),'utf8');
+for(const skill of ['road-to-send-entry','road-to-send-refill'])assert.match(codexDrain,new RegExp('\\$'+skill),`the Codex drain skill delegates to $${skill} instead of restating it`);
+assert.match(codexDrain,/Spawn exactly one/,'the Codex drain skill serializes write-heavy subagents');
+assert.match(codexDrain,/npm run queue/,'the Codex drain skill branches on npm run queue');
+for(const skill of ['road-to-send-entry','road-to-send-refill','road-to-send-drain']){
+  assert.match(codexMetadata(skill),/allow_implicit_invocation: false/,`${skill} requires explicit invocation because it can create branches and pull requests`);
+}
+
 const loopDoc=readFileSync(at('docs/loop-prompt.md'),'utf8');
-assert.ok(!loopDoc.includes('```'),'docs/loop-prompt.md points at .claude/commands/entry.md instead of carrying a second copy of the prompt in a fenced block');
+assert.ok(!loopDoc.includes('```'),'docs/loop-prompt.md points at tool-specific workflows instead of carrying another fenced prompt');
 assert.match(loopDoc,/\.claude\/commands\/entry\.md/,'docs/loop-prompt.md names where the prompt actually lives');
+assert.match(loopDoc,/\.agents\/skills\/road-to-send-entry\//,'docs/loop-prompt.md names where the Codex entry skill lives');
 
 // The live site is only published from a green tree, and only the app is published.
 const pages=readFileSync(at('.github/workflows/pages.yml'),'utf8');

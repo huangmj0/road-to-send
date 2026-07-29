@@ -1,0 +1,6 @@
+interface:
+  display_name: "Road to Send Entry"
+  short_description: "Ship one queued improvement safely"
+  default_prompt: "Use $road-to-send-entry to ship exactly one queued improvement."
+policy:
+  allow_implicit_invocation: false
