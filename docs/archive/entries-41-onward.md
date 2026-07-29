@@ -106,3 +106,66 @@ so nothing above it could be split.
 Add the note to the leaderboard, the person card, or any summary; change what `exportData()` writes; change `CAT_LABELS`; touch `src/scoring.json` (rule 2).
 
 ---
+
+## 43. Filter your own feed by category
+
+Status: Done — 2026-07-27
+Notes: Commit `Filter your own feed by category`. `filterByType(items,type)` is a one-line pure
+helper that returns `items` itself for a falsy or `'all'` type and otherwise `items.filter()` on
+`x.type` — it does not sort, slice or re-key, so `activityMarkup(items,limit,allowDelete)` stays
+the single place ordering and limiting happen, and delete still works through the filter because
+`activityMarkup()` derives `data-del` from `logs.indexOf(x)` rather than the position in the list
+it was handed. `feedChips()` builds the chip faces from `CATEGORIES`/`CAT_LABELS`
+(`SCORING.categoryLabels`) and `TYPE_ICONS`, so nothing is hard-coded but the word "All";
+`renderFeedChips()` writes them into the new `#feedFilter` container, and `setFeedType(type)`
+validates against `CATEGORIES`, returns early when unchanged, calls `resetFeedLimits()` and
+re-renders through `render()`. The selected type is module-level `feedType` (default `'all'`,
+declared beside the feed limits), never read back out of the DOM. `render()` gains one call and one
+`filterByType()` pass over the already-computed `myLogs`; `hasMyLogs` still comes from the
+unfiltered list, so the empty state and the feed's `hide` toggle behave exactly as before.
+Template: one `<div id="feedFilter" class="cat-chips feed-filter" role="group" aria-label=…>`
+between `#youEmptyState` and `#personalActivity`, which leaves the
+`data-panel="you"` → `#todayBounties` → `#personalActivity` → `.stat-grid` chain intact. CSS is
+four selectors reusing the existing `.cat-chip` pill (min-height 44px, rule 7) with the pressed
+state expressed as `[aria-pressed="true"]` — CSS only, so the `prefers-reduced-motion` kill-switch
+applies. index.html 144,032 → 145,443 bytes (+1,411, 90.3% of the 161,000-byte budget). Tests: 15
+assertions in `tests/client-state.state.test.js` covering `filterByType()` (all/empty/missing type,
+each category including `bounty`, a type nobody logged, an empty feed, and two order assertions on
+deliberately unsorted input) plus four on `feedChips()` reading its faces from the scoring config;
+17 in `tests/client-state.dom.test.js` for the rendered feed narrowing, restoring, the pressed chip
+flipping, and the show-more limit resetting across a filter change; seven in
+`tests/static-check.mjs` for the container id, `role="group"`, the chip button shape with
+`aria-pressed`, the two helper names, the `resetFeedLimits()` call site and the CSS pressed rule,
+plus a source-order assertion `#youEmptyState` → `#feedFilter` → `#personalActivity`. Verified the
+suite bites by mutating the built source three ways — `filterByType()` returning `items`
+unconditionally, `setFeedType()` skipping `resetFeedLimits()`, and `render()` dropping
+`renderFeedChips()` — each of which failed, so the assertions lock the behaviour rather than
+describing it. Deviations: (1) the entry's chip-row wording put the row "below `#youEmptyState`",
+which is where it sits, so it is visible even when the user has no activity yet; hiding it would be
+behaviour the entry did not ask for and did not test, so it was left visible. (2) `feedChips()` is
+a second small helper the entry did not name, extracted only so the chip faces are assertable
+without a document; `renderFeedChips()` remains the sole writer of the container. (3) Rule 10
+archiving: entry 42 was moved verbatim into `docs/archive/entries-41-onward.md` (the file
+`IMPROVEMENTS.md` marks current) and its index line dropped; the lifted block was string-matched
+back out of the archive — exactly one occurrence, gone from the log, heading at the start of its
+own line — and entry 41 above it was confirmed intact and unsplit.
+
+### Why
+The You feed lists every activity newest-first, and entry 38 made it show more of itself. Someone who wants to see just their climbs — to check what grades they have been logging, or find the session they wrote a note about — has to scroll past exercise and mobility rows to do it. The category totals already exist on the same tab in `categoryBreakdown()`, so the app knows the split; it just will not narrow the list to it.
+
+### Requirements
+- `src/app.js` — a pure helper `filterByType(items,type)` returning `items` unchanged for a falsy/`'all'` type and otherwise only entries whose `type` matches. It must not sort, slice, or otherwise duplicate what `activityMarkup()` already does; `activityMarkup(items,limit,allowDelete)` stays the single place ordering and limiting happen.
+- `src/index.template.html` — a chip row directly above `#personalActivity` and below `#youEmptyState`, so the existing `data-panel="you"` → `#todayBounties` → `#personalActivity` chain is unbroken. Each chip is a `type="button"` carrying `aria-pressed`, one per category in `SCORING.categories` plus an "All" chip that is pressed by default.
+- Reuse `TYPE_ICONS` and `SCORING.categoryLabels` for the chip faces rather than hard-coding labels. The selected type is a module-level `feedType` (default `'all'`), not read back out of the DOM — `getAttribute` returns `null` in the DOM harness, so a DOM-derived flag is untestable.
+- Changing the filter must call `resetFeedLimits()` so entry 38's show-more count does not carry across filters, and must re-render through the existing `render()` path.
+- `src/styles.css` — reuse the existing chip/pill visual language; each chip keeps `min-height:44px` (rule 7). Any state change is CSS-only so the `prefers-reduced-motion` kill-switch applies (rule 7).
+
+### Tests
+- `tests/client-state.state.test.js`: `filterByType()` returns every item for `'all'` and for an empty argument, only matching items for each category, an empty array for a type nobody logged, and never reorders what it is given.
+- `tests/client-state.dom.test.js`: the You feed shows all rows initially; selecting a category narrows it to that category's rows; selecting "All" restores them; switching filters resets the show-more limit.
+- `tests/static-check.mjs`: presence assertions for the chip container id and `aria-pressed`, plus an order assertion that the chip row precedes `id="personalActivity"`.
+
+### Do not
+Add a localStorage key to remember the filter (rule 4 — it resets on reload, deliberately); filter the Crew feed here (that is entry 44); add a count of what is hidden, or any copy about what the user has not logged (tone rule); animate the chips in JavaScript.
+
+---

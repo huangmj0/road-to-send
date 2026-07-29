@@ -452,6 +452,42 @@ const domChecks = `(()=>{
   // The filter is deliberately not remembered: it is module state, so a reload starts at All.
   assert.equal(feedType,'all','the filter ends where it started, with nothing persisted');
 
+  // Entry 44: the Crew feed carries the same chips over its own module-level filter. The two feeds
+  // must not share one variable, so every assertion below checks the other feed is untouched.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;feedType='all';crewFeedType='all';resetFeedLimits();
+  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[{id:'c1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'c2',name:'Bo',type:'exercise',date:shift(-2),createdAt:'2'},{id:'c3',name:'Alex',type:'mobility',date:shift(-3),createdAt:'3'},{id:'c4',name:'Bo',type:'climb',date:shift(-4),createdAt:'4'}];
+  render();
+  const bothCrewFeed=document.querySelector('#activityList'),bothCrewChips=document.querySelector('#crewFeedFilter'),bothYouFeed=document.querySelector('#personalActivity');
+  const bothRows=el=>el.innerHTML.split('class="activity').length-1;
+  assert.equal(bothRows(bothCrewFeed),4,'the Crew feed opens showing every category');
+  assert.equal(bothCrewChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="true"')>=0,true,'All is the pressed Crew chip by default');
+  assert.equal(bothCrewChips.innerHTML.indexOf('data-feed-type="climb"')>=0,true,'and the Crew row offers a chip per category');
+  // Narrow the You feed first, so the Crew filter has something to leave alone.
+  setFeedType('mobility');
+  assert.equal(bothRows(bothYouFeed),1,'the You feed narrows to its own category');
+  setFeedType('climb',true);
+  assert.equal(crewFeedType,'climb','the Crew choice lives in its own module state');
+  assert.equal(feedType,'mobility','and setting it leaves the You feed filter alone');
+  assert.equal(bothRows(bothCrewFeed),2,'the Crew feed narrows to that category across every climber');
+  assert.equal(bothRows(bothYouFeed),1,'while the You feed keeps the rows its own filter selected');
+  assert.equal(bothCrewChips.innerHTML.indexOf('data-feed-type="climb" aria-pressed="true"')>=0,true,'the chosen Crew chip is the pressed one');
+  assert.equal(bothCrewChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="false"')>=0,true,'and All un-presses on the Crew row');
+  assert.equal(document.querySelector('#feedFilter').innerHTML.indexOf('data-feed-type="mobility" aria-pressed="true"')>=0,true,'the You chip row still shows its own selection');
+  setFeedType('exercise',true);
+  assert.equal(bothRows(bothCrewFeed),1,'switching the Crew filter shows the next category');
+  assert.equal(bothRows(bothYouFeed),1,'still without disturbing the You feed');
+  setFeedType('all',true);
+  assert.equal(crewFeedType,'all','the Crew filter returns to All');
+  assert.equal(bothRows(bothCrewFeed),4,'restoring every Crew row');
+  assert.equal(feedType,'mobility','and the You feed filter survives the round trip untouched');
+  // Symmetry: changing the You filter must not reach back into the Crew feed either.
+  setFeedType('climb');
+  assert.equal(crewFeedType,'all','the You filter never writes the Crew feed variable');
+  assert.equal(bothRows(bothCrewFeed),4,'so the Crew feed still shows everything');
+  assert.equal(bothRows(bothYouFeed),1,'and the You feed shows its own narrowed rows');
+  setFeedType('all');
+
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
 

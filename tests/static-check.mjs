@@ -81,6 +81,16 @@ assert.match(script,/function filterByType\(/,'a pure helper narrows the feed by
 assert.match(script,/function setFeedType\(/,'a named handler changes the filter so the delegated chip listener has something to call');
 assert.match(script,/feedType=next;resetFeedLimits\(\)/,'changing the filter resets the show-more count');
 assert.match(html,/\.feed-filter \.cat-chip\[aria-pressed="true"\]\{/,'the pressed chip is styled in CSS, not by a JS-driven animation');
+// Entry 44: the Crew feed carries the same chip row. One container per feed, one module-level
+// filter per feed, and the chips themselves come from the one renderer asserted above.
+assert.match(html,/id="crewFeedFilter"[^>]*role="group"[^>]*aria-label="[^"]+"/,'the Crew feed category filter is a named group');
+assert.match(html,/id="crewFeedFilter"[^>]*class="[^"]*feed-filter/,'the Crew chip row reuses the You feed chip styling rather than a second visual language');
+assert.match(html,/id="crewLocalHint"[\s\S]*id="crewFeedFilter"[\s\S]*id="activityList"/,'the Crew filter chips sit between the local-mode hint and the feed they filter');
+assert.match(script,/renderFeedChips\('#crewFeedFilter',crewFeedType\)/,'the Crew chip row is painted from the Crew feed\'s own filter');
+assert.match(script,/renderFeedChips\('#feedFilter',feedType\)/,'and the You chip row from the You feed\'s own filter');
+assert.match(script,/crewFeedType=next;else feedType=next;resetFeedLimits\(\)/,'the two feeds filter independently and either change resets the show-more count');
+assert.match(script,/filterByType\(logs,crewFeedType\)/,'the Crew feed reuses filterByType() rather than a second narrowing helper');
+assert.equal((script.match(/function filterByType\(/g)||[]).length,1,'filterByType() is defined exactly once');
 assert.match(html,/id="personalShowMore"[^>]*type="button"/,'the You feed can show more');
 assert.match(html,/id="crewShowMore"[^>]*type="button"/,'the crew feed can show more');
 assert.match(script,/function showMoreFeed\(/,'one pager serves both feeds');
