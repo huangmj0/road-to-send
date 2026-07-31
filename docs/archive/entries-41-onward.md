@@ -514,3 +514,35 @@ Entry 20 made leaderboard rows open a per-person card, wired through a single de
 Add a second delegated listener or duplicate `openPersonCard()`; make You feed rows tappable; add delete affordances to Crew rows (entry 29 made that feed read-only); change `personSummary()` or what the card shows.
 
 ---
+
+## 49. Say which filter emptied the feed
+
+Status: Done — 2026-07-31
+Notes: Commit `Say which filter emptied the feed`. New pure `feedEmptyCopy(type)` sits directly
+above `activityMarkup()`: `'No activity yet.'` for `'all'`, a missing/blank type, and anything
+`CATEGORIES` does not contain (which covers an unknown string and `'bounty'`, the one type
+`filterByType()` accepts but the chip row never offers), otherwise `` `No ${CAT_LABELS[type]||type}
+entries in this view.` `` with the label read from `CAT_LABELS` rather than a second hard-coded list.
+`activityMarkup()`'s fallback becomes `` `<p class="hint">${feedEmptyCopy(allowDelete?feedType:crewFeedType)}</p>` ``
+— no fourth parameter, so `static-check.mjs`'s `activityMarkup(…,false)` crew call-site pin still
+matches, and `allowDelete` is read exactly the way it already means "this is the owner's own feed"
+at both call sites. Neither `render()` call site changed. index.html 149,886 → 150,076 bytes (+190,
+75.0% of the 200,000-byte budget). `npm test`: 5/5 suites.
+Deviations: None.
+
+### Why
+`activityMarkup()` ends with a single fallback, `'<p class="hint">No activity yet.</p>'`, used whenever the list it was handed is empty. Entry 43's category chips gave both feeds a filter, so that sentence is now often false: there is activity, just none of the type the user selected. Someone who taps `🧘 Mobility` on a feed full of climbs is told the feed is empty and gets no hint that the chip they just pressed is what emptied it.
+
+### Requirements
+- `src/app.js` — a pure `feedEmptyCopy(type)` returning `'No activity yet.'` for `'all'`, a missing type, or a type not in `CATEGORIES`, and otherwise `` `No ${CAT_LABELS[type]||type} entries in this view.` ``. Labels come from `CAT_LABELS`, never a second hard-coded list.
+- `activityMarkup()` uses it for its fallback. **Do not add a fourth parameter**: `tests/static-check.mjs` pins the crew call site as `activityMarkup(…,false)` and a fourth argument would stop that assertion matching. `allowDelete` already means "this is the owner's own feed" at both call sites (see entry 48's notes), so `activityMarkup()` selects the filter itself with `allowDelete?feedType:crewFeedType`. Both are `let`-declared later in the file but initialised before `render()` ever runs.
+- The copy is escaped-free plain text inside the existing `<p class="hint">`; no new element, no new CSS, no change to the two `render()` call sites.
+
+### Tests
+- `tests/client-state.state.test.js`: `feedEmptyCopy()` for `'all'`, `''`, `undefined`, an unknown type, and each of `CATEGORIES` (label read from `CAT_LABELS`, not spelled out); and that `activityMarkup([],5,false)` still returns the `hint` paragraph.
+- `tests/client-state.dom.test.js`: with logs of one type only, `setFeedType()` to a different category and assert `#personalActivity` and `#activityList` name that category rather than saying the feed is empty, and that clearing back to `all` restores the plain sentence.
+
+### Do not
+Name a person, a count, or a date in the copy; add a call to action, a "log one" button, or anything the user could read as a prompt to participate — this sentence reports the state of a filter the user just set, in the panel they set it in, and nothing more (tone rule). Do not touch `filterByType()`, the chip row, or the show-more clamp.
+
+---
