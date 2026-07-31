@@ -906,6 +906,47 @@ const checks = `(()=>{
   assert.equal(idsOf(chips.slice(1).map(c=>({id:c.type}))),CATEGORIES.join(','),'the rest are the configured categories, in config order');
   assert.ok(chips.slice(1).every(c=>c.label===CAT_LABELS[c.type]&&c.icon===TYPE_ICONS[c.type]),'each chip face is read from the scoring config');
 
+  // Entry 47: the last grade a person logged, ordered the way the feed orders everything else.
+  logs=[
+    {id:'lg1',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-10',createdAt:'1'},
+    {id:'lg2',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-12',createdAt:'1'},
+    {id:'lg3',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-12',createdAt:'2'},
+    {id:'lg4',name:'Maya',type:'climb',hardestGrade:'V9',date:'2026-07-20',createdAt:'1'},
+  ];
+  assert.equal(lastLoggedGrade('alex'),'V4','the most recent climb wins, and createdAt breaks a same-day tie');
+  assert.notEqual(lastLoggedGrade('alex'),'V2','the oldest climb is never the answer');
+  assert.equal(lastLoggedGrade('maya'),'V9','each climber reads their own last climb');
+  assert.equal(lastLoggedGrade('nobody'),'','a person with no climbs has no default');
+  // A later non-climb entry must neither become the answer nor blank it out.
+  logs=logs.concat([
+    {id:'lg5',name:'Alex',type:'exercise',date:'2026-07-25',createdAt:'1'},
+    {id:'lg6',name:'Alex',type:'mobility',date:'2026-07-26',createdAt:'1'},
+    {id:'lg7',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-27',createdAt:'1'},
+  ]);
+  assert.equal(lastLoggedGrade('alex'),'V4','exercise, mobility and bounty entries are ignored');
+  // Another person climbing later changes nothing about this one.
+  logs=logs.concat([{id:'lg8',name:'Maya',type:'climb',hardestGrade:'V11',date:'2026-07-30',createdAt:'1'}]);
+  assert.equal(lastLoggedGrade('alex'),'V4','another climber, however recent, never leaks into this default');
+  assert.equal(lastLoggedGrade('maya'),'V11','while their own default does move');
+  // Only a grade the scoring config offers can be preselected.
+  logs=[{id:'lg9',name:'Alex',type:'climb',hardestGrade:'5.12a',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(lastLoggedGrade('alex'),'','a grade absent from SCORING.grades yields no default');
+  logs=[{id:'lg10',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(lastLoggedGrade('alex'),'','a climb logged without a grade yields no default');
+  // The name is matched the way nameKey() matches it everywhere else, and a blank name matches nobody.
+  logs=[{id:'lg11',name:'  Alex  ',type:'climb',hardestGrade:'V3',date:'2026-07-13',createdAt:'1'},{id:'lg12',name:'',type:'climb',hardestGrade:'V7',date:'2026-07-14',createdAt:'1'}];
+  assert.equal(lastLoggedGrade('alex'),'V3','a padded stored name still resolves through nameKey()');
+  assert.equal(lastLoggedGrade(''),'','a blank name matches nobody, not the nameless entry');
+  // Reading the log must not reorder it: the helper sorts a copy.
+  logs=[
+    {id:'lg13',name:'Alex',type:'climb',hardestGrade:'V1',date:'2026-07-10',createdAt:'1'},
+    {id:'lg14',name:'Alex',type:'climb',hardestGrade:'V6',date:'2026-07-11',createdAt:'1'},
+  ];
+  assert.equal(lastLoggedGrade('alex'),'V6','the newer of two climbs is the default');
+  assert.equal(logs.map(x=>x.id).join(','),'lg13,lg14','and logs is left in the order it arrived');
+  logs=[];
+  assert.equal(lastLoggedGrade('alex'),'','an empty log has no default either');
+
   endpoint='';
   logs=[];
 })()`;
