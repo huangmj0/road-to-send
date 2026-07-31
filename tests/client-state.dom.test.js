@@ -229,6 +229,22 @@ const domChecks = `(()=>{
   toggleClaimed();
   assert.equal(claimedBox.innerHTML,'','and closes back to nothing');
 
+  // Entry 50: the claimed list also shows what each claim scored, calling out a capped one.
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  logs=[
+    {id:'s1',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'},
+    {id:'s2',name:'Alex',type:'bounty',bountyId:'outdoor-send',bountyTitle:'Outdoor Send',date:'2026-07-14',createdAt:'1'},
+    {id:'s3',name:'Alex',type:'bounty',bountyId:'century-club',bountyTitle:'Century Club',date:'2026-07-15',createdAt:'1'},
+  ];
+  toggleClaimed();
+  assert.equal(claimedOpen,true,'opens for the scored-claims case');
+  assert.ok(claimedBox.innerHTML.indexOf('bounty-pts">+3</span>')>=0,'the first two, uncapped claims show their full credit');
+  assert.ok(claimedBox.innerHTML.indexOf('bounty-pts">+0</span>')>=0,'the claim past the weekly cap shows its reduced credit');
+  assert.ok(claimedBox.innerHTML.indexOf('weekly bounty cap')>=0,'and names the weekly bounty cap as the reason');
+  assert.equal(claimedBox.innerHTML.split('weekly bounty cap').length-1,1,'only the capped row carries the cap wording');
+  toggleClaimed();
+  assert.equal(claimedOpen,false,'closes again');
+
   // Entry 34: a note written on a bounty claim round-trips to the Sheet and back, and until now was
   // rendered to nobody — the bounty branch showed the title and stopped.
   me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;

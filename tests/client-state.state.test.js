@@ -167,6 +167,27 @@ const checks = `(()=>{
   logs=[{id:'c7',name:'Alex',type:'bounty',date:'2026-07-13',createdAt:'1'}];
   assert.equal(claimedBounties('alex')[0].label,'Bounty','a claim with no id at all still lists');
 
+  // Entry 50: claimedBounties also reports what each claim scored, read out of computeCredits()
+  // rather than re-derived, so a claim past the weekly cap shows its reduced or zero credit.
+  logs=[
+    {id:'p1',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'},
+    {id:'p2',name:'Alex',type:'bounty',bountyId:'outdoor-send',bountyTitle:'Outdoor Send',date:'2026-07-14',createdAt:'1'},
+    {id:'p3',name:'Alex',type:'bounty',bountyId:'century-club',bountyTitle:'Century Club',date:'2026-07-15',createdAt:'1'},
+  ];
+  let capped=claimedBounties('alex'),byLabel=name=>capped.find(r=>r.label===name);
+  assert.equal(capped.length,3);
+  assert.equal(byLabel('Send It').base,3,"base is the bounty's face value");
+  assert.equal(byLabel('Send It').credit,3,'the first claim of the week is fully credited');
+  assert.equal(byLabel('Outdoor Send').credit,3,'the second claim fills the rest of the weekly cap');
+  assert.equal(byLabel('Century Club').base,3,'base stays the face value even once the week is capped');
+  assert.equal(byLabel('Century Club').credit,0,'a claim past the weekly cap credits nothing');
+
+  // A claim outside the challenge window credits zero; base is still the bounty's face value.
+  logs=[{id:'p4',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-06-01',createdAt:'1'}];
+  let outside=claimedBounties('alex')[0];
+  assert.equal(outside.base,3,'base is unaffected by being outside the window');
+  assert.equal(outside.credit,0,'a claim outside the challenge window credits nothing');
+
   // Nobody, and no claims, both come back empty rather than undefined.
   logs=[{id:'c8',name:'Maya',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'}];
   // deepEqual against a literal is avoided here on purpose: length is enough and cannot trip the
