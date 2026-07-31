@@ -675,6 +675,20 @@ const domChecks = `(()=>{
   gradeField.value='';
   render();
   assert.equal(gradeField.value,'V6','and switching back reads the first person again');
+  // A default the form filled in on its own is not a choice, so switching targets while it is
+  // still showing re-derives it instead of saving the previous person's grade for the new one.
+  recordingFor='Maya';
+  render();
+  assert.equal(gradeField.value,'V10','switching targets replaces a still-untouched default with the new person grade');
+  assert.equal(draftActivity().hardestGrade,'V10','and the entry that would be saved carries the new person grade');
+  recordingFor='Alex';
+  render();
+  assert.equal(gradeField.value,'V6','switching back replaces it again');
+  gradeField.value='V9';
+  recordingFor='Maya';
+  render();
+  assert.equal(gradeField.value,'V9','a hand-picked grade still outranks the default across a target switch');
+  recordingFor='Alex';
   // No climb history means no guess: the select is left on its placeholder.
   logs=[{id:'gd4',name:'Alex',type:'exercise',date:shift(-1),createdAt:'1'}];
   gradeField.value='';

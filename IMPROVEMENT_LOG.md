@@ -87,6 +87,18 @@ archive — exactly one occurrence, gone from the log, heading at the start of i
 45 above it was confirmed intact and unsplit. (2) The entry names one helper; a second one-line
 `applyGradeDefault()` holds the DOM side so the pure helper stays pure and testable without a
 document, which is what rule 9 asks for.
+Follow-up in the same PR — commit `Re-derive the grade default when the target changes`: the
+field-has-value guard could not tell a grade the form had filled in from one the user picked, so
+choosing "Record for someone else" while the auto-applied default was still showing kept person A's
+grade and would have saved it under person B. `applyGradeDefault()` now remembers the value it wrote
+in a module-level `gradeDefaultApplied` and treats only a value it did not write as a manual choice;
+a still-untouched default is re-derived (and cleared when the new target has no climbs), while a
+hand-picked grade is left alone exactly as before. `lastLoggedGrade()` is unchanged and still pure.
+The original DOM test cleared the select before each `recordingFor` switch, so it never crossed the
+guard; four assertions were added on top of it (the switch with the default still showing, the draft
+`hardestGrade` that would be saved, the switch back, and a hand-picked grade surviving a switch) and
+no existing assertion was touched. Verified the first fails on a rebuild of the pre-fix script.
+index.html 149,624 → 149,729 bytes (+105, 93.0% of budget). `npm test`: 5/5 suites.
 
 ### Why
 `#hardestGrade` resets to its first option every time the Record form repaints. A climber logging three sessions in a week re-picks the same grade from an eighteen-entry list each time, on a phone, at the gym. The information needed to do better is already in `logs`.
