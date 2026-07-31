@@ -74,5 +74,12 @@ that explains the growth, as entries 23 and 24 did.
 - `npm run queue` should now report your first entry on the `next:` line.
 - Commit, `git push -u origin claude/queue-<N>-<N+k>`, open a **draft** PR that lists the proposed
   entries and flags any carve-out you granted or budget you re-baselined.
-- Report the PR URL and the entry range. Then stop. Do not start `/entry` — that is the next run,
-  after a human merges this.
+- Promote it to **ready for review** — `update_pull_request` with `draft: false`, or `gh pr ready` —
+  once `npm test` passed every suite, `git diff --name-only` against `origin/main` shows
+  `IMPROVEMENT_LOG.md` and nothing else, `npm run queue` names your first entry, and CI on the
+  pushed head commit concluded successfully. Give the checks up to ten minutes to conclude; if they
+  are still pending, or any of those four is not true, leave it a draft and say which one.
+- **Never merge it**, and never enable auto-merge. A human reading this queue and merging it is the
+  gate on what gets built at all; marking it ready is as far as you go.
+- Report the PR URL, the entry range, and whether the PR is ready for review or still a draft. Then
+  stop. Do not start `/entry` — that is the next run, after a human merges this.

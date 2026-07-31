@@ -31,13 +31,14 @@ once; serialized entries overlap in the files they touch.
 
 Give the subagent this task:
 
-> Invoke `$road-to-send-entry` and follow it exactly from start to finish. Return only six lines:
+> Invoke `$road-to-send-entry` and follow it exactly from start to finish. Return only seven lines:
 > `ENTRY: <number> — <title>`, `PR: <url or none>`, `CI: <green|red|pending>`,
-> `BYTES: <before> -> <after>`, `DEVIATIONS: <one line or none>`, and
-> `STATUS: <shipped|blocked|stopped>`. Do not include diffs, file contents, test output, or the PR
-> body. If stopped, put the reason on the `DEVIATIONS` line.
+> `REVIEW: <ready|draft — reason>`, `BYTES: <before> -> <after>`,
+> `DEVIATIONS: <one line or none>`, and `STATUS: <shipped|blocked|stopped>`. Do not include diffs,
+> file contents, test output, or the PR body. If stopped, put the reason on the `DEVIATIONS` line.
 
-Keep only those six lines in the orchestrator context.
+Keep only those seven lines in the orchestrator context. `REVIEW: ready` means the entry promoted
+its own pull request out of draft and it now waits on a human merge, which the loop never performs.
 
 ## 3. Delegate at most one refill
 
@@ -47,9 +48,10 @@ stop silently; two proposals cannot both merge.
 
 Otherwise spawn exactly one general-purpose or worker subagent and wait. Give it this task:
 
-> Invoke `$road-to-send-refill` and follow it exactly from start to finish. Return only four lines:
-> `QUEUE: <first>-<last>`, `PR: <url or none>`, `COUNT: <n> entries`, and
-> `STATUS: <proposed|stopped>`. Do not include entry bodies or the PR description.
+> Invoke `$road-to-send-refill` and follow it exactly from start to finish. Return only five lines:
+> `QUEUE: <first>-<last>`, `PR: <url or none>`, `COUNT: <n> entries`,
+> `REVIEW: <ready|draft — reason>`, and `STATUS: <proposed|stopped>`. Do not include entry bodies or
+> the PR description.
 
 Tell the user that the queue pull request awaits review, then stop. A future tick must detect the
 open proposal instead of proposing another queue.
@@ -60,7 +62,8 @@ The pull request is the record. Stay silent after a clean shipped iteration. Spe
 
 - exit code 5 occurs;
 - a subagent reports `blocked` or `stopped`;
-- CI is red;
+- CI is red, or `REVIEW: draft` — the pull request could not hand itself over, so name the check
+  that stopped it;
 - a refill proposal needs human review;
 - the same entry number appears twice in a row; or
 - `BYTES` crosses 95% of the budget.

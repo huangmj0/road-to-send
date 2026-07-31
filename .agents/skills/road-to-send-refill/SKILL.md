@@ -1,6 +1,6 @@
 ---
 name: road-to-send-refill
-description: Propose new Road to Send Todo entries after the improvement queue is empty, validate them, and open a queue-only draft pull request. Use only when explicitly invoked to refill IMPROVEMENT_LOG.md without implementing the proposals.
+description: Propose new Road to Send Todo entries after the improvement queue is empty, validate them, open a queue-only draft pull request, and mark it ready for review once its checks pass. Use only when explicitly invoked to refill IMPROVEMENT_LOG.md without implementing the proposals.
 ---
 
 # Refill the improvement queue
@@ -67,5 +67,13 @@ the first entry a deliberate, explained re-baseline.
 - Commit, push `codex/queue-<N>-<N+k>`, and open a draft pull request listing the proposals and any
   carve-out or budget re-baseline. Prefer the connected GitHub tools when available; otherwise use
   `gh`.
+- Mark that pull request **ready for review** — `update_pull_request` with `draft: false`, or
+  `gh pr ready` — once `npm test` passed every suite, the diff against `origin/main` covers
+  `IMPROVEMENT_LOG.md` alone, `npm run queue` names your first entry, and every check run on the
+  pushed head commit concluded successfully. Allow up to ten minutes for the checks. If they are
+  still pending, or any of those four is untrue, leave it a draft and report which one.
+- **Never merge it** and never enable auto-merge. A human reading the queue and merging it is the
+  gate on what gets built at all.
 
-Report the pull-request URL and entry range, then stop. Do not invoke `$road-to-send-entry`.
+Report the pull-request URL, entry range, and whether the pull request is ready for review or still a
+draft, then stop. Do not invoke `$road-to-send-entry`.

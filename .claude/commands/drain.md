@@ -10,8 +10,8 @@ subagent whose context dies when it finishes — that is the entire point of thi
 
 The reason is arithmetic. `/loop` fires into the *same* session, so whatever you read stays with
 you for every later iteration. An entry worked inline costs tens of thousands of tokens — `app.js`
-alone is 78 KB — and ten of those end the window. Worked through a subagent it costs you six lines.
-Your job is to check state, delegate, keep the six lines, and pick the next wake-up.
+alone is 78 KB — and ten of those end the window. Worked through a subagent it costs you seven lines.
+Your job is to check state, delegate, keep those seven lines, and pick the next wake-up.
 
 ## 1. Check state
 
@@ -40,10 +40,11 @@ Agent(
   prompt: """
 Invoke the `entry` skill and follow it exactly, start to finish.
 
-Then reply with ONLY these six lines, and nothing else:
+Then reply with ONLY these seven lines, and nothing else:
   ENTRY: <number> — <title>
   PR: <url, or "none">
   CI: <green|red|pending>
+  REVIEW: <ready|draft — reason>
   BYTES: <before> -> <after>
   DEVIATIONS: <one line, or "none">
   STATUS: <shipped|blocked|stopped>
@@ -55,7 +56,10 @@ iterations. If you stopped without shipping, say why on the DEVIATIONS line.
 )
 ```
 
-Keep those six lines. Nothing else from that run enters your context.
+Keep those seven lines. Nothing else from that run enters your context.
+
+`REVIEW: ready` means the entry's PR passed its own checks and is now waiting on the user to merge —
+which is the one thing the loop never does for itself.
 
 ## 3. Refill, in a subagent, at most once
 
@@ -74,10 +78,11 @@ Agent(
   prompt: """
 Invoke the `refill` skill and follow it exactly, start to finish.
 
-Then reply with ONLY these four lines, and nothing else:
+Then reply with ONLY these five lines, and nothing else:
   QUEUE: <first>-<last>
   PR: <url, or "none">
   COUNT: <n> entries
+  REVIEW: <ready|draft — reason>
   STATUS: <proposed|stopped>
 
 Do not paste entry bodies or the PR description into your reply.
@@ -90,11 +95,12 @@ exit 3 will find the open proposal and idle silently until it merges.
 
 ## 4. What to say
 
-The PR is the record, so stay silent on a clean iteration that opened a green one. Speak up only
-when the user has something to do or something is wrong:
+The PR is the record, so stay silent on a clean iteration that opened a green one and marked it
+ready. Speak up only when the user has something to do or something is wrong:
 
 - exit 5, or a subagent reported `STATUS: blocked` or `stopped`
-- a subagent reported `CI: red`
+- a subagent reported `CI: red`, or `REVIEW: draft` — the PR could not hand itself over, so say
+  which check stopped it
 - a refill PR was opened — the loop cannot continue until it is merged
 - the same entry number comes back twice running, or `BYTES` crossed 95% of the budget
 
