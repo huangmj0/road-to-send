@@ -947,6 +947,22 @@ const checks = `(()=>{
   logs=[];
   assert.equal(lastLoggedGrade('alex'),'','an empty log has no default either');
 
+  // Entry 49: feedEmptyCopy() names the filter that emptied a feed instead of always claiming
+  // there is no activity at all.
+  assert.equal(feedEmptyCopy('all'),'No activity yet.','the All filter keeps the plain sentence');
+  assert.equal(feedEmptyCopy(''),'No activity yet.','a blank type keeps the plain sentence');
+  assert.equal(feedEmptyCopy(undefined),'No activity yet.','a missing type keeps the plain sentence');
+  assert.equal(feedEmptyCopy('parkour'),'No activity yet.','a type outside CATEGORIES keeps the plain sentence');
+  assert.equal(feedEmptyCopy('bounty'),'No activity yet.','bounty is not a feed chip and keeps the plain sentence');
+  for(const t of CATEGORIES){
+    assert.equal(feedEmptyCopy(t),'No '+CAT_LABELS[t]+' entries in this view.','the '+t+' filter names its own label');
+    assert.notEqual(feedEmptyCopy(t),'No '+t+' entries in this view.','the label comes from CAT_LABELS, not the raw type spelled out');
+  }
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  const stillEmpty=activityMarkup([],5,false);
+  assert.equal(stillEmpty,'<p class="hint">No activity yet.</p>','activityMarkup([],5,false) still opens and closes the hint paragraph');
+
   endpoint='';
   logs=[];
 })()`;

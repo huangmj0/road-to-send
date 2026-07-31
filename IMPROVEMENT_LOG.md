@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 48 — Open a crewmate's card from the Crew feed — Done — 2026-07-31
-- 49 — Say which filter emptied the feed — Todo
+- 49 — Say which filter emptied the feed — Done — 2026-07-31
 - 50 — Show what each claimed bounty scored — Todo
 - 51 — Caption the grade pyramid — Todo
 - 52 — Let a climb carry a note — Todo
@@ -48,75 +47,20 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 48. Open a crewmate's card from the Crew feed
-
-Status: Done — 2026-07-31
-Notes: Commit `Open a crewmate's card from the Crew feed`. `activityMarkup()` now derives
-`nm=esc(x.name)` once and a `who` fragment beside the existing `del` fragment, gated on the same
-`allowDelete` flag that already distinguishes the two feeds (`true` at the `#personalActivity` call
-site, `false` at `#activityList`): the You feed keeps the `<strong>${nm}</strong>` it always
-rendered, and the Crew feed emits the leaderboard's button markup **character for character** —
-`<button class="climber" type="button" data-person="${nm}" aria-haspopup="dialog" aria-label="Open
-${nm}'s details">${nm}</button>` — so the two lists cannot drift apart. No fourth parameter was added;
-`allowDelete` already means "this is the owner's own feed" at both call sites. `openPersonCard()`,
-`personSummary()` and the card's contents are untouched, and no delete affordance reaches the Crew
-rows (entry 29's assertions still pass unchanged).
-Deviations: (1) The delegated `closest('[data-person]')` listener was bound to `#leaderRows`, and
-clicks inside `#activityList` do not bubble through a sibling `<tbody>`, so the *existing* handler
-could never have seen them. Its one `addEventListener` was retargeted from `#leaderRows` to `#crew`,
-the section that contains both lists — still exactly one listener and one handler function, which is
-what the entry's "no second listener and no new handler function" asks for, but it is a change to an
-existing line rather than a pure addition. A static assertion pins the count at one so a second
-handler cannot be added later. Nothing else in `#crew` carries `data-person`, so the widened scope is
-a no-op for every other click. (2) No `src/styles.css` change was needed: `button.climber` (44px
-min-height, `:focus-visible` outline, dotted underline) is already global rather than scoped to the
-leaderboard, so adding the class *is* the reuse the entry asks for — writing any rule at all would
-have been the second styling it forbids. index.html 149,729 → 149,886 bytes (+157, 93.1% of the
-161,000-byte budget).
-Tests: 11 assertions in `tests/client-state.dom.test.js` (both Crew rows carry the hook, not just the
-newest; the shared climber button and its `aria-haspopup`; the You feed has rows yet carries no hook
-and keeps its plain `<strong>` name; the Crew feed still has no delete buttons; the hook value is
-parsed back out of the rendered Crew markup and fed straight into `openPersonCard()`, which titles
-and opens the dialog) and six in `tests/static-check.mjs`, scoped to `activityMarkup()`'s own line so
-that a `data-person=` elsewhere in the script cannot satisfy them, plus the handler-target and
-handler-count assertions. Per the harness trap the delegated handler is never simulated. Verified the
-new assertions bite, and that each mutation is caught by the assertion **named for it** rather than
-by collateral damage: dropping the crew hook fails "a Crew row carries the climber it names as a
-per-person hook"; hooking the You feed too fails "the You feed lists your own entries, so its names
-get no per-person hook"; rendering a `<span>` instead of the shared button fails "the Crew name
-reuses the leaderboard climber button rather than a new control"; putting the listener back on
-`#leaderRows` fails "a single delegated handler on the Crew panel covers both the leaderboard and the
-feed"; adding a second `#activityList` handler fails "there is exactly one such handler"; and making
-`openPersonCard()` bail for the crew row's name fails "the value a Crew row carries opens that
-climber card" **first**, with `expected 'Bo', actual ''` — confirming that assertion reaches the code
-path it names and is not masked by entry 20's older card assertions. (3) Rule 10 archiving: entry 47
-was moved verbatim into `docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks
-current, 42,988 bytes against the 90,000-byte cap) and its index line dropped; the lifted block was
-matched back out of the archive — exactly one occurrence, gone from the log, heading at the start of
-its own line — and entry 46 above it confirmed intact and unsplit. `npm test`: 5/5 suites.
-
-### Why
-Entry 20 made leaderboard rows open a per-person card, wired through a single delegated `closest('[data-person]')` handler and `openPersonCard()`. The Crew feed names a person on every row and none of them are tappable, so the same gesture works in one list and silently does nothing in the other.
-
-### Requirements
-- `src/app.js` — the Crew feed's name element carries `data-person` with the same value the leaderboard rows use, so the **existing** delegated handler opens the card. Add no second listener and no new handler function.
-- The name becomes a `type="button"` (or otherwise reaches a 44px target, rule 7) and keeps visible focus via the site's `:focus-visible` (rule 7). Escape the name through `esc()` as the surrounding markup already does.
-- Only the Crew feed changes. The You feed lists one person's own entries, where a card of themselves adds nothing.
-- `src/styles.css` — reuse the existing tappable-name styling from the leaderboard rather than adding a second one.
-
-### Tests
-- `tests/client-state.dom.test.js`: Crew feed rows carry `data-person` matching the entry's climber, and the You feed's rows do not; calling `openPersonCard()` with that value populates `#personTitle`.
-- `tests/static-check.mjs`: an assertion that the built script emits `data-person` for the Crew feed rows.
-- Note for the implementer: the delegated handler cannot be fired from the DOM harness — the element stub has no `closest()` and its listeners are no-ops (see the TRAP comment in `tests/harness.js`). Assert the emitted attribute and call `openPersonCard()` directly rather than trying to simulate the tap.
-
-### Do not
-Add a second delegated listener or duplicate `openPersonCard()`; make You feed rows tappable; add delete affordances to Crew rows (entry 29 made that feed read-only); change `personSummary()` or what the card shows.
-
----
-
 ## 49. Say which filter emptied the feed
 
-Status: Todo
+Status: Done — 2026-07-31
+Notes: Commit `Say which filter emptied the feed`. New pure `feedEmptyCopy(type)` sits directly
+above `activityMarkup()`: `'No activity yet.'` for `'all'`, a missing/blank type, and anything
+`CATEGORIES` does not contain (which covers an unknown string and `'bounty'`, the one type
+`filterByType()` accepts but the chip row never offers), otherwise `` `No ${CAT_LABELS[type]||type}
+entries in this view.` `` with the label read from `CAT_LABELS` rather than a second hard-coded list.
+`activityMarkup()`'s fallback becomes `` `<p class="hint">${feedEmptyCopy(allowDelete?feedType:crewFeedType)}</p>` ``
+— no fourth parameter, so `static-check.mjs`'s `activityMarkup(…,false)` crew call-site pin still
+matches, and `allowDelete` is read exactly the way it already means "this is the owner's own feed"
+at both call sites. Neither `render()` call site changed. index.html 149,886 → 150,076 bytes (+190,
+75.0% of the 200,000-byte budget). `npm test`: 5/5 suites.
+Deviations: None.
 
 ### Why
 `activityMarkup()` ends with a single fallback, `'<p class="hint">No activity yet.</p>'`, used whenever the list it was handed is empty. Entry 43's category chips gave both feeds a filter, so that sentence is now often false: there is activity, just none of the type the user selected. Someone who taps `🧘 Mobility` on a feed full of climbs is told the feed is empty and gets no hint that the chip they just pressed is what emptied it.
