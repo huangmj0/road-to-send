@@ -7,6 +7,14 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 ## Queue index
 
 - 48 — Open a crewmate's card from the Crew feed — Done — 2026-07-31
+- 49 — Say which filter emptied the feed — Todo
+- 50 — Show what each claimed bounty scored — Todo
+- 51 — Caption the grade pyramid — Todo
+- 52 — Let a climb carry a note — Todo
+- 53 — Show a crewmate's weekly points in their card — Todo
+- 54 — Show a crewmate's most recent entries in their card — Todo
+- 55 — Say which protocol version this build expects — Todo
+- 56 — Date the export snapshot — Todo
 
 Entries 1–40 shipped and now live under `docs/archive/`, together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. `IMPROVEMENTS.md` indexes them by title. Entry numbers never restart.
 
@@ -103,3 +111,181 @@ Entry 20 made leaderboard rows open a per-person card, wired through a single de
 
 ### Do not
 Add a second delegated listener or duplicate `openPersonCard()`; make You feed rows tappable; add delete affordances to Crew rows (entry 29 made that feed read-only); change `personSummary()` or what the card shows.
+
+---
+
+## 49. Say which filter emptied the feed
+
+Status: Todo
+
+### Why
+`activityMarkup()` ends with a single fallback, `'<p class="hint">No activity yet.</p>'`, used whenever the list it was handed is empty. Entry 43's category chips gave both feeds a filter, so that sentence is now often false: there is activity, just none of the type the user selected. Someone who taps `🧘 Mobility` on a feed full of climbs is told the feed is empty and gets no hint that the chip they just pressed is what emptied it.
+
+### Requirements
+- `src/app.js` — a pure `feedEmptyCopy(type)` returning `'No activity yet.'` for `'all'`, a missing type, or a type not in `CATEGORIES`, and otherwise `` `No ${CAT_LABELS[type]||type} entries in this view.` ``. Labels come from `CAT_LABELS`, never a second hard-coded list.
+- `activityMarkup()` uses it for its fallback. **Do not add a fourth parameter**: `tests/static-check.mjs` pins the crew call site as `activityMarkup(…,false)` and a fourth argument would stop that assertion matching. `allowDelete` already means "this is the owner's own feed" at both call sites (see entry 48's notes), so `activityMarkup()` selects the filter itself with `allowDelete?feedType:crewFeedType`. Both are `let`-declared later in the file but initialised before `render()` ever runs.
+- The copy is escaped-free plain text inside the existing `<p class="hint">`; no new element, no new CSS, no change to the two `render()` call sites.
+
+### Tests
+- `tests/client-state.state.test.js`: `feedEmptyCopy()` for `'all'`, `''`, `undefined`, an unknown type, and each of `CATEGORIES` (label read from `CAT_LABELS`, not spelled out); and that `activityMarkup([],5,false)` still returns the `hint` paragraph.
+- `tests/client-state.dom.test.js`: with logs of one type only, `setFeedType()` to a different category and assert `#personalActivity` and `#activityList` name that category rather than saying the feed is empty, and that clearing back to `all` restores the plain sentence.
+
+### Do not
+Name a person, a count, or a date in the copy; add a call to action, a "log one" button, or anything the user could read as a prompt to participate — this sentence reports the state of a filter the user just set, in the panel they set it in, and nothing more (tone rule). Do not touch `filterByType()`, the chip row, or the show-more clamp.
+
+---
+
+## 50. Show what each claimed bounty scored
+
+Status: Todo
+
+### Why
+`claimedBounties()` returns a title, a date and a note, so the "Bounties you have claimed" list on the You tab shows *that* a claim happened but never what it was worth. `SCORING.weeklyBountyCap` means some claims credit less than the bounty's face value, and `#bountyCapHint` says so only in aggregate and only for the current week. Reopening the list to check which past claims actually scored is impossible.
+
+### Requirements
+- `src/app.js` — `claimedBounties(nameLower)` also returns `base` and `credit` per row, read out of `computeCredits(logs).info` (rule 6 — consume the map, never re-derive the cap). The key is `creditKey(x,logs.indexOf(x))`, the same lookup `activityMarkup()` uses; the helper filters and then sorts, so the position in `logs` must be taken before the sort, not from the sorted index.
+- `renderClaimed()` renders the credit in a `<span class="bounty-pts">+N</span>` third cell, exactly as `renderBountyWeek()` already does inside `.bounty-peek` — the class is a three-column grid, so no `src/styles.css` change is needed.
+- When `credit<base`, the row's `<small>` also carries the existing wording `weekly bounty cap` (the same phrase `activityMarkup()`'s `note` map uses), after the date and any note.
+- The existing dom assertions read `#claimedList` for the bounty title, the note, and the `bounty-peek` class; keep all three true.
+
+### Tests
+- `tests/client-state.state.test.js`: a claim inside the window returns `credit===base`; claims past `SCORING.weeklyBountyCap` in one week return a reduced or zero `credit` with `base` unchanged; a claim outside the challenge window returns `credit` 0; the existing `label`/ordering assertions still hold.
+- `tests/client-state.dom.test.js`: after `toggleClaimed()`, `#claimedList` shows the credited figure and, for a capped claim, the cap wording.
+
+### Do not
+Change `computeCredits()`, `bountyWeekProgress()`, or `#bountyCapHint`; show another person's claims; add a total or a streak line under the list; write copy about bounties not claimed or days without a claim (tone rule).
+
+---
+
+## 51. Caption the grade pyramid
+
+Status: Todo
+
+### Why
+Entry 36 gave the heatmap and both trend charts a visible plain-text caption (`#heatmapSummary`, `#trendSummary`, `#youTrendSummary`) because a `role="img"` `aria-label` is read by a screen reader and by nobody else. `#gradePyramid` was left out, so the card shows bars whose totals a sighted user has to add up by eye.
+
+### Requirements
+- `src/app.js` — a pure `pyramidCaption(rows)` in the shape of `heatmapCaption()`/`trendCaption()`: `''` for an empty list, otherwise a sentence naming the total number of graded sends and the hardest grade. `gradePyramid()` already returns rows hardest-first, so the hardest is `rows[0].grade`; pluralise `send`/`sends` the way the existing captions do.
+- `src/index.template.html` — `<p id="pyramidSummary" class="hint"></p>` immediately after `#gradePyramid`, still inside `#gradePyramidCard`, mirroring where `#heatmapSummary` sits. No new CSS: `.hint` is global.
+- `renderPyramid()` sets it from the same `rows` it already computed and clears it to `''` on the hidden-card path, exactly as `renderHeatmap()` does with `#heatmapSummary`.
+- The caption is a **sibling** of `#gradePyramid`, never inside it: `tests/client-state.dom.test.js` asserts `#gradePyramid`'s `innerHTML` equals `#personPyramid`'s, and putting the caption inside would break that.
+
+### Tests
+- `tests/client-state.state.test.js`: `pyramidCaption([])` is `''`; a one-send list is singular; a multi-grade list names the total across grades and `rows[0].grade` as the hardest.
+- `tests/client-state.dom.test.js`: with graded climbs, `#pyramidSummary` carries the caption and `#gradePyramid` still matches `#personPyramid`; with none, the card hides and `#pyramidSummary` is empty.
+- `tests/static-check.mjs`: `#pyramidSummary` sits between `#gradePyramid` and the close of the card, and `#gradePyramid` keeps its `role="img"` and `aria-label`.
+
+### Do not
+Add `aria-live` (the pyramid changes only when the user logs a climb, and `#todayRemaining` is the You card's one live region — see the comment above `renderYouPace()`); change `gradePyramid()`, `pyramidRow()`, or the existing `aria-label`; caption `#personPyramid` — that is a different surface and a later entry's business.
+
+---
+
+## 52. Let a climb carry a note
+
+Status: Todo
+
+### Why
+`activityMarkup()`'s climb branch already renders `x.note` after the grade, and `validateActivity()` in `src/apps-script.js` already accepts and stores a note on every activity type. But `updateRecordPreview()` hides `#noteFields` whenever the selected type is `climb`, and `draftActivity()` sets `base.note` only for the bounty and fall-through branches — so the note a climb row is built to display can never be written. "V4, first try on the slab" has nowhere to go.
+
+### Requirements
+- `src/app.js` — `updateRecordPreview()` stops hiding `#noteFields` for climb, so the note field is available for all four types. `draftActivity()` sets `base.note=noteValue()` on the climb branch alongside `base.hardestGrade`.
+- `src/index.template.html` — drop `hide` from `#noteFields`'s class list, since the pre-script default type is `climb` and the field now belongs there. Its `<label for="activityNote">` stays exactly as it is (`tests/static-check.mjs` requires it).
+- `submitActivity()` already sends `note:draft.note||''` and already clears `#activityNote` after a save — do not touch it.
+- **No carve-out from rule 2 is needed or granted.** `src/apps-script.js` and `src/schema.json` already permit a ≤120-character note on any type; `noteValue()` already truncates to 120. Do not edit either file.
+
+### Tests
+- `tests/client-state.dom.test.js`: with the climb radio selected, `updateRecordPreview()` leaves `#noteFields` unhidden and `draftActivity()` carries the typed note; the grade field is still shown for climb and still hidden for the other types; switching to exercise and back keeps the note field visible.
+- `tests/client-state.state.test.js`: `activityMarkup()` on a climb with both a grade and a note renders both, in that order, escaped (the existing escaping assertion at the climb row already covers injection — extend, do not replace).
+
+### Do not
+Make the note required, raise the 120-character cap, or prefill it; add a note to the activity-type picker copy; touch `src/apps-script.js`, `src/schema.json`, or `src/scoring.json` (rule 2); add a localStorage key (rule 4).
+
+---
+
+## 53. Show a crewmate's weekly points in their card
+
+Status: Todo
+
+### Why
+`personalWeeklyTrend(nameLower,today)` already computes any climber's week-by-week points, and `#youTrendCard` renders it for the signed-in user through `trendColumns()`/`trendAria()`. A crewmate's card (`#personModal`) shows rank, records, breakdown and pyramid — every static figure — but no week-over-week shape, so the one view that shows whether someone is building or coasting exists only for yourself.
+
+### Requirements
+- `src/app.js` — `personSummary()` adds one field, `trend` is taken; call it `weeks:personalWeeklyTrend(key,today)`. Adding a field is safe: every existing assertion reads `personSummary()` by named field.
+- `src/index.template.html` — inside `#personModal`, after `#personRecords` and before the existing `Grade pyramid` heading: `<h3 class="person-head">Weekly points</h3><div class="trend-scroll"><div id="personTrend" class="trend" role="img" aria-label="Weekly points"></div></div>`. No new CSS — `.trend-scroll`, `.trend` and `.person-head` are all global.
+- `renderPersonCard()` fills `#personTrend` with `trendColumns(data.weeks)` and sets its `aria-label` from `trendAria()` the way `renderYouTrend()` does; with no rows it emits the same `<p class="hint">` fallback shape the card's other empty sections use. Reuse `renderPersonCard()`'s existing `set()` closure rather than a second `querySelector` ladder.
+- Sequence: this entry and entry 54 both add a section to `#personModal`. Take them in order — 54 assumes this section is already the one between `#personRecords` and the pyramid.
+
+### Tests
+- `tests/client-state.dom.test.js`: `openPersonCard()` for a climber with logs across two weeks fills `#personTrend` with the same markup `#youTrend` holds for that same person, and a climber with no logs gets the hint fallback rather than an empty box.
+- `tests/client-state.state.test.js`: `personSummary().weeks` deep-equals `personalWeeklyTrend()` for the same name and day — the card reads the shared helper, not a second implementation.
+- `tests/static-check.mjs`: `#personTrend` carries `role="img"` and an `aria-label`, sits inside a `.trend-scroll`, and falls between `#personRecords` and `#personPyramid` in document order.
+
+### Do not
+Add a heatmap, a projection, or a pace line to the card; compare the person to you, to the crew, or to a crew average; add `aria-live` to a dialog that only exists because the user tapped a name; change `personalWeeklyTrend()`, `trendColumns()` or `trendAria()`.
+
+---
+
+## 54. Show a crewmate's most recent entries in their card
+
+Status: Todo
+
+### Why
+The Crew feed mixes everyone together and its filter narrows by category, not by person. Entry 48 made a feed row open that climber's card, but the card then answers everything except the obvious follow-up question — what has this person actually been logging lately.
+
+### Requirements
+- Depends on entry 53: this section goes **below** `#personTrend`, as the last section of `#personModal`.
+- `src/app.js` — a pure `personRecent(nameLower,limit=5)` filtering `logs` by `nameKey()`, sorted newest-first by `date` then `createdAt` exactly as `claimedBounties()` sorts, sliced to `limit`. Each row is `{label,value}`: `label` is the entry's title — `CAT_LABELS[x.type]` plus the grade when there is one, or the bounty title resolved through the `x.bountyTitle || bountyById(x.bountyId).title || 'Bounty'` chain `claimedBounties()` already uses — and `value` is `fmtDay(x.date)` (rule 6: never `new Date()` for a challenge date).
+- `src/index.template.html` — `<h3 class="person-head">Recent activity</h3><div id="personRecent" class="records"></div>` as the final section of `#personModal`. No new CSS: `.records` is global.
+- `renderPersonCard()` renders the rows with the existing `recordsRow(label,value)` and falls back to the same `<p class="hint">` shape as the card's other sections.
+- **Do not reuse `activityMarkup()` here.** With `allowDelete` false it emits `<button class="climber" data-person=…>` rows, and `#personModal` sits outside the `#crew` element the single delegated handler is bound to, so those buttons would render dead. `recordsRow()` is the right shared helper for a two-column list.
+
+### Tests
+- `tests/client-state.state.test.js`: `personRecent()` returns at most `limit` rows, newest first with the `createdAt` tiebreak; resolves a bounty title through the same fallback chain; includes the grade on a climb; excludes other people; returns `[]` for a blank name and for an empty log.
+- `tests/client-state.dom.test.js`: `openPersonCard()` fills `#personRecent` with `records-row` markup naming that person's newest entry and not a crewmate's, and a person with no entries gets the hint fallback.
+- `tests/static-check.mjs`: `#personRecent` is the last section of `#personModal`, uses the `records` class, and the built script's `renderPersonCard()` line does not call `activityMarkup()`.
+
+### Do not
+Add a delete button, a "show more", a second delegated listener, or a `data-person` hook inside the dialog; show points on these rows (the breakdown above already carries them); pad the list to `limit` with placeholder rows, or add copy about days with nothing logged (tone rule).
+
+---
+
+## 55. Say which protocol version this build expects
+
+Status: Todo
+
+### Why
+`unpackRemote()` rejects any payload whose version is not in `SUPPORTED_API_VERSIONS`, and `renderSync()` then reports `Apps Script update required` plus the code `RTS-REFRESH-VERSION`. Neither says which version this build wants, so the organizer reading the diagnostics has no number to deploy against. `testConnection()` does name one, but as the literal string `deploy v11`, which will quietly go stale the next time the version bumps.
+
+### Requirements
+- `src/app.js` — `renderSync()` appends the expected version to the existing `#diagnosticDetail` sentence, using `[...SUPPORTED_API_VERSIONS][0]`, the same expression `saveSetup()` and `exportData()` already use. Append only: `tests/client-state.shared.test.js` asserts `detail.indexOf('Protocol')===0`, so the `Protocol …` clause must keep leading.
+- `testConnection()`'s outdated-script message derives its version from that same expression instead of the hard-coded `deploy v11`.
+- No template change and no new element — this is text inside `#syncDiagnostics`, which already exists and already has its `role="status"`.
+
+### Tests
+- `tests/client-state.shared.test.js`: after a successful sync, `#diagnosticDetail` still starts with `Protocol` and now also names the expected version; after a payload with an unsupported version, the diagnostics name the expected version while `#diagnosticCode` still reads `RTS-REFRESH-VERSION`; `testConnection()` against a stale payload names the same version rather than a literal.
+- `tests/static-check.mjs`: the built script contains no `deploy v11` literal.
+
+### Do not
+Change `SUPPORTED_API_VERSIONS`, `unpackRemote()`, `syncFailureCode()`, or the `RTS-REFRESH-*` codes; touch `src/apps-script.js` or `src/schema.json` (rule 2); add a second `aria-live` region; surface the endpoint URL — the shared suite asserts it never appears in the diagnostics.
+
+---
+
+## 56. Date the export snapshot
+
+Status: Todo
+
+### Why
+`exportData()` always names the download `road-to-send-export.json`. Take a snapshot before a risky change and another after, and the second either overwrites the first or lands as `road-to-send-export (1).json`; either way the folder listing says nothing about when each was taken. The timestamp exists only inside the file, which is exactly where you cannot see it while choosing between two of them.
+
+### Requirements
+- `src/app.js` — `exportData()` builds the filename from `challengeToday()`: `road-to-send-<YYYY-MM-DD>.json`. Rule 6 applies: `challengeToday()`, never `new Date()`, so a shared-mode export is named for the Sheet's day the same way every other date in the app is.
+- The blob's contents, including its `exportedAt` ISO timestamp, are unchanged; so is the `URL.revokeObjectURL()` cleanup in the `finally` block and both toast messages.
+- One line changes. Do not restructure the try/catch — entry 31's assertions cover a blocked `click()` and a failing `Blob` separately, and both must keep passing.
+
+### Tests
+- `tests/client-state.shared.test.js`: extend the existing export test so the anchor stub records `download` alongside `href`, and assert the filename carries `challengeToday()` and still ends in `.json`; the success and both failure paths keep their current assertions unchanged.
+
+### Do not
+Add a time-of-day, a person's name, or a counter to the filename; change the export payload, its `version` field, or the `mode` field; add a localStorage key (rule 4); prompt anyone to take a snapshot.
+
+---
