@@ -149,6 +149,13 @@ assert.match(html,/data-panel="crew"[\s\S]*class="card group-card"[\s\S]*id="wee
 assert.match(html,/id="weeklyTrend"[^>]*role="img"[^>]*aria-label=/,'the weekly trend chart is announced as a graphic');
 assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="weeklyTrend"/,'the weekly trend chart sits inside a horizontally scrollable wrapper');
 assert.match(html,/\.trend-scroll\{overflow-x:auto\}/,'the trend wrapper scrolls horizontally instead of squeezing');
+// Entry 45: the same chart, restricted to the signed-in climber, on the You panel after the heatmap.
+assert.match(html,/data-panel="you"[\s\S]*id="heatmapCard"[\s\S]*id="youTrendCard"/,'the personal weekly trend card sits after the daily activity heatmap on the You panel');
+assert.match(html,/id="youTrend"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the personal weekly trend chart is announced as a graphic with a non-empty label');
+assert.match(html,/id="youTrendCard"[\s\S]*class="trend-scroll"[^>]*>\s*<div id="youTrend"/,'the personal trend chart reuses the horizontally scrollable trend wrapper');
+assert.match(html,/id="youTrend"[\s\S]*id="youTrendSummary"/,'the personal trend caption follows its chart');
+assert.match(script,/function personalWeeklyTrend\(/,'a pure helper restricts the weekly rows to one climber');
+assert.match(script,/function trendColumns\(/,'both trend charts draw their bars from one markup helper');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderPointsBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Points toggle is a real button with aria-pressed');

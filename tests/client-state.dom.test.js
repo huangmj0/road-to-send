@@ -286,6 +286,35 @@ const domChecks = `(()=>{
   assert.equal(heatCap.textContent,'','a hidden heatmap card carries no caption');
   assert.equal(trendCap.textContent,'','and neither does a hidden trend card');
 
+  // Entry 45: the You panel charts the signed-in climber own weeks. The card is hidden until they
+  // have logged, and a repaint redraws the bars rather than appending a second set of them.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+  logs=[];
+  render();
+  const youTrendCard=document.querySelector('#youTrendCard'),youTrendEl=document.querySelector('#youTrend'),youTrendCap=document.querySelector('#youTrendSummary');
+  assert.equal(youTrendCard.classList.contains('hide'),true,'a climber with nothing logged gets no personal trend card');
+  assert.equal(youTrendEl.innerHTML,'','and no bars left behind it');
+  assert.equal(youTrendCap.textContent,'','and no caption');
+  logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt2',name:'Maya',type:'climb',date:shift(-1),createdAt:'2'}];
+  render();
+  assert.equal(youTrendCard.classList.contains('hide'),false,'logging something opens the card');
+  const youBars=youTrendEl.innerHTML.split('trend-col').length-1;
+  assert.ok(youBars>0,'and it draws a column per challenge week');
+  assert.ok(youTrendEl.innerHTML.indexOf('trend-bar')>=0,'reusing the crew chart bar markup rather than a second visual language');
+  assert.ok(youTrendCap.textContent.indexOf('Best week')===0,'and trendCaption writes the caption underneath it');
+  render();
+  assert.equal(youTrendEl.innerHTML.split('trend-col').length-1,youBars,'a repaint redraws the same bars instead of appending a second set');
+  assert.equal(youTrendCard.classList.contains('hide'),false,'and leaves the card open');
+  assert.equal(personalWeeklyTrend('alex',challengeToday()).reduce((s,r)=>s+r.points,0),3,'the personal chart counts only this climber points');
+  assert.equal(weeklyTrend(challengeToday()).reduce((s,r)=>s+r.points,0),6,'while the crew chart still counts both climbers, unchanged');
+  me='Maya';recordingFor='Maya';
+  logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(youTrendCard.classList.contains('hide'),true,'switching to a climber with nothing logged closes the card again');
+  assert.equal(youTrendEl.innerHTML,'','and empties the bars');
+  assert.equal(youTrendCap.textContent,'','and clears the caption');
+
   // Entry 18: the today card carries the personal countdown and the person share of the crew pace.
   me='Alex';recordingFor='Alex';endpoint='';
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};

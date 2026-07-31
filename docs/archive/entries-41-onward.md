@@ -169,3 +169,63 @@ The You feed lists every activity newest-first, and entry 38 made it show more o
 Add a localStorage key to remember the filter (rule 4 — it resets on reload, deliberately); filter the Crew feed here (that is entry 44); add a count of what is hidden, or any copy about what the user has not logged (tone rule); animate the chips in JavaScript.
 
 ---
+
+## 44. Filter the Crew feed with the same chips
+
+Status: Done — 2026-07-27
+Notes: Commit `Filter the Crew feed with the same chips`. Entry 43 had merged, so the dependency
+held and this entry stayed unblocked. No new function was added: the two functions entry 43
+introduced were parameterised instead, which is what "adds no second helper" costs least.
+`renderFeedChips(sel,active)` now takes the container selector and the filter it should show as
+pressed — `render()` calls it twice, `renderFeedChips('#feedFilter',feedType)` and
+`renderFeedChips('#crewFeedFilter',crewFeedType)` — and `setFeedType(type,crew)` grew one optional
+flag choosing which module variable it writes (`if(crew)crewFeedType=next;else feedType=next`),
+keeping its single `resetFeedLimits();render()` tail so either feed's change still clears entry
+38's show-more count. `crewFeedType` is declared beside `feedType` on the same `let` line, default
+`'all'`, and the two are never read through one another; `filterByType()` is untouched and now has
+two callers, `filterByType(myLogs,feedType)` and `filterByType(logs,crewFeedType)`. The Crew feed's
+`renderShowMore()` argument moved from `logs.length` to the filtered `crewShown.length`, so the
+show-more offer counts the rows the current filter actually has rather than the whole log. Template:
+one `<div id="crewFeedFilter" class="cat-chips feed-filter" role="group" aria-label=…>` inside the
+Activity card between its `card-head` and `#activityList` — `#crewLocalHint` lives in the preceding
+leaderboard card, so the required `#crewLocalHint` → chips → `#activityList` source order holds
+without moving either card. `init()` gains one delegated listener on the new container, mirroring
+43's and passing `true` as the second argument. **No CSS change at all**: reusing the
+`cat-chips feed-filter` classes means the existing pill, the 44px `min-height` (rule 7) and the
+CSS-only `[aria-pressed="true"]` state all apply as they stand, which is what the entry asked for.
+index.html 145,443 → 145,995 bytes (+552, 90.7% of the 161,000-byte budget). Tests: 20 assertions in
+`tests/client-state.dom.test.js` — the Crew feed opening unfiltered, narrowing across every
+climber, switching category, and restoring, with the You feed deliberately parked on a *different*
+category throughout so each step asserts both feeds, plus the symmetric check that changing the You
+filter leaves `crewFeedType` and the Crew rows alone; eight in `tests/static-check.mjs` for the
+container id, `role="group"`, its non-empty `aria-label`, the reused `feed-filter` class, the
+`#crewLocalHint` → `#crewFeedFilter` → `#activityList` order, both `renderFeedChips()` call sites,
+the two-branch assignment in `setFeedType()`, and that `filterByType()` is still defined exactly
+once. Verified the suite bites by mutating the built script four ways — collapsing the two branches
+of `setFeedType()` onto `feedType`, passing `logs` unfiltered to the Crew feed, dropping the Crew
+`renderFeedChips()` call, and painting the Crew chips from `feedType` — each of which failed both
+the DOM suite and `static-check`. Deviations: (1) the entry says "adds no second helper"; adding
+the crew chip row still needs a second delegated click listener in `init()`, which is a listener
+rather than a helper and has no shared-state alternative, so it was added. (2) Rule 10 archiving:
+entry 43 was moved verbatim into `docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md`
+marks current) and its index line dropped; the lifted block was string-matched back out of the
+archive — exactly one occurrence, gone from the log, heading at the start of its own line — and
+entry 42 above it was confirmed intact and unsplit.
+
+### Why
+Entry 43 gives the You feed a category filter. The Crew feed on `#activityList` has the same problem and the same shape, and a filter that exists on one feed and not the other reads as an oversight rather than a decision.
+
+### Requirements
+- **Depends on entry 43** and must be implemented after it: this entry consumes `filterByType()` and the chip markup pattern 43 introduces, and adds no second helper. If 43 is not yet merged, this entry is `Blocked`.
+- `src/index.template.html` — a chip row above `#activityList`, below `#crewLocalHint`, mirroring 43's markup with its own ids.
+- `src/app.js` — a module-level `crewFeedType` kept separate from 43's `feedType`, so the two feeds filter independently. Changing it calls `resetFeedLimits()` and re-renders through `render()`.
+- Reuse 43's chip styling as-is; `src/styles.css` should need no new rule beyond selecting the new container, if that.
+
+### Tests
+- `tests/client-state.dom.test.js`: the Crew feed narrows to a category and back; the two feeds' filters do not affect each other (setting one leaves the other's rows intact).
+- `tests/static-check.mjs`: presence and `aria-pressed` assertions for the new chip container, and an order assertion that it precedes `id="activityList"`.
+
+### Do not
+Re-implement `filterByType()`; share one filter variable between the two feeds; add delete affordances to Crew rows (entry 29 made that feed read-only); add any per-person or crew-wide participation figure (tone rule).
+
+---
