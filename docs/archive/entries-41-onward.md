@@ -373,3 +373,79 @@ it was confirmed intact and unsplit.
 Add claim buttons or change `claimBounty()`'s same-day rule; show which bounties were *not* claimed, or a claimed-out-of-total figure (tone rule — surface what people did, never what they didn't); list another person's claims here; open the section by default; change `src/scoring.json` (rule 2).
 
 ---
+
+## 47. Start the grade select where you left it
+
+Status: Done — 2026-07-31
+Notes: Commit `Start the grade select where you left it`. `lastLoggedGrade(nameLower)` filters `logs`
+to `x.type==='climb'&&nameKey(x)===key`, sorts a **copy** (the array `filter()` returned, so `logs`
+is never reordered) with `activityMarkup()`'s exact date-then-`createdAt` comparison reversed for
+newest-first, takes `[0]`, and returns `String(last.hardestGrade||'')` only when
+`GRADES.indexOf(grade)>=0` — so an unlisted grade, a blank grade and a missing one all give `''`,
+matching the "not in `SCORING.grades`" clause. `GRADES` is `SCORING.grades`, read not written, so
+rule 2 is untouched. A blank `nameLower` returns `''` rather than matching entries whose own name is
+blank, mirroring entry 46's precedent. No `new Date()`, no scoring re-derivation, no localStorage
+key: it derives from `logs` on every call. `applyGradeDefault()` reads `#hardestGrade`, returns
+immediately if the field is missing **or already has a value**, and otherwise writes
+`lastLoggedGrade(currentTarget()?.name.toLowerCase())`. `currentTarget()` (not `me`) is the source of
+the name, which is what makes the default follow `recordingFor` and matches the name
+`draftActivity()` will save under. The single call site is `updateRecordPreview()`, guarded by
+`if(type==='climb')` and placed beside the existing `if(type==='bounty')populateBountySelect()` line
+and before `draftActivity()`, so the preview sees the applied grade. That is the app's one
+form-populate path — the type radios, `prefillCategory()`, `showTab('record')` and `render()` all
+funnel through it — so no second hook was needed and no new listener was added. The field-has-value
+guard is what satisfies "never overwrite a grade the user has already picked": a repaint with a
+chosen grade is a no-op. After `submitActivity()` clears the field, the following `render()`
+re-applies the just-saved grade, which is the entry's stated point. No template and no CSS change —
+the select, its `<label for>` and its 44px sizing already exist. index.html 148,967 → 149,624 bytes
+(+657, 92.9% of the 161,000-byte budget). Tests: 17 assertions in `tests/client-state.state.test.js`
+(most recent climb wins, the `createdAt` tiebreak inside one day, the oldest climb explicitly not the
+answer, exercise/mobility/bounty entries ignored even when they are the newest rows, another
+person's later climb not leaking in while their own default does move, `''` for an unlisted grade,
+for a climb with no grade, for a person with no climbs, for a blank name against a nameless entry,
+and for an empty log, a padded stored name resolving through `nameKey()`, and `logs` left in its
+arrival order after a call); nine in `tests/client-state.dom.test.js` (populate preselects the last
+grade, a chosen grade survives both a repaint and a re-populate, switching `recordingFor` picks up
+the other person's grade and switching back picks up the first person's, a climber with no climbs
+left on the placeholder, and an unlistable stored grade never reaching the select). Verified the
+suites bite by mutating the built script nine ways — dropping the `updateRecordPreview()` hook,
+dropping the already-chosen guard, sorting oldest-first, dropping the `createdAt` tiebreak, dropping
+the `GRADES` membership check, dropping the climb-type filter, dropping the blank-name guard, reading
+`me` instead of `currentTarget()`, and sorting `logs` in place — each failed the state or DOM suite
+against a confirmed-clean baseline.
+Deviations: (1) Rule 10 archiving: entry 46 was moved verbatim into
+`docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks current, 35,974 bytes against
+the 90,000-byte cap) and its index line dropped; the lifted block was string-matched back out of the
+archive — exactly one occurrence, gone from the log, heading at the start of its own line — and entry
+45 above it was confirmed intact and unsplit. (2) The entry names one helper; a second one-line
+`applyGradeDefault()` holds the DOM side so the pure helper stays pure and testable without a
+document, which is what rule 9 asks for.
+Follow-up in the same PR — commit `Re-derive the grade default when the target changes`: the
+field-has-value guard could not tell a grade the form had filled in from one the user picked, so
+choosing "Record for someone else" while the auto-applied default was still showing kept person A's
+grade and would have saved it under person B. `applyGradeDefault()` now remembers the value it wrote
+in a module-level `gradeDefaultApplied` and treats only a value it did not write as a manual choice;
+a still-untouched default is re-derived (and cleared when the new target has no climbs), while a
+hand-picked grade is left alone exactly as before. `lastLoggedGrade()` is unchanged and still pure.
+The original DOM test cleared the select before each `recordingFor` switch, so it never crossed the
+guard; four assertions were added on top of it (the switch with the default still showing, the draft
+`hardestGrade` that would be saved, the switch back, and a hand-picked grade surviving a switch) and
+no existing assertion was touched. Verified the first fails on a rebuild of the pre-fix script.
+index.html 149,624 → 149,729 bytes (+105, 93.0% of budget). `npm test`: 5/5 suites.
+
+### Why
+`#hardestGrade` resets to its first option every time the Record form repaints. A climber logging three sessions in a week re-picks the same grade from an eighteen-entry list each time, on a phone, at the gym. The information needed to do better is already in `logs`.
+
+### Requirements
+- `src/app.js` — a pure helper `lastLoggedGrade(nameLower)` returning the `hardestGrade` of that person's most recent climb entry, or `''` when they have none or the stored value is not in `SCORING.grades`. Order by the same date/`createdAt` comparison `activityMarkup()` uses so "most recent" means one thing in this app.
+- Apply it only when the Record form is populated for a climb and the field is otherwise at its default — never overwrite a grade the user has already picked in the open form.
+- This is a default, not a memory: no localStorage key (rule 4), so it derives from `logs` on each populate and follows the person selected in `recordingFor`.
+
+### Tests
+- `tests/client-state.state.test.js`: returns the most recent climb's grade; ignores exercise, mobility and bounty entries; returns `''` for a person with no climbs; returns `''` for a grade absent from `SCORING.grades`; is unaffected by another person's climbs.
+- `tests/client-state.dom.test.js`: populating the Record form for a climber with history preselects their last grade, and a grade already chosen in the open form is not overwritten by a repaint.
+
+### Do not
+Add a localStorage key (rule 4); prefill the note, the date, or the bounty select; change `SCORING.grades` or anything in `src/scoring.json` (rule 2); surface copy about how long since the last session, or anything else framed around not logging (tone rule).
+
+---

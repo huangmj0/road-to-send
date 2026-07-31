@@ -97,6 +97,16 @@ assert.match(script,/function showMoreFeed\(/,'one pager serves both feeds');
 // The clamp lives in showMoreFeed(), never inline at the call site, so the read-only assertion
 // below keeps matching a plain `,false)` argument rather than a nested Math.min(...).
 assert.match(script,/#activityList'\)\.innerHTML=activityMarkup\([^)]*,false\)/,'the crew feed is read-only');
+// Entry 48: the Crew feed's names open the same per-person card the leaderboard rows open. app.js
+// is one top-level function per line, so the feed-row assertions below are scoped to
+// activityMarkup's own line — a `data-person=` anywhere else in the script must not satisfy them.
+const feedRowSource=script.split('\n').find(line=>line.startsWith('function activityMarkup('))||'';
+assert.ok(feedRowSource,'the activity feed markup helper is a top-level function');
+assert.match(feedRowSource,/data-person="/,'the crew feed rows expose the climber name as the same per-person hook the leaderboard uses');
+assert.match(feedRowSource,/<button class="climber" type="button" data-person=/,'the crew feed name reuses the leaderboard climber button rather than a second control');
+assert.match(feedRowSource,/<strong>\$\{nm\}<\/strong>/,'the You feed keeps a plain name, so only the crew feed becomes tappable');
+assert.match(script,/querySelector\('#crew'\)\.addEventListener\('click',event=>\{const button=event\.target\.closest\('\[data-person\]'\)/,'a single delegated handler on the Crew panel covers both the leaderboard and the feed');
+assert.equal((script.match(/closest\('\[data-person\]'\)/g)||[]).length,1,'and there is exactly one such handler, not a second one added for the feed');
 assert.match(html,/id="undoBar"[^>]*role="status"[^>]*aria-live="polite"/,'the undo bar announces itself politely');
 assert.match(html,/id="undoDelete"[^>]*type="button"/,'undo is a real button');
 assert.match(html,/id="undoDismiss"[^>]*type="button"/,'dismissing the undo bar is a real button');
