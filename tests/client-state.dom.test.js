@@ -586,6 +586,31 @@ const domChecks = `(()=>{
   closeModal('personModal');
   assert.equal(personModal.classList.contains('open'),false,'closing the dialog clears the open class');
 
+  // Entry 48: the Crew feed names a person on every row, and those names open the same card the
+  // leaderboard rows open. The You feed lists only your own entries, so its names stay plain text.
+  // The delegated handler cannot be fired here (harness.js trap), so this asserts the emitted hook
+  // and then feeds the value it emitted straight into openPersonCard.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[{id:'f1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-2),createdAt:'1'},{id:'f2',name:'Bo',type:'exercise',date:shift(-1),createdAt:'2'}];
+  render();
+  const feedCrew=document.querySelector('#activityList'),feedYou=document.querySelector('#personalActivity');
+  assert.ok(feedCrew.innerHTML.indexOf('data-person="Bo"')>=0,'a Crew row carries the climber it names as a per-person hook');
+  assert.ok(feedCrew.innerHTML.indexOf('data-person="Alex"')>=0,'every Crew row carries one, not just the newest');
+  assert.ok(feedCrew.innerHTML.indexOf('<button class="climber" type="button" data-person=')>=0,'the Crew name reuses the leaderboard climber button rather than a new control');
+  assert.ok(feedCrew.innerHTML.indexOf('aria-haspopup="dialog"')>=0,'and announces that it opens a dialog');
+  assert.ok(feedYou.innerHTML.length>0,'the You feed has rows of its own to compare against');
+  assert.equal(feedYou.innerHTML.indexOf('data-person='),-1,'the You feed lists your own entries, so its names get no per-person hook');
+  assert.ok(feedYou.innerHTML.indexOf('<strong>Alex</strong>')>=0,'the You feed keeps the plain name it always rendered');
+  assert.equal(feedCrew.innerHTML.indexOf('data-del='),-1,'and the Crew feed is still read-only');
+  const hookMark='data-person="',hookAt=feedCrew.innerHTML.indexOf(hookMark),hooked=feedCrew.innerHTML.slice(hookAt+hookMark.length,feedCrew.innerHTML.indexOf('"',hookAt+hookMark.length));
+  assert.equal(hooked,'Bo','the newest Crew row hooks the person who logged it');
+  personTitle.textContent='';
+  openPersonCard(hooked);
+  assert.equal(personTitle.textContent,hooked,'the value a Crew row carries opens that climber card');
+  assert.equal(personModal.classList.contains('open'),true,'and opens the shared person dialog');
+  closeModal('personModal');
+
   // Entry 30: the You panel and the person card render the SAME row shape for the same person, and
   // the You-panel bars are no longer silent decoration — they announce themselves like the card's.
   me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
