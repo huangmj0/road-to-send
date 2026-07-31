@@ -297,6 +297,44 @@ const checks = `(()=>{
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   logs=[];
 
+  // Entry 45: personalWeeklyTrend restricts the same rows to one climber, read straight out of
+  // the weeks map computeCredits() returns. today is an ARGUMENT here too, never the clock.
+  logs=[
+    {id:'q1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'q2',name:'Alex',type:'exercise',date:'2026-07-08',createdAt:'1'},
+    {id:'q3',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+    {id:'q4',name:'Maya',type:'climb',date:'2026-07-13',createdAt:'1'},
+  ];
+  let mine=personalWeeklyTrend('alex','2026-07-15');
+  assert.deepEqual(mine.map(r=>r.week),['2026-06-29','2026-07-06','2026-07-13'],'one row per challenge week, the same span weeklyTrend charts');
+  assert.deepEqual(mine.map(r=>r.label),['W1','W2','W3'],'and the same W1..Wn labels, so the two charts read alike');
+  // Object is injected from the host realm, so Object.keys() hands back a host array that no
+  // deepEqual against a literal here can match. Compare the shape as a string instead.
+  assert.equal(Object.keys(mine[0]).sort().join('|'),'label|points|week','the row shape matches weeklyTrend row for row');
+  assert.deepEqual(mine.map(r=>r.points),[3,2,3],'each week carries only that person points, spread across the weeks they logged');
+  const creditWeeks=computeCredits(logs).weeks;
+  assert.equal(mine[1].points,creditWeeks.get('alex|2026-07-06')||0,'a week total is exactly what computeCredits credits that person for it');
+  assert.equal(mine[2].points,creditWeeks.get('alex|2026-07-13')||0,'and the shared Monday week is not double counted');
+  const hers=personalWeeklyTrend('maya','2026-07-15');
+  assert.deepEqual(hers.map(r=>r.points),[0,0,3],'another climber entries never leak into the first one rows');
+  assert.deepEqual(weeklyTrend('2026-07-15').map(r=>r.points),[3,2,6],'the crew chart still sums both climbers, unchanged by the personal one');
+  assert.deepEqual(personalWeeklyTrend('nobody','2026-07-15'),[],'a person with nothing logged charts nothing');
+  assert.deepEqual(personalWeeklyTrend('','2026-07-15'),[],'and neither does a blank name');
+  assert.deepEqual(personalWeeklyTrend('alex','2026-06-30'),[],'before the start there is nothing to chart');
+  assert.deepEqual(personalWeeklyTrend('alex','garbage'),[],'an unparseable today yields no bars');
+  assert.deepEqual(personalWeeklyTrend('alex',''),[],'a blank today yields no bars');
+  logs=[{id:'q5',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'}];
+  assert.equal(personalWeeklyTrend('alex','2026-07-07').length,2,'the window is capped at the week of today, not the trip date');
+  assert.deepEqual(personalWeeklyTrend('alex','2026-07-21').map(r=>r.points),[3,0,0,0],'a week they logged nothing is simply a zero row');
+  config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.deepEqual(personalWeeklyTrend('alex','2026-07-15'),[],'a missing start date yields no bars');
+  config={startDate:'2026-07-01',tripDate:'',goal:500,crew:[]};
+  assert.deepEqual(personalWeeklyTrend('alex','2026-07-15'),[],'a missing trip date yields no bars');
+  config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
+  assert.deepEqual(personalWeeklyTrend('alex','2026-07-15'),[],'an inverted window yields no bars');
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  logs=[];
+
   // Entry 36: the captions state the per-datum facts that only ever lived in a title= attribute --
   // invisible on touch. They are additive: both graphics keep their own container aria-label.
   assert.equal(heatmapCaption([]),'','no days means no caption');
