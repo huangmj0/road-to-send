@@ -23,6 +23,21 @@ Prefer dynamic pacing or a long interval. Every iteration is a real feature comm
 so a short interval mostly wakes into "the previous pull request is still open". That is harmless —
 the first thing either command does is check — but it is wasted work.
 
+## How a run hands work back
+
+Every run opens its pull request as a draft, because at that moment it has not finished checking
+itself. It then checks: the full `npm test` summary, the diff confined to the files the entry was
+allowed to touch, a clean worktree, the `Status:`/`Notes:` bookkeeping, and every CI check run on
+the pushed commit. When all of that is green it marks the pull request **ready for review** — and
+stops there.
+
+So the draft flag reads as a signal rather than a formality. Ready means the run believes the change
+is complete and CI agrees; still-a-draft means something did not pass, and the run says which thing
+on the way out — a red suite, a check still pending after ten minutes, a deviation that needs a
+ruling. Either way the loop never merges, never enables auto-merge and never approves. Reading the
+diff and merging it is yours, and it is the only gate between this loop and an app a real crew is
+using.
+
 ## Why the loop delegates
 
 `/loop` fires into the **same session**, so everything an iteration reads stays in context for

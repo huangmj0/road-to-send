@@ -14,6 +14,8 @@ shared Google Sheet and from their browsers' localStorage. `index.html` is the d
   anyone else's `In progress`. If nothing is `Todo`, stop and report "queue empty — no Todo entries".
 - One entry = one commit. Set `Status: In progress — <date>` first, and `Status: Done — <date>` plus
   the commit subject and any deviations in `Notes:` in the same commit as the implementation.
+- A run opens its PR as a draft and marks it **ready for review** itself once the suites and CI are
+  green; a run that could not get there leaves the PR a draft and says why. Merging stays yours.
 - Shipped entries live under `docs/archive/`, split by pass and indexed by `IMPROVEMENTS.md`. That
   is the archive, not a queue — never work from it, and when you do need to look something up, read
   the one pass file that holds it.

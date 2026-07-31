@@ -1,6 +1,6 @@
 ---
 name: road-to-send-entry
-description: Implement exactly one queued Road to Send improvement, verify it, commit it, push it, and open a draft pull request. Use only when explicitly invoked to work the next Todo entry in IMPROVEMENT_LOG.md.
+description: Implement exactly one queued Road to Send improvement, verify it, commit it, push it, open a draft pull request, and mark that pull request ready for review once its checks pass. Use only when explicitly invoked to work the next Todo entry in IMPROVEMENT_LOG.md.
 ---
 
 # Work one queue entry
@@ -66,5 +66,26 @@ Run `npm run build`, then `npm test`. Read the complete `=== summary ===` block.
   available; otherwise use `gh`.
 - Check CI without pretending pending checks are green.
 
-Report the entry number and title, pull-request URL, CI status, byte count before and after, and any
-deviations. Then stop.
+## 6. Hand the pull request to the reviewer
+
+A draft means this run has not finished checking itself. When it has, mark the pull request **ready
+for review** — `update_pull_request` with `draft: false`, or `gh pr ready`. Promote it only when
+every one of these holds:
+
+- `npm test` reported `PASS` for every suite in the `=== summary ===` block, `check:generated` and
+  `size-check` included.
+- The commit contains only this entry's permitted files plus the regenerated `index.html`, and
+  `git status --short` is clean afterward.
+- `Status: Done — <today>` and the ``Commit `<subject>`.`` note are in that same commit.
+- Every check run on the pushed head commit concluded successfully, not just the first to report.
+- The entry is not `Blocked`, and no note records a deviation a human must rule on.
+
+Give the checks up to ten minutes to conclude, without a foreground polling loop. If they are still
+pending then, or if any item above fails, leave the pull request a draft and report which one
+stopped it. A draft that names its problem is more useful than a ready pull request that hides it.
+
+**Never merge it**, enable auto-merge, approve it, or push to `main`. Marking it ready is the entire
+handoff; merging is the human decision that gates what reaches a live app.
+
+Report the entry number and title, pull-request URL, CI status, whether the pull request is ready for
+review or still a draft and why, byte count before and after, and any deviations. Then stop.

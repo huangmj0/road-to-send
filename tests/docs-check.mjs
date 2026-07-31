@@ -93,6 +93,15 @@ for(const skill of ['road-to-send-entry','road-to-send-refill','road-to-send-dra
   assert.match(codexMetadata(skill),/allow_implicit_invocation: false/,`${skill} requires explicit invocation because it can create branches and pull requests`);
 }
 
+// A run that passed its own checks promotes its pull request out of draft, and stops there. Both
+// halves are load-bearing: the draft flag only means anything if a green run clears it, and the
+// merge is the human gate on what reaches a live app, so no workflow may take it.
+for(const workflow of ['.claude/commands/entry.md','.claude/commands/refill.md','.agents/skills/road-to-send-entry/SKILL.md','.agents/skills/road-to-send-refill/SKILL.md']){
+  const text=readFileSync(at(workflow),'utf8');
+  assert.match(text,/ready for review/i,`${workflow} marks its pull request ready for review once the checks pass, so a draft still means unfinished`);
+  assert.match(text,/[Nn]ever merge it/,`${workflow} stops at ready for review — merging is the human gate on what ships to a live app`);
+}
+
 const loopDoc=readFileSync(at('docs/loop-prompt.md'),'utf8');
 assert.ok(!loopDoc.includes('```'),'docs/loop-prompt.md points at tool-specific workflows instead of carrying another fenced prompt');
 assert.match(loopDoc,/\.claude\/commands\/entry\.md/,'docs/loop-prompt.md names where the prompt actually lives');

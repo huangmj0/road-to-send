@@ -61,4 +61,32 @@ just the first failure. `check:generated` is read-only: if it fails, run `npm ru
 - All of that goes in the **same commit** as the implementation. One entry = one commit.
 - `git push -u origin claude/entry-<N>-<slug>`, then open a **draft** PR filling in the
   repository's pull request template.
-- Report the entry number, the PR URL, and CI status. Then stop — do not start the next entry.
+
+## 6. Hand it to the reviewer
+
+A draft means "this run has not finished checking itself". Once it has, say so: promote the PR to
+**ready for review** — `update_pull_request` with `draft: false`, or `gh pr ready` — but only when
+every one of these holds.
+
+- `npm test` printed `PASS` for every suite in the `=== summary ===` block. One `FAIL` anywhere,
+  including `check:generated` or `size-check`, means no.
+- The commit touches only what this entry was allowed to touch, plus the regenerated `index.html`,
+  and `git status --short` is clean afterwards — no stray file left behind, nothing uncommitted.
+- `Status: Done — <today>` and the ``Commit `<subject>`.`` note landed in that same commit.
+- CI on the pushed head commit has **concluded successfully** — every check run, not just the first
+  one to report back.
+- The entry is not `Blocked`, and nothing in `Notes:` is a deviation a human has to rule on.
+
+CI takes about a minute. Re-read the PR's check runs until they conclude, for up to ten minutes;
+don't spin on a foreground `sleep` — use whatever wait your harness gives you. If they are still
+pending when that budget runs out, leave the PR a draft and report `CI: pending`.
+
+If any item above fails, **leave it a draft** and say which one. A draft that names its problem is
+worth more than a ready PR that buries it.
+
+**Never merge it.** Not by merging, not by enabling auto-merge, not by approving, not by pushing to
+`main`. Marking ready is the entire handoff; the merge is the human's, and it is the only gate
+between this loop and an app a real crew uses.
+
+- Report the entry number, the PR URL, CI status, and whether the PR is ready for review or still a
+  draft and why. Then stop — do not start the next entry.

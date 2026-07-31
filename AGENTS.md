@@ -24,6 +24,8 @@ shared Google Sheet and from their browsers' localStorage. `index.html` is the d
   one queue entry.
 - Invoke `$road-to-send-refill` only when the queue is empty to propose new entries in a queue-only
   draft PR.
+- Both open their PR as a draft and mark it **ready for review** themselves once the local suites
+  and CI are green. Neither ever merges: the merge is the human gate on what reaches a live app.
 - Invoke `$road-to-send-drain` for a context-light loop tick. It reads only queue state and delegates
   the entry or refill workflow to one fresh subagent, then stops. The outer automation or operator
   owns the next tick.
