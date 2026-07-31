@@ -555,6 +555,38 @@ const domChecks = `(()=>{
   assert.equal(bothRows(bothYouFeed),1,'and the You feed shows its own narrowed rows');
   setFeedType('all');
 
+  // Entry 49: a feed emptied by entry 43/44's chips used to claim there was no activity at all.
+  // Each feed's fallback now names the filter that emptied it, and each reads its OWN filter —
+  // the You feed's from feedType, the Crew feed's from crewFeedType.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;feedType='all';crewFeedType='all';resetFeedLimits();
+  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[{id:'e1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'e2',name:'Bo',type:'climb',date:shift(-2),createdAt:'2'}];
+  render();
+  const emptyYou=document.querySelector('#personalActivity'),emptyCrew=document.querySelector('#activityList');
+  const mobilityCopy='No '+CAT_LABELS.mobility+' entries in this view.',exerciseCopy='No '+CAT_LABELS.exercise+' entries in this view.';
+  assert.equal(emptyYou.innerHTML.indexOf('No activity yet.'),-1,'a You feed with rows says nothing about being empty');
+  assert.equal(emptyCrew.innerHTML.indexOf('No activity yet.'),-1,'nor does a Crew feed with rows');
+  setFeedType('mobility');
+  assert.equal(emptyYou.innerHTML.split('class="activity').length-1,0,'the You feed really is emptied by a category nobody logged');
+  assert.ok(emptyYou.innerHTML.indexOf(mobilityCopy)>=0,'so the You feed names the category that emptied it');
+  assert.equal(emptyYou.innerHTML.indexOf('No activity yet.'),-1,'and no longer claims the feed has no activity at all');
+  assert.ok(emptyYou.innerHTML.indexOf('<p class="hint">')>=0,'the filter sentence rides in the existing hint paragraph');
+  assert.equal(emptyCrew.innerHTML.split('class="activity').length-1,2,'the Crew feed keeps its own rows under its own filter');
+  setFeedType('exercise',true);
+  assert.equal(emptyCrew.innerHTML.split('class="activity').length-1,0,'the Crew feed empties under its own filter');
+  assert.ok(emptyCrew.innerHTML.indexOf(exerciseCopy)>=0,'and names the category the Crew chips selected');
+  assert.equal(emptyCrew.innerHTML.indexOf(mobilityCopy),-1,'the Crew feed reads crewFeedType, never the You feed filter');
+  assert.ok(emptyYou.innerHTML.indexOf(mobilityCopy)>=0,'and the You feed still names its own filter');
+  setFeedType('all');setFeedType('all',true);
+  assert.equal(emptyYou.innerHTML.indexOf('entries in this view.'),-1,'clearing the You filter drops the filter sentence with its rows back');
+  assert.equal(emptyCrew.innerHTML.indexOf('entries in this view.'),-1,'and clearing the Crew filter drops it there too');
+  // With the filter back at All, a genuinely empty feed reads as the plain sentence it always did.
+  logs=[];
+  render();
+  assert.ok(emptyYou.innerHTML.indexOf('No activity yet.')>=0,'an unfiltered empty You feed keeps the original sentence');
+  assert.ok(emptyCrew.innerHTML.indexOf('No activity yet.')>=0,'and so does an unfiltered empty Crew feed');
+  assert.equal(emptyYou.innerHTML.indexOf('entries in this view.'),-1,'with no filter named, because no filter emptied it');
+
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
 

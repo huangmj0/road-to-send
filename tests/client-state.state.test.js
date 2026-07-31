@@ -947,6 +947,26 @@ const checks = `(()=>{
   logs=[];
   assert.equal(lastLoggedGrade('alex'),'','an empty log has no default either');
 
+  // Entry 49: the feed's empty fallback said "No activity yet." even when entry 43's chips were
+  // what emptied it. feedEmptyCopy() names the filter instead, reading its label from CAT_LABELS.
+  assert.equal(feedEmptyCopy('all'),'No activity yet.','the All filter keeps the plain sentence');
+  assert.equal(feedEmptyCopy(''),'No activity yet.','an empty type keeps the plain sentence');
+  assert.equal(feedEmptyCopy(undefined),'No activity yet.','a missing type keeps the plain sentence');
+  assert.equal(feedEmptyCopy('not-a-category'),'No activity yet.','a type outside CATEGORIES keeps the plain sentence');
+  assert.equal(feedEmptyCopy('bounty'),'No activity yet.','bounty is not a chip type, so it keeps the plain sentence too');
+  for(const t of CATEGORIES)assert.equal(feedEmptyCopy(t),'No '+CAT_LABELS[t]+' entries in this view.','the '+t+' filter names its own category');
+  assert.ok(CATEGORIES.every(t=>feedEmptyCopy(t).indexOf(CAT_LABELS[t])>=0),'every category label reaching the copy comes from CAT_LABELS, not a second list');
+  assert.ok(CATEGORIES.every(t=>feedEmptyCopy(t)!=='No activity yet.'),'no category falls back to the unfiltered sentence');
+  // The copy reports a filter and nothing else — no name, no count, no date, no call to action.
+  assert.ok(CATEGORIES.every(t=>!/[0-9]/.test(feedEmptyCopy(t))),'the copy carries no count and no date');
+  assert.ok(CATEGORIES.every(t=>feedEmptyCopy(t).toLowerCase().indexOf('log ')<0),'the copy asks nobody to log anything');
+  // The fallback still arrives as the same hint paragraph the feeds have always rendered.
+  logs=[];
+  const emptyFeed=activityMarkup([],5,false);
+  assert.ok(emptyFeed.indexOf('<p class="hint">')===0,'an empty feed still returns the hint paragraph');
+  assert.ok(emptyFeed.indexOf('No activity yet.')>=0,'and with no filter set it still reads as the plain sentence');
+  assert.ok(emptyFeed.indexOf('</p>')>0,'the paragraph is closed as before');
+
   endpoint='';
   logs=[];
 })()`;
