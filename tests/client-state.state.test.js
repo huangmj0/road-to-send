@@ -134,6 +134,48 @@ const checks = `(()=>{
   assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'non-bounty entries and other people are ignored');
   logs=[];
 
+  // Entry 46: claimedBounties lists one person's bounty claims, newest-first, resolving the title
+  // through the same bountyTitle -> bountyById -> 'Bounty' chain activityMarkup() uses.
+  logs=[
+    {id:'c1',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'},
+    {id:'c2',name:'Alex',type:'bounty',bountyId:'outdoor-send',bountyTitle:'Outdoor Send',note:'cold rock',date:'2026-07-15',createdAt:'1'},
+    {id:'c3',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-16',createdAt:'1'},
+    {id:'c4',name:'Maya',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-17',createdAt:'1'},
+  ];
+  let claims=claimedBounties('alex');
+  assert.equal(claims.length,2,'only the named person’s bounty entries are listed');
+  assert.equal(claims[0].label,'Outdoor Send','newest claim comes first');
+  assert.equal(claims[1].label,'Send It','older claim follows it');
+  assert.equal(claims[0].note,'cold rock','the note written on the claim is carried through');
+  assert.equal(claims[1].note,'','a claim with no note reports an empty string, never undefined');
+  assert.equal(claims[0].date,fmtDay('2026-07-15'),'the day is labelled with fmtDay()');
+  assert.equal(claims[0].date.indexOf('2026'),-1,'and is the formatted label, not the raw ISO date');
+  assert.equal(claims.filter(r=>r.label==='V4').length,0,'climb entries never appear among the claims');
+
+  // Same-day claims fall back to createdAt, the tiebreak activityMarkup() uses.
+  logs=[
+    {id:'t1',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Earlier',date:'2026-07-15',createdAt:'1'},
+    {id:'t2',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Later',date:'2026-07-15',createdAt:'2'},
+  ];
+  assert.equal(claimedBounties('alex')[0].label,'Later','a later createdAt sorts first within one day');
+
+  // The title resolves from bountyId when bountyTitle is absent, and falls back for an unknown id.
+  logs=[{id:'c5',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(claimedBounties('alex')[0].label,bountyById('send-it').title,'a missing bountyTitle resolves through bountyById');
+  logs=[{id:'c6',name:'Alex',type:'bounty',bountyId:'not-a-real-bounty',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(claimedBounties('alex')[0].label,'Bounty','an unknown bountyId falls back to a plain label rather than throwing');
+  logs=[{id:'c7',name:'Alex',type:'bounty',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(claimedBounties('alex')[0].label,'Bounty','a claim with no id at all still lists');
+
+  // Nobody, and no claims, both come back empty rather than undefined.
+  logs=[{id:'c8',name:'Maya',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'}];
+  // deepEqual against a literal is avoided here on purpose: length is enough and cannot trip the
+  // cross-realm array comparison this vm harness is prone to.
+  assert.equal(claimedBounties('alex').length,0,'a person with no claims of their own gets an empty list');
+  assert.equal(claimedBounties('').length,0,'a blank name matches nobody, not the crew');
+  logs=[];
+  assert.equal(claimedBounties('alex').length,0,'an empty log yields no claims');
+
   // gradePyramid counts ALL of the person's graded climb logs, hardest-first by GRADES index.
   logs=[
     {id:'g1',name:'Alex',type:'climb',hardestGrade:'V9',date:'2026-07-13',createdAt:'1'},
