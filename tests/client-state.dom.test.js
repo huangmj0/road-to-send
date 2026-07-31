@@ -555,6 +555,31 @@ const domChecks = `(()=>{
   assert.equal(bothRows(bothYouFeed),1,'and the You feed shows its own narrowed rows');
   setFeedType('all');
 
+  // Entry 49: a filter that empties a feed says so by name, in that feed alone, rather than
+  // falling back to the same "no activity" sentence a truly empty feed shows.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;feedType='all';crewFeedType='all';resetFeedLimits();
+  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[{id:'n1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'n2',name:'Bo',type:'climb',date:shift(-2),createdAt:'2'}];
+  render();
+  const namedYouFeed=document.querySelector('#personalActivity'),namedCrewFeed=document.querySelector('#activityList');
+  setFeedType('mobility');
+  assert.ok(namedYouFeed.innerHTML.indexOf('No '+CAT_LABELS.mobility+' entries in this view.')>=0,'the You feed names the category that emptied it');
+  assert.equal(namedYouFeed.innerHTML.indexOf('No activity yet.'),-1,'and drops the generic sentence while a filter is active');
+  assert.equal(namedCrewFeed.innerHTML.indexOf('No '+CAT_LABELS.mobility+' entries in this view.'),-1,'the Crew feed keeps its own rows and reads no filter sentence');
+  setFeedType('exercise',true);
+  assert.ok(namedCrewFeed.innerHTML.indexOf('No '+CAT_LABELS.exercise+' entries in this view.')>=0,'the Crew feed also names its own filter when it empties');
+  assert.ok(namedYouFeed.innerHTML.indexOf('No '+CAT_LABELS.mobility+' entries in this view.')>=0,'while the You feed still names its own, unrelated filter');
+  setFeedType('all');
+  assert.equal(namedYouFeed.innerHTML.indexOf('entries in this view.'),-1,'clearing the You filter drops the category sentence now that Alex has a climb logged');
+  setFeedType('all',true);
+  assert.equal(namedCrewFeed.innerHTML.indexOf('entries in this view.'),-1,'clearing the Crew filter drops the category sentence too');
+
+  // With nothing logged at all, the unfiltered feed keeps the original, plain sentence.
+  logs=[];
+  render();
+  assert.ok(namedYouFeed.innerHTML.indexOf('No activity yet.')>=0,'a genuinely empty You feed still reads the plain sentence');
+  assert.ok(namedCrewFeed.innerHTML.indexOf('No activity yet.')>=0,'a genuinely empty Crew feed still reads the plain sentence');
+
   // The shared branch posts action:'delete' through fetchShared; harness 2 has no fetch stub,
   // so it stays with the fetch-stubbed harness pattern below.
 
