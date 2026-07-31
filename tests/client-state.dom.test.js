@@ -191,6 +191,44 @@ const domChecks = `(()=>{
   assert.equal(bountyWeekOpen,false,'tapping again closes it');
   assert.equal(weekBox.innerHTML,'','and it renders nothing again');
 
+  // Entry 46: the claimed list follows the same closed-by-default contract, and lists only claims.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(20),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+  const claimedId=dailyBounties(challengeToday())[0].id,claimedTitle=bountyById(claimedId).title;
+  logs=[
+    {id:'k1',name:'Alex',type:'bounty',bountyId:claimedId,bountyTitle:claimedTitle,note:'felt good',date:shift(-1),createdAt:'1'},
+    {id:'k2',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'2'},
+    {id:'k3',name:'Maya',type:'bounty',bountyId:claimedId,bountyTitle:'Maya only',date:shift(-1),createdAt:'3'},
+  ];
+  render();
+  const claimedBox=document.querySelector('#claimedList');
+  // setAttribute is a no-op in this stub, so the open state is asserted where it actually lives.
+  assert.equal(claimedOpen,false,'the claimed list starts closed');
+  assert.equal(claimedBox.innerHTML,'','and renders nothing at all until it is opened');
+  assert.equal(claimedBox.classList.contains('hide'),true,'the container stays hidden');
+  toggleClaimed();
+  assert.equal(claimedOpen,true,'tapping the toggle opens it');
+  assert.equal(claimedBox.classList.contains('hide'),false,'and reveals the container');
+  assert.ok(claimedBox.innerHTML.indexOf(claimedTitle)>=0,'which now names the bounty that was claimed');
+  assert.ok(claimedBox.innerHTML.indexOf('felt good')>=0,'and the note written on the claim');
+  assert.ok(claimedBox.innerHTML.indexOf('bounty-peek')>=0,'reusing the existing bounty row markup');
+  assert.equal(claimedBox.innerHTML.indexOf('Maya only'),-1,'another person’s claims never appear here');
+  assert.equal(claimedBox.innerHTML.indexOf('data-claim-bounty'),-1,'claimed rows are plain rows, never claim buttons');
+  assert.equal(claimedBox.innerHTML.indexOf('data-del'),-1,'and carry no delete affordance');
+  render();
+  assert.ok(claimedBox.innerHTML.indexOf(claimedTitle)>=0,'a repaint keeps an open list open');
+  assert.equal(claimedBox.innerHTML.split('bounty-peek').length-1,1,'and redraws one row rather than appending a second');
+  toggleClaimed();
+  assert.equal(claimedOpen,false,'tapping again closes it');
+  assert.equal(claimedBox.innerHTML,'','and it empties again');
+  // Someone with nothing claimed opens to a plain empty state, not a zero-of-total figure.
+  logs=[{id:'k4',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
+  toggleClaimed();
+  assert.equal(claimedOpen,true,'it still opens for a climber with no claims');
+  assert.equal(claimedBox.innerHTML.indexOf('bounty-peek'),-1,'listing no rows');
+  toggleClaimed();
+  assert.equal(claimedBox.innerHTML,'','and closes back to nothing');
+
   // Entry 34: a note written on a bounty claim round-trips to the Sheet and back, and until now was
   // rendered to nobody — the bounty branch showed the title and stopped.
   me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;

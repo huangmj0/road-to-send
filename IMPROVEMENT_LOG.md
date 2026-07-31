@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 45 — Chart your own weeks on the You tab — Done — 2026-07-31
-- 46 — List the bounties you have claimed — Todo
+- 46 — List the bounties you have claimed — Done — 2026-07-31
 - 47 — Start the grade select where you left it — Todo
 - 48 — Open a crewmate's card from the Crew feed — Todo
 
@@ -43,80 +42,59 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 45. Chart your own weeks on the You tab
-
-Status: Done — 2026-07-31
-Notes: Commit `Chart your own weeks on the You tab`. `personalWeeklyTrend(nameLower,today)` is
-`weeklyTrend()`'s week walk with one line changed: instead of pre-summing the `weeks` map into a
-per-week crew total it reads `weeks.get(key+'|'+wk)||0` straight out of the map `computeCredits()`
-returns, which is the same key shape `weekTrend()` and `personalRecords()` already index by. It
-carries `weeklyTrend()`'s four guards verbatim (unparseable `startDate`/`tripDate`/`today`,
-inverted window, `today` before the start) plus two the entry asked for — a blank `nameLower`, and
-`!logs.some(x=>nameKey(x)===key)` for a person with nothing logged — so the "nothing logged" case
-returns `[]` rather than a row of zeros, which is what lets the card hide. Rows are the same
-`{week,label,points}` shape, so `trendCaption()` consumes them unchanged. `weeklyTrend()` itself is
-untouched, and a test asserts the crew chart still sums both climbers while the personal one counts
-three points. `renderYouTrend()` mirrors `renderHeatmap()`/`renderPyramid()`: `classList.toggle(
-'hide',!rows.length)`, empty the container and the caption when hidden, and it is called from
-`render()` immediately after `renderHeatmap()`. Template: one `<article id="youTrendCard" class=
-"card hide">` after `#heatmapCard` — the last card on the You panel, so every existing You-panel
-order assertion is untouched — wrapping `<div id="youTrend" class="trend" role="img" aria-label=
-"Your weekly points">` in the existing `.trend-scroll`, with `#youTrendSummary` beneath it. **No CSS
-change at all**: reusing `trend-scroll`/`trend`/`trend-col`/`trend-bar`/`trend-label` means the
-horizontal scroll, the bar geometry and the `prefers-reduced-motion` kill-switch all apply as they
-stand, which is what "reuse the existing trend bar CSS rather than adding a second visual language"
-asked for. index.html 145,995 → 147,510 bytes (+1,515, 91.6% of the 161,000-byte budget). Tests: 20
-assertions in `tests/client-state.state.test.js` (one row per challenge week across the same span
-`weeklyTrend()` charts, the W1..Wn labels, the row shape, per-week points checked against
-`computeCredits().weeks` directly, another climber's entries staying out, the crew chart unchanged,
-nothing-logged/blank-name/before-start/unparseable-today/blank-today/missing-start/missing-trip/
-inverted-window all returning `[]`, the window capped at the week of today, and a logged-nothing
-week appearing as a plain zero row); 14 in `tests/client-state.dom.test.js` (card hidden with no
-entries, opening once something is logged, a column per week, the caption written by
-`trendCaption()`, a repaint drawing the same bar count rather than a second set, and switching to a
-climber with nothing logged closing and emptying it again); six in `tests/static-check.mjs` for the
-`#heatmapCard` → `#youTrendCard` order, `role="img"` with a non-empty `aria-label`, the reused
-`.trend-scroll` wrapper, the caption following its chart, and both new helper functions. Verified
-the suite bites by mutating the built script six ways — zeroing the personal weeks, dropping
-`renderYouTrend()` from `render()`, removing the empty-person guard, pinning the card open, making
-the repaint append rather than assign, and deleting the card from the markup — each of which failed
-the DOM suite, the state suite or `static-check`. Deviations: (1) the entry forbids changing "the
-Crew tab's chart", and `renderTrend()` was still edited — its bar markup and its aria-label list
-were lifted into two pure helpers, `trendColumns(rows)` and `trendAria(rows)`, that both charts now
-call. The Crew chart's rendered output is byte-identical (its own DOM assertions still pass
-untouched); duplicating ~300 characters of bar markup was the alternative, and rule 6 asks for small
-pure helpers rather than a forked copy. `weeklyTrend()` itself, and what the Crew chart draws, are
-unchanged. (2) `Object.keys()` in the state suite hands back a **host-realm** array that no
-`deepEqual` against a literal inside the vm template can match — the row-shape assertion compares
-`.sort().join('|')` instead, with a comment saying why. (3) Rule 10 archiving: entry 44 was moved
-verbatim into `docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks current) and its
-index line dropped; the lifted block was string-matched back out of the archive — exactly one
-occurrence, gone from the log, heading at the start of its own line — and entry 43 above it was
-confirmed intact and unsplit.
-
-### Why
-`weeklyTrend(today)` builds week-by-week bars from `computeCredits(logs)` across the whole crew, and the Crew tab renders them. An individual only ever gets `weekTrend(name)`, which is a single up/down/even arrow against last week. So the app can show the crew's shape over the whole challenge but shows one person only whether this week beat last week — and the per-week numbers for one climber are already in the same `computeCredits()` output.
-
-### Requirements
-- `src/app.js` — a pure helper `personalWeeklyTrend(nameLower,today)` returning the same row shape `weeklyTrend()` returns, restricted to one person. Derive it from the maps `computeCredits(logs)` returns (rule 6); never re-derive scoring math and never call `new Date()` for challenge dates — use `challengeToday()`, `weekKey()` and `parseDateOnly()` as `weeklyTrend()` does.
-- Return `[]` when the person has nothing logged, when the config dates are unparseable, or when `today` precedes `config.startDate` — matching `weeklyTrend()`'s existing guards rather than inventing new ones.
-- `src/index.template.html` — a card on the You panel after `#heatmapCard`, so the existing You-panel order assertions keep passing. It carries `role="img"` with an `aria-label` naming the per-week figures, and decorative bars are `aria-hidden="true"` (rule 7).
-- Reuse `trendCaption()` for the text caption beneath it, as `#trendSummary` does on the Crew tab, and reuse the existing trend bar CSS rather than adding a second visual language.
-- Hide the card when the helper returns `[]`, the way `renderPyramid()` and `renderHeatmap()` already toggle `hide` on their cards.
-
-### Tests
-- `tests/client-state.state.test.js`: the helper returns one row per challenge week for a person with entries spread across weeks; totals for a week match what `computeCredits()` credits that person for it; a person with nothing logged returns `[]`; a blank or unparseable date returns `[]`; another climber's entries never appear in the result.
-- `tests/client-state.dom.test.js`: the card is hidden for a climber with no entries and populated for one with entries; a repaint does not duplicate the bars.
-- `tests/static-check.mjs`: presence assertions for the card and chart ids, `role="img"` and a non-empty `aria-label`, and an order assertion `id="heatmapCard"` → the new card id.
-
-### Do not
-Change `weeklyTrend()` or the Crew tab's chart; compare the person against anyone else or against the crew average; render a week they logged nothing as a callout rather than simply a zero-height bar (tone rule — no absence counts); add a new localStorage key; animate the bars in JavaScript.
-
----
-
 ## 46. List the bounties you have claimed
 
-Status: Todo
+Status: Done — 2026-07-31
+Notes: Commit `List the bounties you have claimed`. `claimedBounties(nameLower)` filters `logs` to
+`x.type==='bounty'&&nameKey(x)===key`, sorts with `activityMarkup()`'s exact date-then-`createdAt`
+comparison (reversed for newest-first), and maps each entry to `{date,label,note}` — `label` through
+the same `x.bountyTitle||(bountyById(x.bountyId)||{}).title||'Bounty'` chain `activityMarkup()` uses,
+`date` through `fmtDay()`, `note` coerced with `String(x.note||'')` so a missing note is `''` rather
+than `undefined`. It re-reads `logs` on each call and never touches scoring, so rule 6 is satisfied
+by consumption rather than re-derivation; no `new Date()` anywhere. A blank `nameLower` returns `[]`
+rather than matching entries whose own name is blank. `renderClaimed()` mirrors `renderBountyWeek()`
+line for line — `toggle.setAttribute('aria-expanded',String(claimedOpen))`, `classList.toggle('hide',
+!claimedOpen)`, and `if(!claimedOpen){box.innerHTML='';return}` so a closed section renders nothing
+at all — driven by the module-level `let claimedOpen=false` that entry 41's precedent asks for, never
+by reading the attribute back. `toggleClaimed()` flips the flag and repaints; `renderBounties()`
+calls `renderClaimed()` immediately after `renderBountyWeek()`, and `init()` wires the toggle beside
+the existing `#bountyWeekToggle` listener. Template: one `<button id="claimedToggle" class="text-btn"
+type="button" aria-expanded="false" aria-controls="claimedList">` plus `<div id="claimedList" class=
+"bounty-week hide">`, appended inside the existing Today's-bounties article after `#bountyWeek` —
+under `#bountyWeek` and above `#youEmptyState` as required, and no existing id moved. Rows reuse the
+`.bounty-peek` / `.bounty-cat` markup verbatim, so the only CSS change is widening one selector to
+`#bountyWeekToggle,#claimedToggle{min-height:44px}` for rule 7's touch target; expand/collapse stays
+the existing `.hide` class toggle, so it is CSS-only and the `prefers-reduced-motion` kill-switch
+still applies. index.html 147,510 → 148,967 bytes (+1,457, 92.5% of the 161,000-byte budget).
+Tests: 20 assertions in `tests/client-state.state.test.js` (only the named person's bounty rows,
+newest-first ordering, the `createdAt` tiebreak within one day, the note carried through, a missing
+note as `''`, the day formatted by `fmtDay()` and demonstrably not the raw ISO date, climb entries
+excluded, title resolved from `bountyId` when `bountyTitle` is absent, `'Bounty'` for an unknown id
+and for no id at all, and empty results for a person with no claims, a blank name and an empty log);
+17 in `tests/client-state.dom.test.js` (closed by default with an empty container, opening lists the
+claim and its note using `.bounty-peek`, another person's claim absent, no `data-claim-bounty` and no
+`data-del` on these rows, a repaint keeping it open and redrawing one row rather than appending a
+second, closing emptying it again, and a climber with no claims opening to no rows); seven in
+`tests/static-check.mjs` (toggle id with `type="button"` and `aria-expanded="false"`, its
+`aria-controls`, the container id, the `#bountyWeek` → `#claimedToggle` → `#claimedList` →
+`#youEmptyState` order, the 44px rule, and both new functions). Verified the suite bites by mutating
+the built script 11 ways — dropping the name filter, dropping `renderClaimed()` from
+`renderBounties()`, letting a closed section keep its markup, sorting oldest-first, renaming the
+toggle id, making the repaint append, collapsing the title chain to a constant, removing the 44px
+rule, defaulting the flag to open, blanking the note, and deleting `aria-expanded` — each failed the
+state suite, the DOM suite or `static-check`, against a confirmed-clean baseline.
+Deviations: (1) the entry specifies the row shape `{date,label,note}` while also asking for a
+resolved title and an `fmtDay()` day label, which is three derivations for two free fields. Read as:
+`label` carries the resolved bounty title (it is the only field the title can occupy, and entry 45's
+`{week,label,points}` uses `label` for display text the same way) and `date` carries the `fmtDay()`
+label. No raw ISO date is exposed, because the newest-first sort happens inside the helper and no
+caller needs one. (2) `assert.deepEqual` against a literal `[]` was avoided for the empty cases in
+favour of `.length` checks, with a comment saying why — entry 45 hit a cross-realm array comparison
+in this vm harness and length is sufficient here. (3) Rule 10 archiving: entry 45 was moved verbatim
+into `docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks current, 21KB against the
+90KB cap) and its index line dropped; the lifted block was string-matched back out of the archive —
+exactly one occurrence, gone from the log, heading at the start of its own line — and entry 44 above
+it was confirmed intact and unsplit.
 
 ### Why
 `bountyWeekProgress()` knows how many bounty points this week have been credited against the weekly cap, and entry 41 added a preview of what the coming days will offer. Nothing shows what you actually claimed. The bounty rows in the feed are interleaved with every other activity, so reconstructing "which bounties have I done" means scrolling the whole log and reading each row's title.

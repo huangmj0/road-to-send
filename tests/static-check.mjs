@@ -107,6 +107,13 @@ assert.match(html,/id="bountyWeekToggle"[^>]*type="button"[^>]*aria-expanded="fa
 assert.match(html,/id="bountyWeek"/,'the week preview has a container');
 assert.match(html,/id="todayBounties"[\s\S]*id="bountyWeekToggle"[\s\S]*id="bountyWeek"/,'the preview sits under today bounties');
 assert.match(script,/function upcomingBounties\(/,'a pure helper computes the coming days');
+assert.match(html,/id="claimedToggle"[^>]*type="button"[^>]*aria-expanded="false"/,'the claimed list opens from a real button and starts closed');
+assert.match(html,/id="claimedToggle"[^>]*aria-controls="claimedList"/,'the claimed toggle points at the container it controls');
+assert.match(html,/id="claimedList"/,'the claimed list has a container');
+assert.match(html,/id="bountyWeek"[\s\S]*id="claimedToggle"[\s\S]*id="claimedList"[\s\S]*id="youEmptyState"/,'the claimed list sits under the week preview and above the You empty state');
+assert.match(html,/#bountyWeekToggle,#claimedToggle\{min-height:44px\}/,'the claimed toggle reuses the 44px touch target');
+assert.match(script,/function claimedBounties\(/,'a pure helper lists the claims');
+assert.match(script,/function renderClaimed\(/,'a render function owns the claimed list');
 assert.match(script,/function shareProgress\(/,'the Share button goes through the system share sheet first');
 assert.match(script,/function writeStore\(/,'the shared storage helper exists');
 assert.equal((script.match(/localStorage\.setItem/g)||[]).length,1,'storage writes funnel through one helper');
