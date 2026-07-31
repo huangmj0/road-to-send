@@ -300,3 +300,76 @@ confirmed intact and unsplit.
 Change `weeklyTrend()` or the Crew tab's chart; compare the person against anyone else or against the crew average; render a week they logged nothing as a callout rather than simply a zero-height bar (tone rule — no absence counts); add a new localStorage key; animate the bars in JavaScript.
 
 ---
+
+## 46. List the bounties you have claimed
+
+Status: Done — 2026-07-31
+Notes: Commit `List the bounties you have claimed`. `claimedBounties(nameLower)` filters `logs` to
+`x.type==='bounty'&&nameKey(x)===key`, sorts with `activityMarkup()`'s exact date-then-`createdAt`
+comparison (reversed for newest-first), and maps each entry to `{date,label,note}` — `label` through
+the same `x.bountyTitle||(bountyById(x.bountyId)||{}).title||'Bounty'` chain `activityMarkup()` uses,
+`date` through `fmtDay()`, `note` coerced with `String(x.note||'')` so a missing note is `''` rather
+than `undefined`. It re-reads `logs` on each call and never touches scoring, so rule 6 is satisfied
+by consumption rather than re-derivation; no `new Date()` anywhere. A blank `nameLower` returns `[]`
+rather than matching entries whose own name is blank. `renderClaimed()` mirrors `renderBountyWeek()`
+line for line — `toggle.setAttribute('aria-expanded',String(claimedOpen))`, `classList.toggle('hide',
+!claimedOpen)`, and `if(!claimedOpen){box.innerHTML='';return}` so a closed section renders nothing
+at all — driven by the module-level `let claimedOpen=false` that entry 41's precedent asks for, never
+by reading the attribute back. `toggleClaimed()` flips the flag and repaints; `renderBounties()`
+calls `renderClaimed()` immediately after `renderBountyWeek()`, and `init()` wires the toggle beside
+the existing `#bountyWeekToggle` listener. Template: one `<button id="claimedToggle" class="text-btn"
+type="button" aria-expanded="false" aria-controls="claimedList">` plus `<div id="claimedList" class=
+"bounty-week hide">`, appended inside the existing Today's-bounties article after `#bountyWeek` —
+under `#bountyWeek` and above `#youEmptyState` as required, and no existing id moved. Rows reuse the
+`.bounty-peek` / `.bounty-cat` markup verbatim, so the only CSS change is widening one selector to
+`#bountyWeekToggle,#claimedToggle{min-height:44px}` for rule 7's touch target; expand/collapse stays
+the existing `.hide` class toggle, so it is CSS-only and the `prefers-reduced-motion` kill-switch
+still applies. index.html 147,510 → 148,967 bytes (+1,457, 92.5% of the 161,000-byte budget).
+Tests: 20 assertions in `tests/client-state.state.test.js` (only the named person's bounty rows,
+newest-first ordering, the `createdAt` tiebreak within one day, the note carried through, a missing
+note as `''`, the day formatted by `fmtDay()` and demonstrably not the raw ISO date, climb entries
+excluded, title resolved from `bountyId` when `bountyTitle` is absent, `'Bounty'` for an unknown id
+and for no id at all, and empty results for a person with no claims, a blank name and an empty log);
+17 in `tests/client-state.dom.test.js` (closed by default with an empty container, opening lists the
+claim and its note using `.bounty-peek`, another person's claim absent, no `data-claim-bounty` and no
+`data-del` on these rows, a repaint keeping it open and redrawing one row rather than appending a
+second, closing emptying it again, and a climber with no claims opening to no rows); seven in
+`tests/static-check.mjs` (toggle id with `type="button"` and `aria-expanded="false"`, its
+`aria-controls`, the container id, the `#bountyWeek` → `#claimedToggle` → `#claimedList` →
+`#youEmptyState` order, the 44px rule, and both new functions). Verified the suite bites by mutating
+the built script 11 ways — dropping the name filter, dropping `renderClaimed()` from
+`renderBounties()`, letting a closed section keep its markup, sorting oldest-first, renaming the
+toggle id, making the repaint append, collapsing the title chain to a constant, removing the 44px
+rule, defaulting the flag to open, blanking the note, and deleting `aria-expanded` — each failed the
+state suite, the DOM suite or `static-check`, against a confirmed-clean baseline.
+Deviations: (1) the entry specifies the row shape `{date,label,note}` while also asking for a
+resolved title and an `fmtDay()` day label, which is three derivations for two free fields. Read as:
+`label` carries the resolved bounty title (it is the only field the title can occupy, and entry 45's
+`{week,label,points}` uses `label` for display text the same way) and `date` carries the `fmtDay()`
+label. No raw ISO date is exposed, because the newest-first sort happens inside the helper and no
+caller needs one. (2) `assert.deepEqual` against a literal `[]` was avoided for the empty cases in
+favour of `.length` checks, with a comment saying why — entry 45 hit a cross-realm array comparison
+in this vm harness and length is sufficient here. (3) Rule 10 archiving: entry 45 was moved verbatim
+into `docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks current, 21KB against the
+90KB cap) and its index line dropped; the lifted block was string-matched back out of the archive —
+exactly one occurrence, gone from the log, heading at the start of its own line — and entry 44 above
+it was confirmed intact and unsplit.
+
+### Why
+`bountyWeekProgress()` knows how many bounty points this week have been credited against the weekly cap, and entry 41 added a preview of what the coming days will offer. Nothing shows what you actually claimed. The bounty rows in the feed are interleaved with every other activity, so reconstructing "which bounties have I done" means scrolling the whole log and reading each row's title.
+
+### Requirements
+- `src/app.js` — a pure helper `claimedBounties(nameLower)` returning that person's bounty entries newest-first as `{date,label,note}`, resolving each title through `x.bountyTitle` then `bountyById(x.bountyId)` with the same fallback chain `activityMarkup()` already uses, and labelling the day with `fmtDay()`.
+- `src/index.template.html` — a collapsible section under `#bountyWeek` and above `#youEmptyState`, opened by a `type="button"` toggle carrying `aria-expanded` and `aria-controls`. **Closed by default, rendering nothing until opened**, exactly as entry 41's preview does; the render function empties the container whenever it is closed.
+- Follow entry 41's precedent for state: a module-level open/closed flag is the source of truth and the render writes `aria-expanded` from it, rather than reading the attribute back (the DOM harness cannot observe it).
+- Reuse the existing bounty row visual language; the toggle keeps `min-height:44px` (rule 7); expand/collapse is CSS-only (rule 7).
+
+### Tests
+- `tests/client-state.state.test.js`: the helper returns only bounty-type entries for the named person, newest-first; resolves a title from `bountyId` when `bountyTitle` is absent; falls back cleanly for an unknown `bountyId`; returns `[]` for someone with no claims; never includes another person's claims.
+- `tests/client-state.dom.test.js`: the container is empty until the toggle runs; opening lists the claims; a repaint keeps an open list open; closing empties it again.
+- `tests/static-check.mjs`: presence assertions for the container and toggle ids, `aria-expanded` on the toggle, and an order assertion `id="bountyWeek"` → the new toggle id.
+
+### Do not
+Add claim buttons or change `claimBounty()`'s same-day rule; show which bounties were *not* claimed, or a claimed-out-of-total figure (tone rule — surface what people did, never what they didn't); list another person's claims here; open the section by default; change `src/scoring.json` (rule 2).
+
+---

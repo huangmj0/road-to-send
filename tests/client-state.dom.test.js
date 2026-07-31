@@ -648,6 +648,45 @@ const domChecks = `(()=>{
   assert.equal(shareBtnEl.classList.contains('hide'),true,'no profile hides the Share button');
   assert.equal(shareBtnEl.disabled,true,'no profile disables the Share button');
 
+  // Entry 47: the grade select starts where this climber left it, and never argues with a choice
+  // already made in the open form.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+  logs=[
+    {id:'gd1',name:'Alex',type:'climb',hardestGrade:'V3',date:shift(-3),createdAt:'1'},
+    {id:'gd2',name:'Alex',type:'climb',hardestGrade:'V6',date:shift(-1),createdAt:'1'},
+    {id:'gd3',name:'Maya',type:'climb',hardestGrade:'V10',date:shift(-1),createdAt:'2'},
+  ];
+  const gradeField=document.querySelector('#hardestGrade');
+  gradeField.value='';
+  updateRecordPreview();
+  assert.equal(gradeField.value,'V6','populating the climb form preselects the grade this person logged last');
+  gradeField.value='V9';
+  render();
+  assert.equal(gradeField.value,'V9','a grade already chosen in the open form survives a repaint');
+  updateRecordPreview();
+  assert.equal(gradeField.value,'V9','and survives being populated again');
+  // The default is derived per populate, so it follows whoever the form is recording for.
+  recordingFor='Maya';
+  gradeField.value='';
+  updateRecordPreview();
+  assert.equal(gradeField.value,'V10','recording for someone else defaults to that person, not to the last default shown');
+  recordingFor='Alex';
+  gradeField.value='';
+  render();
+  assert.equal(gradeField.value,'V6','and switching back reads the first person again');
+  // No climb history means no guess: the select is left on its placeholder.
+  logs=[{id:'gd4',name:'Alex',type:'exercise',date:shift(-1),createdAt:'1'}];
+  gradeField.value='';
+  render();
+  assert.equal(gradeField.value,'','a climber with no climbs is left on the placeholder');
+  // A stored grade the scoring config does not offer is not selectable, so it is not applied.
+  logs=[{id:'gd5',name:'Alex',type:'climb',hardestGrade:'5.12a',date:shift(-1),createdAt:'1'}];
+  gradeField.value='';
+  render();
+  assert.equal(gradeField.value,'','an unlistable stored grade never reaches the select');
+  gradeField.value='';
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 

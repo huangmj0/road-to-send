@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 46 — List the bounties you have claimed — Done — 2026-07-31
-- 47 — Start the grade select where you left it — Todo
+- 47 — Start the grade select where you left it — Done — 2026-07-31
 - 48 — Open a crewmate's card from the Crew feed — Todo
 
 Entries 1–40 shipped and now live under `docs/archive/`, together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. `IMPROVEMENTS.md` indexes them by title. Entry numbers never restart.
@@ -42,82 +41,52 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 46. List the bounties you have claimed
-
-Status: Done — 2026-07-31
-Notes: Commit `List the bounties you have claimed`. `claimedBounties(nameLower)` filters `logs` to
-`x.type==='bounty'&&nameKey(x)===key`, sorts with `activityMarkup()`'s exact date-then-`createdAt`
-comparison (reversed for newest-first), and maps each entry to `{date,label,note}` — `label` through
-the same `x.bountyTitle||(bountyById(x.bountyId)||{}).title||'Bounty'` chain `activityMarkup()` uses,
-`date` through `fmtDay()`, `note` coerced with `String(x.note||'')` so a missing note is `''` rather
-than `undefined`. It re-reads `logs` on each call and never touches scoring, so rule 6 is satisfied
-by consumption rather than re-derivation; no `new Date()` anywhere. A blank `nameLower` returns `[]`
-rather than matching entries whose own name is blank. `renderClaimed()` mirrors `renderBountyWeek()`
-line for line — `toggle.setAttribute('aria-expanded',String(claimedOpen))`, `classList.toggle('hide',
-!claimedOpen)`, and `if(!claimedOpen){box.innerHTML='';return}` so a closed section renders nothing
-at all — driven by the module-level `let claimedOpen=false` that entry 41's precedent asks for, never
-by reading the attribute back. `toggleClaimed()` flips the flag and repaints; `renderBounties()`
-calls `renderClaimed()` immediately after `renderBountyWeek()`, and `init()` wires the toggle beside
-the existing `#bountyWeekToggle` listener. Template: one `<button id="claimedToggle" class="text-btn"
-type="button" aria-expanded="false" aria-controls="claimedList">` plus `<div id="claimedList" class=
-"bounty-week hide">`, appended inside the existing Today's-bounties article after `#bountyWeek` —
-under `#bountyWeek` and above `#youEmptyState` as required, and no existing id moved. Rows reuse the
-`.bounty-peek` / `.bounty-cat` markup verbatim, so the only CSS change is widening one selector to
-`#bountyWeekToggle,#claimedToggle{min-height:44px}` for rule 7's touch target; expand/collapse stays
-the existing `.hide` class toggle, so it is CSS-only and the `prefers-reduced-motion` kill-switch
-still applies. index.html 147,510 → 148,967 bytes (+1,457, 92.5% of the 161,000-byte budget).
-Tests: 20 assertions in `tests/client-state.state.test.js` (only the named person's bounty rows,
-newest-first ordering, the `createdAt` tiebreak within one day, the note carried through, a missing
-note as `''`, the day formatted by `fmtDay()` and demonstrably not the raw ISO date, climb entries
-excluded, title resolved from `bountyId` when `bountyTitle` is absent, `'Bounty'` for an unknown id
-and for no id at all, and empty results for a person with no claims, a blank name and an empty log);
-17 in `tests/client-state.dom.test.js` (closed by default with an empty container, opening lists the
-claim and its note using `.bounty-peek`, another person's claim absent, no `data-claim-bounty` and no
-`data-del` on these rows, a repaint keeping it open and redrawing one row rather than appending a
-second, closing emptying it again, and a climber with no claims opening to no rows); seven in
-`tests/static-check.mjs` (toggle id with `type="button"` and `aria-expanded="false"`, its
-`aria-controls`, the container id, the `#bountyWeek` → `#claimedToggle` → `#claimedList` →
-`#youEmptyState` order, the 44px rule, and both new functions). Verified the suite bites by mutating
-the built script 11 ways — dropping the name filter, dropping `renderClaimed()` from
-`renderBounties()`, letting a closed section keep its markup, sorting oldest-first, renaming the
-toggle id, making the repaint append, collapsing the title chain to a constant, removing the 44px
-rule, defaulting the flag to open, blanking the note, and deleting `aria-expanded` — each failed the
-state suite, the DOM suite or `static-check`, against a confirmed-clean baseline.
-Deviations: (1) the entry specifies the row shape `{date,label,note}` while also asking for a
-resolved title and an `fmtDay()` day label, which is three derivations for two free fields. Read as:
-`label` carries the resolved bounty title (it is the only field the title can occupy, and entry 45's
-`{week,label,points}` uses `label` for display text the same way) and `date` carries the `fmtDay()`
-label. No raw ISO date is exposed, because the newest-first sort happens inside the helper and no
-caller needs one. (2) `assert.deepEqual` against a literal `[]` was avoided for the empty cases in
-favour of `.length` checks, with a comment saying why — entry 45 hit a cross-realm array comparison
-in this vm harness and length is sufficient here. (3) Rule 10 archiving: entry 45 was moved verbatim
-into `docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks current, 21KB against the
-90KB cap) and its index line dropped; the lifted block was string-matched back out of the archive —
-exactly one occurrence, gone from the log, heading at the start of its own line — and entry 44 above
-it was confirmed intact and unsplit.
-
-### Why
-`bountyWeekProgress()` knows how many bounty points this week have been credited against the weekly cap, and entry 41 added a preview of what the coming days will offer. Nothing shows what you actually claimed. The bounty rows in the feed are interleaved with every other activity, so reconstructing "which bounties have I done" means scrolling the whole log and reading each row's title.
-
-### Requirements
-- `src/app.js` — a pure helper `claimedBounties(nameLower)` returning that person's bounty entries newest-first as `{date,label,note}`, resolving each title through `x.bountyTitle` then `bountyById(x.bountyId)` with the same fallback chain `activityMarkup()` already uses, and labelling the day with `fmtDay()`.
-- `src/index.template.html` — a collapsible section under `#bountyWeek` and above `#youEmptyState`, opened by a `type="button"` toggle carrying `aria-expanded` and `aria-controls`. **Closed by default, rendering nothing until opened**, exactly as entry 41's preview does; the render function empties the container whenever it is closed.
-- Follow entry 41's precedent for state: a module-level open/closed flag is the source of truth and the render writes `aria-expanded` from it, rather than reading the attribute back (the DOM harness cannot observe it).
-- Reuse the existing bounty row visual language; the toggle keeps `min-height:44px` (rule 7); expand/collapse is CSS-only (rule 7).
-
-### Tests
-- `tests/client-state.state.test.js`: the helper returns only bounty-type entries for the named person, newest-first; resolves a title from `bountyId` when `bountyTitle` is absent; falls back cleanly for an unknown `bountyId`; returns `[]` for someone with no claims; never includes another person's claims.
-- `tests/client-state.dom.test.js`: the container is empty until the toggle runs; opening lists the claims; a repaint keeps an open list open; closing empties it again.
-- `tests/static-check.mjs`: presence assertions for the container and toggle ids, `aria-expanded` on the toggle, and an order assertion `id="bountyWeek"` → the new toggle id.
-
-### Do not
-Add claim buttons or change `claimBounty()`'s same-day rule; show which bounties were *not* claimed, or a claimed-out-of-total figure (tone rule — surface what people did, never what they didn't); list another person's claims here; open the section by default; change `src/scoring.json` (rule 2).
-
----
-
 ## 47. Start the grade select where you left it
 
-Status: Todo
+Status: Done — 2026-07-31
+Notes: Commit `Start the grade select where you left it`. `lastLoggedGrade(nameLower)` filters `logs`
+to `x.type==='climb'&&nameKey(x)===key`, sorts a **copy** (the array `filter()` returned, so `logs`
+is never reordered) with `activityMarkup()`'s exact date-then-`createdAt` comparison reversed for
+newest-first, takes `[0]`, and returns `String(last.hardestGrade||'')` only when
+`GRADES.indexOf(grade)>=0` — so an unlisted grade, a blank grade and a missing one all give `''`,
+matching the "not in `SCORING.grades`" clause. `GRADES` is `SCORING.grades`, read not written, so
+rule 2 is untouched. A blank `nameLower` returns `''` rather than matching entries whose own name is
+blank, mirroring entry 46's precedent. No `new Date()`, no scoring re-derivation, no localStorage
+key: it derives from `logs` on every call. `applyGradeDefault()` reads `#hardestGrade`, returns
+immediately if the field is missing **or already has a value**, and otherwise writes
+`lastLoggedGrade(currentTarget()?.name.toLowerCase())`. `currentTarget()` (not `me`) is the source of
+the name, which is what makes the default follow `recordingFor` and matches the name
+`draftActivity()` will save under. The single call site is `updateRecordPreview()`, guarded by
+`if(type==='climb')` and placed beside the existing `if(type==='bounty')populateBountySelect()` line
+and before `draftActivity()`, so the preview sees the applied grade. That is the app's one
+form-populate path — the type radios, `prefillCategory()`, `showTab('record')` and `render()` all
+funnel through it — so no second hook was needed and no new listener was added. The field-has-value
+guard is what satisfies "never overwrite a grade the user has already picked": a repaint with a
+chosen grade is a no-op. After `submitActivity()` clears the field, the following `render()`
+re-applies the just-saved grade, which is the entry's stated point. No template and no CSS change —
+the select, its `<label for>` and its 44px sizing already exist. index.html 148,967 → 149,624 bytes
+(+657, 92.9% of the 161,000-byte budget). Tests: 17 assertions in `tests/client-state.state.test.js`
+(most recent climb wins, the `createdAt` tiebreak inside one day, the oldest climb explicitly not the
+answer, exercise/mobility/bounty entries ignored even when they are the newest rows, another
+person's later climb not leaking in while their own default does move, `''` for an unlisted grade,
+for a climb with no grade, for a person with no climbs, for a blank name against a nameless entry,
+and for an empty log, a padded stored name resolving through `nameKey()`, and `logs` left in its
+arrival order after a call); nine in `tests/client-state.dom.test.js` (populate preselects the last
+grade, a chosen grade survives both a repaint and a re-populate, switching `recordingFor` picks up
+the other person's grade and switching back picks up the first person's, a climber with no climbs
+left on the placeholder, and an unlistable stored grade never reaching the select). Verified the
+suites bite by mutating the built script nine ways — dropping the `updateRecordPreview()` hook,
+dropping the already-chosen guard, sorting oldest-first, dropping the `createdAt` tiebreak, dropping
+the `GRADES` membership check, dropping the climb-type filter, dropping the blank-name guard, reading
+`me` instead of `currentTarget()`, and sorting `logs` in place — each failed the state or DOM suite
+against a confirmed-clean baseline.
+Deviations: (1) Rule 10 archiving: entry 46 was moved verbatim into
+`docs/archive/entries-41-onward.md` (the file `IMPROVEMENTS.md` marks current, 35,974 bytes against
+the 90,000-byte cap) and its index line dropped; the lifted block was string-matched back out of the
+archive — exactly one occurrence, gone from the log, heading at the start of its own line — and entry
+45 above it was confirmed intact and unsplit. (2) The entry names one helper; a second one-line
+`applyGradeDefault()` holds the DOM side so the pure helper stays pure and testable without a
+document, which is what rule 9 asks for.
 
 ### Why
 `#hardestGrade` resets to its first option every time the Record form repaints. A climber logging three sessions in a week re-picks the same grade from an eighteen-entry list each time, on a phone, at the gym. The information needed to do better is already in `logs`.
