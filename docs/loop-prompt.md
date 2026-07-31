@@ -47,8 +47,8 @@ suites and the split archive were meant to stop, arriving by a different route.
 
 So the drain workflow reads almost nothing. It runs `npm run queue`, branches on the exit code, and
 delegates the entry itself to a subagent that starts cold and dies when it finishes, reporting back
-six fixed lines: entry, PR, CI, bytes, deviations, status. Those six lines are all the orchestrator
-keeps, which is what lets one session run many iterations.
+seven fixed lines: entry, PR, CI, review, bytes, deviations, status. Those seven lines are all the
+orchestrator keeps, which is what lets one session run many iterations.
 
 Each drain implementation delegates by naming its own entry and refill workflow rather than
 restating either one. `tests/docs-check.mjs` asserts both agent surfaces preserve that boundary.

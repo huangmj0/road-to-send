@@ -10,8 +10,8 @@ subagent whose context dies when it finishes — that is the entire point of thi
 
 The reason is arithmetic. `/loop` fires into the *same* session, so whatever you read stays with
 you for every later iteration. An entry worked inline costs tens of thousands of tokens — `app.js`
-alone is 78 KB — and ten of those end the window. Worked through a subagent it costs you six lines.
-Your job is to check state, delegate, keep the six lines, and pick the next wake-up.
+alone is 78 KB — and ten of those end the window. Worked through a subagent it costs you seven lines.
+Your job is to check state, delegate, keep those seven lines, and pick the next wake-up.
 
 ## 1. Check state
 
