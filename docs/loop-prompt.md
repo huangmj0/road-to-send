@@ -74,8 +74,14 @@ where a mistake gets caught:
 In Claude Code this is enforced twice, because there are two ways in. `.claude/agents/queue-entry.md`
 and `queue-refill.md` pin the model and effort for the subagents `/drain` spawns, and the `model` and
 `effort` frontmatter on `.claude/commands/entry.md`, `refill.md` and `drain.md` pins the same values
-when a human invokes one directly. Change a tier in one place and change it in the other, or the two
-paths drift apart.
+when a human invokes one directly.
+
+Two files per workflow is two places to drift, so `tests/docs-check.mjs` holds them together: each
+command pins a ranked model and an effort rather than inheriting the session's, each agent agrees
+with its command on both, `/drain` spawns the two agents by name instead of `general-purpose`, and
+refill outranks entry. Retuning a tier is a deliberate edit to both files — and if you retune the
+one that makes refill the design step, the suite will tell you the rationale here, in `AGENTS.md`
+and in both agent files needs rewriting with it.
 
 Codex has no equivalent declarative field in `.agents/skills/*/agents/openai.yaml`, so the same
 split is stated in prose at the top of each Codex skill. There it is guidance for the operator

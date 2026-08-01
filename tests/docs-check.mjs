@@ -78,6 +78,39 @@ const drain=readFileSync(drainCommand,'utf8');
 for(const skill of ['entry','refill'])assert.match(drain,new RegExp('`'+skill+'` skill'),`.claude/commands/drain.md delegates to the ${skill} skill by name instead of restating it`);
 assert.match(drain,/npm run queue/,'.claude/commands/drain.md branches on npm run queue');
 
+// The three workflows are not equally hard, so each declares the model and reasoning effort it runs
+// at: refill designs binding specs a later run executes literally, entry executes one a human
+// already merged and npm test checks, drain reads an exit code and delegates. Claude Code reads
+// that tier from a different file depending on how the workflow was entered — the agent definition
+// for the subagents /drain spawns, the command frontmatter for a direct /entry — so the two have to
+// agree. Change one and not the other and that path silently falls back to the session model, which
+// is the failure this pairing exists to catch. docs/loop-prompt.md explains the split.
+const frontmatter=path=>{
+  assert.ok(existsSync(at(path)),`${path} exists`);
+  const block=/^---\n([\s\S]*?)\n---\n/.exec(readFileSync(at(path),'utf8'));
+  assert.ok(block,`${path} opens with a YAML frontmatter block`);
+  return Object.fromEntries([...block[1].matchAll(/^([\w-]+):[ \t]*(.*?)[ \t]*$/gm)].map(m=>[m[1],m[2]]));
+};
+// The tiers this repo routes between, cheapest first. Adding another means ranking it here too.
+const ranked=['haiku','sonnet','opus'];
+const efforts=['low','medium','high','xhigh','max'];
+const tier=Object.fromEntries(['drain','entry','refill'].map(name=>{
+  const fm=frontmatter(`.claude/commands/${name}.md`);
+  assert.ok(ranked.includes(fm.model),`.claude/commands/${name}.md pins the model it runs on, one of ${ranked.join('/')} — inherit or an unranked alias puts it back on whatever the session happened to be using (saw ${JSON.stringify(fm.model)})`);
+  assert.ok(efforts.includes(fm.effort),`.claude/commands/${name}.md pins its reasoning effort, one of ${efforts.join('/')} (saw ${JSON.stringify(fm.effort)})`);
+  return [name,fm];
+}));
+for(const [name,agent] of [['entry','queue-entry'],['refill','queue-refill']]){
+  const fm=frontmatter(`.claude/agents/${agent}.md`);
+  assert.equal(fm.name,agent,`.claude/agents/${agent}.md declares name: ${agent}, which is the subagent type /drain spawns`);
+  assert.match(drain,new RegExp('subagent_type: "'+agent+'"'),`.claude/commands/drain.md spawns the ${agent} agent for the ${name} step rather than general-purpose, which would inherit the orchestrator's model instead of pinning its own`);
+  for(const field of ['model','effort'])assert.equal(fm[field],tier[name][field],`.claude/agents/${agent}.md and .claude/commands/${name}.md declare the same ${field} — /drain enters the ${name} step through the first and a human running /${name} enters through the second, so both have to say ${JSON.stringify(tier[name][field])} (agent says ${JSON.stringify(fm[field])})`);
+}
+// Refill designs what entry implements, and it runs once per drained queue against six to twelve
+// entries where entry runs per commit. If it ever stops outranking entry, the reasoning in
+// docs/loop-prompt.md and in both agent files is no longer describing what the loop does.
+assert.ok(ranked.indexOf(tier.refill.model)>ranked.indexOf(tier.entry.model),`refill writes the binding specs entry executes literally, so it runs on a more capable model than entry — change this only together with the rationale in docs/loop-prompt.md, AGENTS.md and both .claude/agents files (saw refill on ${tier.refill.model}, entry on ${tier.entry.model})`);
+
 const codexSkill=name=>at(`.agents/skills/${name}/SKILL.md`);
 const codexMetadata=name=>readFileSync(at(`.agents/skills/${name}/agents/openai.yaml`),'utf8');
 const codexEntry=readFileSync(codexSkill('road-to-send-entry'),'utf8');
