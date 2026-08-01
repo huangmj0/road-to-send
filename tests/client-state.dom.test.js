@@ -411,12 +411,14 @@ const domChecks = `(()=>{
   // against the same rendered feed, so the old behaviour cannot come back unnoticed.
   assert.equal(crewFeed.innerHTML.indexOf('data-del='),-1,'the Crew feed offers no delete buttons');
   assert.equal(crewFeed.innerHTML.indexOf('aria-label="Delete '),-1,'and no delete labels either');
-  const confirmDialog=document.querySelector('#confirmModal'),confirmBody=document.querySelector('#confirmBody');
+  const confirmDialog=document.querySelector('#confirmModal'),confirmBody=document.querySelector('#confirmBody'),confirmNote=document.querySelector('#confirmNote');
   requestDelete(0,'d1','personal');
   assert.equal(confirmDialog.classList.contains('open'),true,'requesting a delete opens the in-app dialog instead of a native prompt');
   assert.ok(confirmBody.textContent.indexOf(CAT_LABELS.climb)>=0,'the confirm copy names the activity');
   assert.ok(confirmBody.textContent.indexOf('V5')>=0,'the confirm copy names the grade the way the old prompt did');
   assert.ok(confirmBody.textContent.indexOf('Alex')>=0,'the confirm copy names the person');
+  assert.equal(confirmNote.textContent,'You can undo this from the bar that appears.','a local delete confirmation names the undo bar');
+  assert.equal(confirmNote.classList.contains('hide'),false,'the local undo note is shown');
   const beforeCount=logs.length;
   performDelete();
   assert.equal(logs.length,beforeCount-1,'confirming removes exactly one entry in local mode');
@@ -447,6 +449,15 @@ const domChecks = `(()=>{
   performDelete();
   assert.deepEqual(logs.map(x=>x.id),['c3'],'a captured row that is already gone takes nothing with it');
   assert.equal(confirmDialog.classList.contains('open'),false,'and the dialog still closes');
+  endpoint='https://sheet.example.test/exec';
+  requestDelete(0,'c3','personal');
+  assert.equal(confirmNote.textContent,'This cannot be undone.','a shared delete keeps the irreversible warning');
+  assert.equal(confirmNote.classList.contains('hide'),false,'the shared delete warning is shown');
+  closeModal('confirmModal');
+  disconnect();
+  assert.equal(confirmNote.classList.contains('hide'),true,'disconnecting hides the irreversible warning');
+  closeModal('confirmModal');
+  endpoint='';
 
   // Entry 28: a local delete offers itself back. performDelete()'s local branch contains no await,
   // so its effects land synchronously and the bar can be inspected straight after the call.
