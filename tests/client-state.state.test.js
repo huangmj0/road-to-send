@@ -197,6 +197,21 @@ const checks = `(()=>{
   logs=[];
   assert.equal(claimedBounties('alex').length,0,'an empty log yields no claims');
 
+  // Entry 61: today's claim state names only bounties this person actually logged today.
+  logs=[
+    {id:'today1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+    {id:'today2',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'2'},
+    {id:'other',name:'Maya',type:'bounty',bountyId:'outdoor-send',date:'2026-07-13',createdAt:'1'},
+    {id:'before',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-12',createdAt:'1'},
+  ];
+  let todayClaims=claimedTodayIds('alex','2026-07-13');
+  assert.equal(claimedTodayIds('nobody','2026-07-13').size,0,'an unknown name has no claimed bounties');
+  assert.equal(todayClaims.has('send-it'),true,'the person’s bounty claim is included');
+  assert.equal(todayClaims.has('outdoor-send'),false,'another person’s claim is excluded');
+  assert.equal(todayClaims.has('century-club'),false,'the person’s claim on another day is excluded');
+  assert.equal(todayClaims.size,1,'two claims of one bounty on the same day stay one id');
+  logs=[];
+
   // Entry 58: the claimed-list caption counts claims and sums credited points, not face value.
   assert.equal(claimedCaption([]),'','an empty claimed list has no caption');
   assert.equal(claimedCaption([{credit:3},{credit:2}]),'2 claims · 5 points counted','multiple claims total their credited points and pluralise claims');

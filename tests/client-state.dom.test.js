@@ -162,6 +162,13 @@ const domChecks = `(()=>{
   logs=[];
   render();
   const claimId=dailyBounties(challengeToday())[0].id;
+  const todayBounties=document.querySelector('#todayBounties');
+  assert.equal(todayBounties.innerHTML.includes('claimed today'),false,'unclaimed bounty rows have no claimed-today suffix');
+  logs=[{id:'claimed',name:'Alex',type:'bounty',bountyId:claimId,date:challengeToday(),createdAt:'1'}];
+  render();
+  assert.ok(todayBounties.innerHTML.includes('data-claim-bounty="'+claimId+'"')&&todayBounties.innerHTML.includes('claimed today'),'the claimed row carries its claim state');
+  assert.equal((todayBounties.innerHTML.match(/claimed today/g)||[]).length,2,'only the claimed row names the state in its text and label');
+  assert.ok(todayBounties.innerHTML.includes('data-claim-bounty')&&todayBounties.innerHTML.includes('aria-label="Claim '),'claimed rows remain labelled claim buttons');
   const bountyRadio=document.querySelector('input[name="activityType"][value="bounty"]');
   const claimSelect=document.querySelector('#bountySelect'),claimDateBox=document.querySelector('#dateFields');
   bountyRadio.checked=false;claimSelect.value='';claimDateBox.classList.remove('hide');

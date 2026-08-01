@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 60 — Announce the crewmate's grade pyramid — Done — 2026-07-31
-- 61 — Mark today's bounties you have already claimed — Todo
+- 61 — Mark today's bounties you have already claimed — Done — 2026-07-31
 - 62 — Key the heatmap shades — Todo
 - 64 — Say the size of the field next to a rank — Todo
 - 65 — Stop promising a local delete cannot be undone — Todo
@@ -55,38 +54,15 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 60. Announce the crewmate's grade pyramid
-
-Status: Done — 2026-07-31
-Notes: Commit `Announce the crewmate's grade pyramid`. Added the shared `pyramidLabel()` helper
-for both pyramid graphics, including the person-card empty state; `#personPyramid` is now a named
-graphic with its live label refreshed on render. Archived entry 59. index.html 153,023 → 153,245
-bytes (+222, 92.9% of the 165,000-byte budget). `npm test`: 5/5 suites.
-Deviations: None.
-
-### Why
-`#gradePyramid` on the You panel is `role="img"` and `renderPyramid()` gives it an `aria-label` listing every grade and count. The identical chart in the person card, `#personPyramid`, is a bare `<div class="pyramid">`: no role, no label. A screen-reader user tapping a crewmate's name gets the summary grid, the breakdown bars and the trend chart announced, then reaches a block of unlabelled bars. Rule 7 requires the text alternative, and the label text already exists — it is inlined in `renderPyramid()`.
-
-### Requirements
-- **Sequencing:** entry 59 has already inserted a section into `#personModal` above the records heading. This entry touches only `#personPyramid`'s own attributes and the two render functions, so it applies cleanly on top.
-- `src/app.js` — extract the label string `renderPyramid()` builds into a pure helper `pyramidLabel(rows)`, taking the `gradePyramid()` output. For a non-empty array it returns exactly what `renderPyramid()` produces today: `'Grade pyramid: '` followed by `` `${r.count} send${r.count===1?'':'s'} at ${r.grade}` `` joined with `', '`. For an empty array it returns `'Grade pyramid: no graded climbs yet'`, which is the case the person card has and the You card does not (that card hides itself when there are no rows).
-- `renderPyramid()` calls `pyramidLabel(rows)` instead of building the string inline. Its behaviour must not change: it is only reached with a non-empty `rows`.
-- `src/index.template.html` — `<div id="personPyramid" class="pyramid">` gains `role="img"` and a non-empty static `aria-label="Grade pyramid"`, matching how `#gradePyramid`, `#youTrend` and `#personTrend` are declared in the template and then relabelled from JS. Keep the element's closing `></div>` immediately followed by the Recent activity heading — `tests/static-check.mjs` line 184 pins that adjacency and `[^>]*` in it accommodates the added attributes.
-- `src/app.js` — `renderPersonCard()` captures the element the existing `set('#personPyramid',…)` call returns and sets `aria-label` to `pyramidLabel(data.pyramid)`, exactly the way it already does for `#personTrend` with `personTrendLabel()`.
-
-### Tests
-- `tests/client-state.state.test.js`: `pyramidLabel([])` is the no-graded-climbs string; a two-row array lists both grades in order with singular/plural `send`/`sends` correct.
-- `tests/client-state.dom.test.js`: the existing entry 30 block already asserts `youPy.innerHTML===personPy.innerHTML`; keep that assertion untouched — this entry changes attributes, not rows.
-- `tests/static-check.mjs`: `id="personPyramid"` carries `role="img"` and a non-empty `aria-label`; `function pyramidLabel(` is present; and the literal `'Grade pyramid: '` appears exactly once in the script, so the label text has one owner.
-
-### Do not
-Add `aria-live` to the pyramid (it is a graphic, not a status), remove `aria-hidden="true"` from the decorative `<i>` fills inside `pyramidRow()`, or change `pyramidCaption()` — the visible caption from entry 51 and the text alternative are separate things and both stay. Do not put the label on the person card's rows instead of the container; `pyramidRow()` already labels each bar and is shared with the You panel.
-
----
-
 ## 61. Mark today's bounties you have already claimed
 
-Status: Todo
+Status: Done — 2026-07-31
+Notes: Commit `Mark today's claimed bounties`. Added `claimedTodayIds()` to identify a person's
+same-day bounty claims without consulting scoring, then used the single set in `renderBounties()`
+to append the state to the existing description and accessible claim label while preserving its
+enabled one-tap markup. Archived entry 60. index.html 153,245 → 153,623 bytes (+378, 93.1% of the
+165,000-byte budget). `npm test`: 5/5 suites.
+Deviations: None.
 
 ### Why
 The three bounty rows on the You card are one-tap claim buttons and look identical whether or not you have already claimed that bounty today. Bounties are not de-duplicated per day the way categories are — a second claim of the same bounty scores again until the weekly cap — so tapping one twice by accident is silent, and the only way to check what you already claimed today is to open the claimed list and read dates. The card that offers the claim should say what you already did with it.
