@@ -735,3 +735,29 @@ Deviations: None.
 Change `SUPPORTED_API_VERSIONS`, `unpackRemote()`, `syncFailureCode()`, or the `RTS-REFRESH-*` codes; touch `src/apps-script.js` or `src/schema.json` (rule 2); add a second `aria-live` region; surface the endpoint URL — the shared suite asserts it never appears in the diagnostics.
 
 ---
+
+## 56. Date the export snapshot
+
+Status: Done — 2026-08-01
+Notes: Commit `Date the export snapshot`. `exportData()`'s `a.download` is now
+`` `road-to-send-${challengeToday()}.json` ``, replacing the fixed `road-to-send-export.json`
+literal; the blob contents, `exportedAt`, the `finally` revoke, and both toast messages are
+unchanged. index.html 152,058 → 152,071 bytes (+13, 76.0% of the 200,000-byte budget). `npm test`:
+5/5 suites.
+Deviations: None.
+
+### Why
+`exportData()` always names the download `road-to-send-export.json`. Take a snapshot before a risky change and another after, and the second either overwrites the first or lands as `road-to-send-export (1).json`; either way the folder listing says nothing about when each was taken. The timestamp exists only inside the file, which is exactly where you cannot see it while choosing between two of them.
+
+### Requirements
+- `src/app.js` — `exportData()` builds the filename from `challengeToday()`: `road-to-send-<YYYY-MM-DD>.json`. Rule 6 applies: `challengeToday()`, never `new Date()`, so a shared-mode export is named for the Sheet's day the same way every other date in the app is.
+- The blob's contents, including its `exportedAt` ISO timestamp, are unchanged; so is the `URL.revokeObjectURL()` cleanup in the `finally` block and both toast messages.
+- One line changes. Do not restructure the try/catch — entry 31's assertions cover a blocked `click()` and a failing `Blob` separately, and both must keep passing.
+
+### Tests
+- `tests/client-state.shared.test.js`: extend the existing export test so the anchor stub records `download` alongside `href`, and assert the filename carries `challengeToday()` and still ends in `.json`; the success and both failure paths keep their current assertions unchanged.
+
+### Do not
+Add a time-of-day, a person's name, or a counter to the filename; change the export payload, its `version` field, or the `mode` field; add a localStorage key (rule 4); prompt anyone to take a snapshot.
+
+---

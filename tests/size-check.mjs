@@ -19,7 +19,14 @@ import { readFileSync } from 'node:fs';
 // for: it buys the whole pass rather than tracking the measured figure. Per the note
 // above, the next budget entry should lower BUDGET back toward what index.html
 // actually weighs once this pass lands.
-const BUDGET = 200000;
+//
+// Re-baselined 200000 -> 165000 by log entry 57: measured 152071 bytes on main after
+// entry 56. This step is a reduction, not another raise: a cap that only ratchets
+// upward stops being a guard. Entries 58–65 are eight small display entries whose
+// nearest analogues in the archive cost between +13 and +1,515 bytes each, so
+// ~12,900 bytes of headroom covers the pass with room for the worst case. As before,
+// the next budget entry re-measures rather than assuming.
+const BUDGET = 165000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
