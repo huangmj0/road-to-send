@@ -185,6 +185,12 @@ assert.doesNotMatch(html,/id="leaderChampions"/,'the redundant champions panel i
 assert.doesNotMatch(html,/\.champions\{|\.champ-line\{|\.champ-scope\{/,'the retired champions and title-tile scope labels have no CSS rules');
 assert.match(html,/\.title-tag\{/,'the folded-in leaderboard title tag is styled');
 assert.match(script,/class="title-tag"/,'a leaderboard row can render a title tag beside the climber name');
+assert.match(script,/model\.hunters\.forEach\(name=>titleMap\.set\(name,\(titleMap\.get\(name\)\|\|\[\]\)\.concat\('Bounty Hunter'\)\)\)/,'Bounty Hunter joins the runtime title map without becoming a category');
+assert.match(script,/<span class="hunter" aria-hidden="true">🏹<\/span>/,'the decorative hunter glyph remains beside its visible label');
+assert.doesNotMatch(script,/title="Bounty Hunter/,'the hunter no longer relies on a title tooltip');
+assert.match(stylesheet,/\.text-btn\{display:inline-flex;align-items:center;min-height:44px\}/,'text buttons meet the minimum touch target from their base class');
+assert.match(stylesheet,/\.sync\{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px\}/,'the sync control meets the minimum touch target from its base class');
+assert.match(stylesheet,/\.brand\{min-height:44px\}/,'the brand link meets the minimum touch target from its base class');
 assert.match(script,/recent:recentTotals\.get\(lower\)\|\|0/,'totals rows expose rolling points from day totals');
 assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
 assert.match(html,/data-panel="crew"[\s\S]*id="goalPace"[\s\S]*?id="goalProjection"[^>]*role="status"[^>]*aria-live="polite"/,'the goal projection line follows the pace line in the crew panel and is announced');
