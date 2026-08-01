@@ -132,9 +132,10 @@ const checks = `(()=>{
   assert.equal(categoryDays('alex','climb','2026-07-13'),4,'credited days include the first window day and ignore a duplicate same-day log');
   assert.equal(categoryDays('bob','climb','2026-07-13'),1,'another person is excluded from a climber title count');
   assert.equal(categoryDays('nobody','climb','2026-07-13'),0,'unknown names have no credited category days');
-  const titleRows=crewTitles('2026-07-13'),rock=titleRows.find(row=>row.id==='rock-hound'),yogi=titleRows.find(row=>row.id==='yogi');
-  assert.deepEqual(rock.holders,['Alex'],'the top category-day holder alone receives Rock Hound');
-  assert.equal(rock.detail,'4 of last 7 days','the title reports its qualifying figure');
+  const titleRows=crewTitles('2026-07-13'),crusher=titleRows.find(row=>row.id==='crusher'),yogi=titleRows.find(row=>row.id==='yogi');
+  assert.equal(titleRows.length,3,'crewTitles returns exactly the three category titles');
+  assert.ok(titleRows.every(row=>!('glyph' in row)),'title rows carry no glyph');
+  assert.deepEqual(crusher.holders,['Alex'],'the top category-day holder alone receives Crusher');
   assert.deepEqual(yogi.holders,['Cara'],'one credited mobility day wins Yogi without a minimum');
   logs=[{id:'tie1',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'1'},{id:'tie2',name:'Bob',type:'exercise',date:'2026-07-13',createdAt:'1'}];
   assert.deepEqual(crewTitles('2026-07-13').find(row=>row.id==='gym-rat').holders,['Alex','Bob'],'tied category leaders share a title');
@@ -150,14 +151,8 @@ const checks = `(()=>{
     {id:'fire1',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
     {id:'fire2',name:'Cara',type:'climb',date:'2026-07-13',createdAt:'1'},
   ];
-  const standingModel=totalsModel(),standingTitles=crewTitles('2026-07-13'),onFire=standingTitles.find(row=>row.id==='on-fire'),beast=standingTitles.find(row=>row.id==='beast');
+  const standingModel=totalsModel();
   assert.equal(standingModel.sorted.find(row=>row.name==='Bob').recent,3,'a bounty in the window is included in the rolling points field');
-  assert.deepEqual(onFire.holders,['Bob','Cara'],'tied recent-points leaders share On Fire');
-  assert.equal(onFire.detail,'3 pts','On Fire reports the rolling points value');
-  assert.deepEqual(beast.holders,['Alex'],'the all-challenge leader holds Beast even when quiet for eight days');
-  assert.equal(beast.detail,'6 pts','Beast reports the all-challenge points value');
-  logs=[];
-  assert.ok(crewTitles('2026-07-13').filter(row=>row.id==='on-fire'||row.id==='beast').every(row=>row.holders.length===0),'zero-point standing titles have no holders');
   challengeToday=savedToday;
   logs=savedLogs;
 
