@@ -9,6 +9,32 @@ is renumbered, reworded, or re-run. This is closed history and never a queue —
 
 ---
 
+## 66. Re-baseline the bundle budget for the rolling-window pass
+
+Status: Done — 2026-08-01
+Notes: Commit `Re-baseline the bundle budget for the rolling-window pass`. Archived entry 65.
+Measured index.html at 154,670 bytes after entries 58–65 and set the rolling-window-pass budget to
+170,000 bytes (91.0%). `npm test`: 5/5 suites.
+Deviations: None.
+
+### Why
+Entry 57 lowered `BUDGET` in `tests/size-check.mjs` from 200,000 to 165,000 against a measured 152,071 bytes, and its comment earmarked the resulting headroom for entries 58–65 — eight small display entries. Entries 67–74 are a different shape: two of them delete live UI and give bytes back, one replaces a div-bar chart with inline SVG and takes them. The cap that governs a pass has to be set before the pass and from a fresh measurement, which is the standing instruction entry 57 left behind.
+
+### Requirements
+- `tests/size-check.mjs` only. **Measure `index.html` on `main` after entries 58–65 have merged** — read the number off the file, do not carry 152,071 forward, and do not assume the queue shipped in the order it was written.
+- Set `BUDGET` to that measurement plus headroom for entries 67–74. Size the headroom from the pass itself rather than a flat percentage: 67 adds a helper and a map with no markup; 68 and 72 are label changes; 69 and 70 add a tile grid and its CSS; 73 changes a comparison; 74 swaps `trendColumns()`'s div output for inline SVG. Entries 70 and 71 **remove** markup, CSS and JS, so this pass is not monotonic growth — take those credits into account rather than budgeting for additions alone.
+- Add a paragraph to the comment block above the constant, in the voice of the two re-baselines already recorded there: the measured figure and what it was measured after, what this pass adds and what it removes, and the standing instruction that the next budget entry re-measures rather than assuming.
+- No `src/` change, so `npm run build` is a no-op. Run it anyway before `npm test` (rule 3) and commit nothing but the test file if the build produces no diff.
+
+### Tests
+- `tests/size-check.mjs` is itself the test. `npm test` must print the new percentage line and pass. If it does not, the figure in the comment is wrong and the comment gets corrected — the cap does not get raised to fit.
+- No assertion anywhere else changes.
+
+### Do not
+Set `BUDGET` below the measured size of `index.html`, raise it beyond what this pass needs "to be safe", or touch `ARCHIVE_CAP` in `tests/docs-check.mjs` — that is a different guard with its own rule. Do not bundle any user-visible change into this commit; a budget move riding along with a feature is exactly what rule 3 forbids.
+
+---
+
 ## 65. Stop promising a local delete cannot be undone
 
 Status: Done — 2026-08-01

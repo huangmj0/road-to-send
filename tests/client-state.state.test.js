@@ -30,6 +30,12 @@ const checks = `(()=>{
 
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
 
+  assert.equal(windowStart('2026-07-13'),'2026-07-07','seven days are inclusive');
+  assert.equal(windowStart('2026-07-13',1),'2026-07-13','one-day windows begin today');
+  assert.equal(windowStart(''),'','a blank day has no window');
+  assert.equal(windowStart('not-a-date'),'','an invalid day has no window');
+  assert.equal(windowStart('2026-08-02'),'2026-07-27','window arithmetic crosses month boundaries');
+
   // Each category scores once per day; a full mix earns the +2 balanced-day bonus.
   const day=[
     {id:'c1',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-13',createdAt:'1'},
@@ -46,6 +52,12 @@ const checks = `(()=>{
   assert.equal(scored.dayMeter.get('alex|2026-07-13'),8,'balanced day tops the daily meter at 8');
   assert.equal(scored.totals.get('alex'),8);
   assert.equal(scored.weeks.get('alex|2026-07-13'),8);
+
+  const fullDay=day.concat([{id:'b1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'5'},{id:'e2',name:'Alex',type:'exercise',date:'2026-07-14',createdAt:'1'}]);
+  scored=computeCredits(fullDay);
+  assert.equal(scored.dayTotal.get('alex|2026-07-13'),11,'dayTotal includes categories, the balanced-day bonus, and bounty credit');
+  assert.ok(scored.dayTotal.get('alex|2026-07-13')>scored.dayMeter.get('alex|2026-07-13'),'dayTotal does not omit or clamp bounty credit');
+  assert.equal([...scored.dayTotal.entries()].filter(x=>x[0].startsWith('alex|')&&weekKey(x[0].slice(5))==='2026-07-13').reduce((sum,x)=>sum+x[1],0),scored.weeks.get('alex|2026-07-13'),'a week of day totals matches its existing weekly total');
 
   // No balanced-day bonus without all three categories.
   scored=computeCredits(day.filter(x=>x.type!=='mobility'));
@@ -65,6 +77,7 @@ const checks = `(()=>{
   assert.equal(scored.bountyWeekCount.get('alex|2026-07-13'),3,'every completion counts toward Bounty Hunter');
   assert.equal(scored.bountyTotal.get('alex'),3,'every completion counts toward the all-time bounty tally, even past the weekly cap');
   assert.equal(scored.totals.get('alex'),6);
+  assert.equal(scored.dayTotal.get('alex|2026-07-15'),0,'a weekly-capped bounty contributes zero to dayTotal');
 
   // totalsModel exposes an all-time bounty count per climber, spanning weeks, for the Bounties leaderboard view.
   const savedLogs=logs;
