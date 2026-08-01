@@ -33,6 +33,7 @@ test('background sync respects the open date picker and refreshes stale caches',
     },
     fireDocumentEvent: type => {const handler = listeners.get(type); if (handler) handler({})},
     countGets: () => gets,
+    setPayloadVersion: v => {payload.version = v},
     fetch: async (url, options = {}) => {if (!options.method) gets++; return {ok: true, json: async () => JSON.parse(JSON.stringify(payload))}},
     localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
     setTimeout() {}, clearTimeout() {},
@@ -68,12 +69,55 @@ test('background sync respects the open date picker and refreshes stale caches',
     assert.ok(detail.indexOf('America/Los_Angeles')>=0,'and the timezone that day comes from');
     assert.ok(detail.indexOf('Protocol')===0,'the protocol line still leads');
     assert.equal(detail.indexOf('sheet.example.test'),-1,'and the endpoint is still nowhere in the diagnostics');
+    // Entry 55: the diagnostics also name the protocol version this build expects, so the
+    // organizer reading them has a number to deploy against.
+    const expectedVersion=[...SUPPORTED_API_VERSIONS][0];
+    assert.ok(detail.indexOf('This build expects v'+expectedVersion)>=0,'the diagnostics name the protocol version this build expects');
+    setPayloadVersion(99);
+    await loadRemote();
+    const mismatchDetail=document.querySelector('#diagnosticDetail').textContent;
+    assert.ok(mismatchDetail.indexOf('This build expects v'+expectedVersion)>=0,'the expected version is still named after an unsupported payload');
+    assert.equal(document.querySelector('#diagnosticCode').textContent,'RTS-REFRESH-VERSION','the version-mismatch code is still reported');
+    setPayloadVersion(11);
     endpoint='';renderSync();
     const localDetail=document.querySelector('#diagnosticDetail').textContent;
     assert.equal(localDetail.indexOf('Challenge day'),-1,'local mode says nothing about a challenge day');
     assert.equal(localDetail.indexOf('America/Los_Angeles'),-1,'nor about a timezone it does not follow');
   })()`;
   await vm.runInNewContext(`${source}\n${syncChecks}`, syncContext, {filename: 'index.html'});
+});
+
+// Entry 55: testConnection()'s outdated-script message used to hard-code "deploy v11", which
+// would quietly go stale the next time the protocol version bumps. It now derives the version
+// from SUPPORTED_API_VERSIONS, the same expression saveSetup() and exportData() already use.
+test('testConnection names the expected protocol version instead of a stale literal', async () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const store = new Map();
+  const testContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: () => [],
+      addEventListener: (type, handler) => listeners.set(type, handler),
+      removeEventListener() {}, createElement: () => makeElement(),
+    },
+    fetch: async () => ({ok: true, json: async () => ({version: 99, features: [], activities: [], config: null, configErrors: []})}),
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const testChecks = `(async()=>{
+    document.querySelector('#endpoint').value='https://sheet.example.test/exec';
+    const expectedVersion=[...SUPPORTED_API_VERSIONS][0];
+    const ok=await testConnection();
+    assert.equal(ok,false,'an unsupported version reports the connection as not usable');
+    assert.equal(document.querySelector('#testResult').textContent,'Outdated Apps Script — deploy v'+expectedVersion,'the outdated-script message names the version this build expects, not a hard-coded literal');
+  })()`;
+  await vm.runInNewContext(`${source}\n${testChecks}`, testContext, {filename: 'index.html'});
 });
 
 // Entry 22 regression lock: saveSetup() awaits copyCrewLink() inside its try, so a rejected

@@ -42,6 +42,7 @@ assert.match(script,/function openPersonCard\(/,'tapping a climber opens the per
 assert.match(script,/<button class="climber" type="button"[^>]*data-person=/,'the climber name is a real button, not a clickable row');
 assert.doesNotMatch(script,/<tr[^>]*tabindex=/,'leaderboard rows stay plain rows without a fake tab stop');
 assert.doesNotMatch(script,/[^.\w]confirm\(/,'destructive actions use the in-app dialog, never a native window.confirm');
+assert.doesNotMatch(script,/deploy v11/,'the outdated-script message derives its version from SUPPORTED_API_VERSIONS instead of a hard-coded literal');
 assert.deepEqual(Object.keys(scoring.categories),['climb','exercise','mobility'],'three categories are configured');
 assert.equal(scoring.balancedDayBonus,2,'balanced-day bonus is configured');
 assert.equal(scoring.weeklyBountyCap,6,'weekly bounty cap is configured');
