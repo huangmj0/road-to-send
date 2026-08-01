@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 86 — Count a bounty-only day as a day you were active — Done — 2026-08-01
-- 87 — Make "rank" mean one thing — Todo
+- 87 — Make "rank" mean one thing — Done — 2026-08-01
 - 88 — One name key, so one odd Sheet row cannot empty or crash the You tab — Todo
 - 89 — Collapse the superseded 44px one-offs and the declarations the cascade already discards — Todo
 - 90 — Delete three class attributes that style nothing — Todo
@@ -55,43 +54,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 86. Count a bounty-only day as a day you were active
-
-Status: Done — 2026-08-01
-Notes: Commit `Count bounty-only days as active`. Archived entry 85. index.html 156,621 → 156,621 bytes (0 bytes, 92.1% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-The heatmap card is titled "Daily activity" / "Points per day" (`src/index.template.html:38`), but `heatmapDays()` reads `dayMeter` (`src/app.js:95`), and `dayMeter` is the **category meter**, not points per day. In `computeCreditsRaw()` the bounty branch calls `addWeek`, `addTotal` and `addDayTotal` and then `continue`s — it never reaches `addMeter` (`src/app.js:30`). `dayMeter` also clamps each day to `DAILY_MAX`, which is right for a meter and wrong for a total.
-
-So a day on which someone claimed bounties and logged nothing else is worth real points everywhere else in the app, and renders as a **blank `heat0` square** — identical to a day they did nothing. The chart erases work that was done. The same wrong map is read by three more surfaces, so the error is consistent across the You tab rather than isolated:
-
-- `heatmapDays()` (`:95`) — the blank square, and `heatmapCaption()` (`:96`) undercounts "N active days" and can name the wrong best day.
-- `streakInfo()` (`:99`) — a bounty-only day **breaks the streak**.
-- `personalRecords()` (`:92`) — `bestDay` ignores bounty points, so "Best single day" can be beaten by a day it does not show.
-- `weekReviewModel()` (`:52`) — `activeDays` in the Week in Review undercounts the same way.
-
-This is settled, documented ground: entry 67 created `dayTotal` precisely because "`dayMeter` skips bounty points entirely (the bounty branch `continue`s before `addMeter`) and clamps to `DAILY_MAX` … copying it here would silently drop bounty points" (`docs/archive/entries-61-onward.md:296`). The heatmap shipped before `dayTotal` existed and was never migrated.
-
-### Requirements
-- `src/app.js` only, plus tests.
-- Move these four readers from `dayMeter` to the `dayTotal` map that `computeCredits()` already returns: `heatmapDays()` (`:95`), `streakInfo()` (`:99`), `personalRecords()`'s `bestDay` accumulation (`:92`), and `weekReviewModel()`'s `activeDays` count (`:52`). Do not re-derive any of these totals — read the map (rule 6).
-- **Two readers of `dayMeter` are correct and must not change:** `todayProgress()` (`:76`) and `updateRecordPreview()`'s `meterAfter` (`:140`). Those drive the eight-pip day meter, which is deliberately per-category and deliberately capped at `DAILY_MAX`. Changing them would let a bounty fill the meter and misreport the balanced-day bonus.
-- `heatLevel()` (`:94`) saturates at `>=DAILY_MAX`, so uncapped input is already safe and needs no change.
-- Fix all four in one commit. Migrating only the heatmap would leave a bounty-only day showing as a coloured square while "Current streak" still treats it as a broken chain and "Best single day" still ignores it — a visible contradiction on one screen.
-
-### Tests
-- `tests/client-state.state.test.js`: with a fixture in which a person claims a bounty and logs nothing else that day — the heatmap day carries that day's points and a non-zero `heatLevel()`; `heatmapCaption()` counts it as an active day; `streakInfo()` treats it as continuing the streak; `personalRecords().bestDay` reflects it. Assert the day meter is unchanged for the same fixture, so the split between `dayTotal` and `dayMeter` is pinned rather than assumed.
-- `tests/client-state.state.test.js:450-461` currently carries the message `'points come from dayMeter'` on an assertion whose 3/2/0 values are identical under either map (the fixture has no bounties). Reword that message to name `dayTotal`. **Per rule 3 this is named here deliberately:** the assertion and its expected values stay exactly as they are — only the description string changes, and no coverage is retired.
-- `tests/client-state.dom.test.js`: a bounty-only day is not rendered as an empty `heat0` cell.
-
-### Do not
-Do not change `DAILY_MAX`, the balanced-day bonus, the weekly bounty cap, or anything in `computeCreditsRaw()` — the scoring is correct; only the four readers are wrong. Do not point `todayProgress()` or the record preview at `dayTotal`. Do not add a new map to the object `computeCredits()` returns. Tone rule: this entry only ever **adds** days a person was active — it must not introduce an inactive-day count, a "days missed" figure, or any streak-loss warning.
-
----
-
 ## 87. Make "rank" mean one thing
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Clarify all-time rank labels`. Archived entry 86. index.html 156,621 → 156,634 bytes (+13 bytes, 92.1% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 The app shows a person two different ranks, one tap apart, and both are labelled just "rank".

@@ -208,6 +208,8 @@ assert.match(script,/function personalPaceInfo\(/,'the personal pace helper back
 assert.match(script,/function setSegmentedMeter\(/,'the You meter renders identifiable per-category segments');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="record"/,'the per-category breakdown card lives inside the You panel');
 assert.match(html,/data-panel="you"[\s\S]*class="stat-grid"[\s\S]*id="youTotal"[\s\S]*id="youRank"[\s\S]*id="youStreak"[\s\S]*id="youBestStreak"[\s\S]*data-panel="record"/,'the current and best streak stat cards join the stat grid on the You panel');
+assert.match(html,/<article class="card stat"><span>All-time rank<\/span><strong id="youRank">/,'the You rank stat names its all-time scope');
+assert.match(html,/<th>Rank<\/th>/,'the leaderboard keeps its rank column header');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*id="gradePyramid"[\s\S]*id="recordsCard"/,'the grade pyramid card sits between the category breakdown and the personal records card on the You panel');
 assert.match(html,/id="gradePyramid"[^>]*role="img"[^>]*aria-label=/,'the grade pyramid is announced as a graphic');
 assert.match(html,/id="gradePyramid" class="pyramid"[^>]*><\/div><p id="pyramidSummary" class="hint"><\/p><\/article>/,'the pyramid caption sits between the graphic and the close of the card');
