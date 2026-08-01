@@ -761,3 +761,31 @@ Deviations: None.
 Add a time-of-day, a person's name, or a counter to the filename; change the export payload, its `version` field, or the `mode` field; add a localStorage key (rule 4); prompt anyone to take a snapshot.
 
 ---
+
+## 57. Re-baseline the bundle budget for this queue
+
+Status: Done — 2026-08-01
+Notes: Commit `Re-baseline the bundle budget for this queue`. `tests/size-check.mjs`'s `BUDGET`
+lowered 200,000 → 165,000; added a comment paragraph recording the measured 152,071 bytes on
+`main` after entry 56, the +13..+1,515-byte range of entries 58–65's nearest archive analogues, and
+the ~12,900-byte headroom that leaves. No `src/` change; `npm run build` produced no diff.
+index.html unchanged at 152,071 bytes (92.2% of the new 165,000-byte budget). `npm test`: 5/5
+suites.
+Deviations: None.
+
+### Why
+`BUDGET` in `tests/size-check.mjs` is 200,000 bytes and `index.html` weighs 152,071 — the cap is 48,000 bytes above the artifact it guards, so it would not catch a change that doubled a card's markup. The comment on that constant says so itself: the 200,000 step was taken on maintainer instruction to buy a whole pass rather than to track the measured figure, and it asks the next budget entry to lower `BUDGET` back toward what `index.html` actually weighs. This is that entry, and it goes first so the tighter cap governs entries 58–65 rather than being set after they land.
+
+### Requirements
+- `tests/size-check.mjs` — `const BUDGET = 165000;`. This is the only change; the `readFileSync` measurement, the `console.log` line and the assertion message stay exactly as they are.
+- Add a paragraph to the comment block above the constant, in the same voice as the two re-baselines already recorded there: measured 152,071 bytes on `main` after entry 56; entries 58–65 are eight small display entries whose nearest analogues in the archive cost between +13 and +1,515 bytes each, so ~12,900 bytes of headroom covers the pass with room for the worst case. Say that this step is a **reduction**, taken because a cap that only ratchets upward stops being a guard, and keep the standing instruction that the next budget entry re-measures rather than assuming.
+- No `src/` change, so `index.html` does not change and `npm run build` is a no-op here. Run it anyway before `npm test` — rule 3 — and commit nothing but the test file if the build produces no diff.
+
+### Tests
+- `tests/size-check.mjs` is itself the test. `npm test` must print the new percentage line and pass; if it does not, the figure in the comment is wrong and the comment gets corrected rather than the cap raised.
+- No assertion anywhere else changes.
+
+### Do not
+Raise `BUDGET` back, set it below the measured 152,071, or touch `ARCHIVE_CAP` in `tests/docs-check.mjs` — that is a different guard with its own rule. Do not bundle any user-visible change into this commit; a budget move that rides along with a feature is exactly what rule 3 forbids.
+
+---

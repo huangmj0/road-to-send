@@ -201,10 +201,11 @@ const domChecks = `(()=>{
     {id:'k3',name:'Maya',type:'bounty',bountyId:claimedId,bountyTitle:'Maya only',date:shift(-1),createdAt:'3'},
   ];
   render();
-  const claimedBox=document.querySelector('#claimedList');
+  const claimedBox=document.querySelector('#claimedList'),claimedCap=document.querySelector('#claimedSummary');
   // setAttribute is a no-op in this stub, so the open state is asserted where it actually lives.
   assert.equal(claimedOpen,false,'the claimed list starts closed');
   assert.equal(claimedBox.innerHTML,'','and renders nothing at all until it is opened');
+  assert.equal(claimedCap.textContent,'','and its caption is empty while closed');
   assert.equal(claimedBox.classList.contains('hide'),true,'the container stays hidden');
   toggleClaimed();
   assert.equal(claimedOpen,true,'tapping the toggle opens it');
@@ -215,12 +216,15 @@ const domChecks = `(()=>{
   assert.equal(claimedBox.innerHTML.indexOf('Maya only'),-1,'another person’s claims never appear here');
   assert.equal(claimedBox.innerHTML.indexOf('data-claim-bounty'),-1,'claimed rows are plain rows, never claim buttons');
   assert.equal(claimedBox.innerHTML.indexOf('data-del'),-1,'and carry no delete affordance');
+  assert.ok(claimedCap.textContent.indexOf('1 claim')>=0,'the open caption names the claim count');
   render();
   assert.ok(claimedBox.innerHTML.indexOf(claimedTitle)>=0,'a repaint keeps an open list open');
   assert.equal(claimedBox.innerHTML.split('bounty-peek').length-1,1,'and redraws one row rather than appending a second');
+  assert.ok(claimedCap.textContent.indexOf('1 claim')>=0,'and keeps the caption on repaint');
   toggleClaimed();
   assert.equal(claimedOpen,false,'tapping again closes it');
   assert.equal(claimedBox.innerHTML,'','and it empties again');
+  assert.equal(claimedCap.textContent,'','and clears the caption again');
   // Someone with nothing claimed opens to a plain empty state, not a zero-of-total figure.
   logs=[{id:'k4',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
   toggleClaimed();
