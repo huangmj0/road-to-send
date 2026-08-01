@@ -197,6 +197,12 @@ const checks = `(()=>{
   logs=[];
   assert.equal(claimedBounties('alex').length,0,'an empty log yields no claims');
 
+  // Entry 58: the claimed-list caption counts claims and sums credited points, not face value.
+  assert.equal(claimedCaption([]),'','an empty claimed list has no caption');
+  assert.equal(claimedCaption([{credit:3},{credit:2}]),'2 claims · 5 points counted','multiple claims total their credited points and pluralise claims');
+  assert.equal(claimedCaption([{credit:1}]),'1 claim · 1 point counted','one claim and one point are singular');
+  assert.equal(claimedCaption([{base:3,credit:1}]),'1 claim · 1 point counted','a capped claim contributes credit rather than base');
+
   // Entry 54: personRecent lists one person's most recent log entries across every type, newest
   // first with the same date/createdAt tiebreak claimedBounties() uses, resolving a bounty title
   // through the same bountyTitle -> bountyById -> 'Bounty' chain.
