@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 76 — Repair the seven dropped `font` shorthands and give the display font a fallback — Done — 2026-08-01
-- 77 — Stop the momentum curve stretching its text and its points — Todo
+- 77 — Stop the momentum curve stretching its text and its points — Done — 2026-08-01
 - 78 — Draw the curve on day one, and the smallest bars at all — Todo
 - 79 — Fit the leaderboard on a 320px screen — Todo
 - 80 — Raise the progress bar, the sorted column and the meter fills to a visible contrast — Todo
@@ -53,43 +52,11 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 76. Repair the seven dropped `font` shorthands and give the display font a fallback
-
-Status: Done — 2026-08-01
-Notes: Commit `Repair font shorthand fallbacks`. Archived entry 75. index.html 155,362 → 155,413
-bytes (+51, 91.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Seven CSS rules use a `font` shorthand ending in `inherit` — `font:800 15px inherit` and friends. `inherit` is not a valid *component* of the `font` shorthand, so the whole declaration is invalid and the browser drops it at parse time. Confirmed by walking `document.styleSheets` in Chromium: those rules contain **no `font` property at all**, while valid shorthands in the same sheet survive. Because the UA stylesheet sets its own `font` shorthand on form controls, and a shorthand beats an inherited `font-family`, every affected button falls back to the UA's **`400 13.3333px Arial`**. So the ⚙ settings button renders at **13.33px instead of the intended 25px**, "Record activity" renders 87.4px wide instead of 115.0px — 24% narrower and a full 400 weight lighter than designed — and the two heading selectors land at **18.72px instead of 14px**. Nothing in the app looks like the stylesheet says it should. The control that proves the mechanism is `button.climber` (`src/styles.css:7`), which uses bare `font:inherit` — valid as a whole value — and correctly computes to DM Sans 800 16px. Separately, `src/styles.css:1` `@import`s DM Sans and Roboto Condensed from Google Fonts, and every `'Roboto Condensed'` shorthand stops at the quoted name with no fallback family. The visual audit hit this for real: in a sandbox that could not reach Google Fonts, **every heading in the app fell back to serif** while body copy stayed sans. That is a live-app resilience bug on the app's only network dependency, not a hypothesis.
-
-### Requirements
-- **Sequencing: entry 75 lands first.** Repairing these declarations widens `.head-actions` from 140.5px to 151px and makes the You page-head overflow ~6% worse (186px → 197px at 320px). Do not start this entry while 75 is still `Todo`.
-- `src/styles.css` only. Add two font tokens to `:root` (`:2`) beside the existing colour tokens — a body stack and a display stack, e.g. `--font:'DM Sans',system-ui,sans-serif` and `--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif`. `var()` **is** legal inside a `font` shorthand, which is what makes the repair a token swap rather than a rewrite.
-- Replace `inherit` with `var(--font)` in exactly these seven declarations, quoted from the current file:
-  - `:3` — `.icon-btn{…font:700 25px/1 inherit;…}`
-  - `:3` — `.btn{…font:800 15px inherit;…}`
-  - `:3` — `.text-btn{…font:800 14px inherit;…}`
-  - `:3` — `.sync{…font:800 12px inherit;…}`
-  - `:3` — `.bottom-nav button{…font:800 12px inherit;…}`
-  - `:16` — `.seg-btn{…font:800 13px inherit;…}`
-  - `:14` — `.review-section h3,.person-head{font:800 14px inherit;…}`
-- Point every `'Roboto Condensed'` shorthand at `var(--head)`: `.brand` (`:3`), `.page-head h1` (`:3`), `.card h2` (`:3`), `.stat strong` (`:3`), `.preview-copy strong` (`:3`), `.rank` (`:3`), `.dialog h2` (`:3`), `.wr-lead` (`:14`). Set `body{font-family:var(--font)}` (`:3`) from the same token so there is one definition of each stack.
-- **Do not reformat the surrounding compact CSS.** Edit these declarations in place, character for character, and leave the rest of each rule untouched — `tests/static-check.mjs` matches exact compact CSS text and its TRAP header names this as a trap.
-- Verify the repair the way the audit did rather than by eye: the seven rules must expose a `font` property when read back from the CSSOM, and `.icon-btn` must compute to 25px.
-- This measurably changes rendered widths app-wide. Re-check that the repaired sizes introduce no new horizontal overflow. The crew-tab case was already re-measured with these seven declarations repaired: `.leader-toggles` grows **+16.7px** as a group and still fits at every viewport (320/360/375/390/414/430), because `.table-card .card-head{flex-wrap:wrap;row-gap:12px}` (`:16`) lets the toggle group drop to its own row. **The leaderboard does not gate this entry** — but confirm it, and confirm entry 75's fix still holds at 320px.
-- Rule 8: no new network requests. This entry adds fallback families to an existing `@import`; it does not add, remove or change a font request.
-
-### Tests
-- `tests/static-check.mjs`: `--font:` and `--head:` are defined in `:root`; **no `font:` declaration in the built stylesheet ends in `inherit`** except `button.climber{…font:inherit…}` and `button.bounty{…font:inherit…}`, which are bare-`inherit` whole values and correct; every `'Roboto Condensed'` occurrence outside the `@import` and the `--head` token is gone. Assert the exact compact text of the seven repaired declarations.
-
-### Do not
-Do not add a font file, a second `@import`, a `<link rel=preload>`, or any new network request (rule 8). Do not change which weights are requested. Do not "fix" the shorthands by splitting them into `font-size` + `font-weight` + `font-family` longhands — that inflates the stylesheet and loses the intent; the token belongs in the shorthand. Do not restyle, resize or re-weight anything beyond restoring what these declarations already ask for. Tone rule: this is a typography repair and adds no copy — do not introduce a nudge, a reminder or a participation figure anywhere you touch.
-
----
-
 ## 77. Stop the momentum curve stretching its text and its points
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Fix momentum curve rendering`. Archived entry 76. index.html 155,413 → 155,411
+bytes (-2, 91.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 `trendSvg()` (`src/app.js:105`) emits `viewBox="0 0 100 100"` with `preserveAspectRatio="none"` into `.trend-svg{display:block;width:100%;height:160px;overflow:visible}` (`src/styles.css:18`). The vertical scale is pinned at 1.6 while the horizontal scale is the card width over 100, so everything inside the SVG is stretched horizontally by a measured **1.65× at 320px, 2.09× at 390px, 2.34× at 430px, 4.24× at 768px and above, and 2.96× for `#personTrend` at 1440px**. The line escapes because it carries `vector-effect:non-scaling-stroke`; the text and the point markers do not. At 1440px the "Current 93" label renders **245.6px wide by 11.0px tall** — letterforms smeared four times wider than they are tall — and `circle r="1.6"` renders as a **21.7 × 5.1px ellipse**, so the data points read as dashes rather than dots. The dots also overlap once the series passes **32 days** and overlap 2.2× at 70 days, which is the challenge length entry 74 designed the curve for. This is the stretched-text symptom the maintainer named.

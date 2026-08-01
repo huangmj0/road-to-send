@@ -205,6 +205,8 @@ assert.match(html,/id="youTrend"[\s\S]*id="youTrendSummary"/,'the personal trend
 assert.match(script,/function personalWeeklyTrend\(/,'a pure helper restricts the weekly rows to one climber');
 assert.match(script,/function momentumCurve\(/,'one helper produces every chart series');
 assert.match(script,/function trendSvg\(/,'one helper renders every chart SVG');
+assert.doesNotMatch(stylesheet,/\.trend-value\{|\.trend-point\{/,'the stretched SVG text and point styles are retired');
+assert.match(stylesheet,/\.trend-labels\{display:flex;justify-content:space-between;gap:12px;padding:8px 2px 0;font-size:12px;font-weight:800\}\.trend-label\.peak\{color:var\(--ink\)\}\.trend-label\.current\{color:var\(--muted\)\}/,'the curve value labels use HTML text styling');
 // Entry 53: the person card gets the same weekly trend chart, sitting between the personal
 // records and the grade pyramid.
 assert.match(html,/id="personBreakdown"[\s\S]*id="personClaimed"[\s\S]*id="personClaimedSummary"[\s\S]*id="personRecords"/,'the person card claimed-bounty section sits between the breakdown and records');
