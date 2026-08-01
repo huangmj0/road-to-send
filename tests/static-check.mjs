@@ -60,6 +60,11 @@ assert.ok((script.match(/Saving…/g)||[]).length>=3,'the preview reports an in-
 assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption');
 assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
+const heatmapCard=html.match(/<article id="heatmapCard"[\s\S]*?<\/article>/)?.[0]||'';
+const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?.[0]||'';
+assert.match(heatmapLegend,/role="img"[^>]*aria-label="[^"]+"/,'the heatmap shade key has one text alternative');
+assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapLegend"[\s\S]*id="heatmapSummary"/,'the heatmap shade key sits between the graphic and caption');
+for(const shade of [0,1,2,3,4])assert.match(heatmapLegend,new RegExp(`class="heat-cell heat${shade}" aria-hidden="true"`),`the heatmap shade key includes heat${shade}`);
 assert.match(html,/class="trend-scroll"[\s\S]*id="trendSummary"/,'the trend caption follows the scroll wrapper');
 assert.match(script,/function heatmapCaption\(/,'a pure helper builds the heatmap caption');
 assert.match(script,/function trendCaption\(/,'a pure helper builds the trend caption');
