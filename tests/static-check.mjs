@@ -63,6 +63,16 @@ assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption')
 assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
 assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.page-head h1\{overflow-wrap:anywhere\}/,'the page head wraps long names while keeping its actions reachable');
 const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
+assert.match(stylesheet,/\.progress i\{[^}]*background:var\(--orange-ink\)/,'the progress fill uses the contrast-safe orange ink token');
+assert.match(stylesheet,/td\.sorted strong\{color:var\(--orange-ink\)\}/,'the sorted leaderboard value uses the contrast-safe orange ink token');
+assert.match(stylesheet,/\.point-meter i\.seg-exercise\.filled\{background:var\(--orange-ink\);border-color:var\(--orange-ink\)\}/,'the exercise meter fill uses orange ink');
+assert.match(stylesheet,/\.point-meter i\.seg-mobility\.filled\{background:var\(--danger\);border-color:var\(--danger\)\}/,'the mobility meter fill uses the visible danger token');
+assert.match(stylesheet,/\.point-meter i\.seg-bonus\{border-color:var\(--orange-ink\);border-style:dashed\}/,'the bonus meter segment keeps a visible dashed border');
+assert.match(stylesheet,/\.heat1\{background:color-mix\(in srgb,var\(--orange\) 24%,var\(--sand\)\)\}\.heat2\{background:color-mix\(in srgb,var\(--orange\) 48%,var\(--sand\)\)\}\.heat3\{background:color-mix\(in srgb,var\(--orange\) 73%,var\(--sand\)\)\}/,'the heatmap ramp evenly separates adjacent levels');
+assert.doesNotMatch(stylesheet,/\.progress i\{[^}]*background:var\(--orange\)/,'the progress fill no longer uses low-contrast orange');
+assert.doesNotMatch(stylesheet,/td\.sorted strong\{color:var\(--orange\)\}/,'the sorted leaderboard value no longer uses low-contrast orange');
+const nonRootStyles=stylesheet.replace(/:root\{[^}]*\}/g,'');
+assert.doesNotMatch(nonRootStyles,/(?:^|[;{])color:var\(--orange\)/,'no non-root text rule paints with low-contrast orange');
 assert.match(stylesheet,/:root\{--font:'DM Sans',system-ui,sans-serif;--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
 for(const declaration of ['\\.icon-btn\\{[^}]*font:700 25px\\/1 var\\(--font\\)','\\.btn\\{[^}]*font:800 15px var\\(--font\\)','\\.text-btn\\{[^}]*font:800 14px var\\(--font\\)','\\.sync\\{[^}]*font:800 12px var\\(--font\\)','\\.bottom-nav button\\{[^}]*font:800 12px var\\(--font\\)','\\.seg-btn\\{[^}]*font:800 13px var\\(--font\\)','\\.review-section h3,\\.person-head\\{font:800 14px var\\(--font\\)'])assert.match(stylesheet,new RegExp(declaration),'each repaired control shorthand keeps its intended body stack');
 assert.doesNotMatch(stylesheet,/font:[^;}]*\s+inherit(?=[;}])/,'no multi-component font shorthand ends in invalid inherit');
