@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 50 — Show what each claimed bounty scored — Done — 2026-07-31
-- 51 — Caption the grade pyramid — Todo
+- 51 — Caption the grade pyramid — Done — 2026-08-01
 - 52 — Let a climb carry a note — Todo
 - 53 — Show a crewmate's weekly points in their card — Todo
 - 54 — Show a crewmate's most recent entries in their card — Todo
@@ -46,41 +45,18 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 50. Show what each claimed bounty scored
-
-Status: Done — 2026-07-31
-Notes: Commit `Show what each claimed bounty scored`. `claimedBounties(nameLower)` now reads
-`computeCredits(logs).info` once and maps each of the person's bounty logs through
-`creditKey(x,logs.indexOf(x))` before sorting, attaching `base` and `credit` to every row; the
-existing newest-first sort (date, then `createdAt`) still runs on the enriched rows, so ordering is
-unchanged. `renderClaimed()` adds a third `<span class="bounty-pts">+N</span>` cell, matching
-`renderBountyWeek()`'s `.bounty-peek` markup exactly (no `src/styles.css` change needed — the grid
-is already global), and appends `` · weekly bounty cap`` to the row's `<small>` whenever
-`credit<base`. index.html 150,076 → 150,365 bytes (+289, 75.2% of the 200,000-byte budget). `npm
-test`: 5/5 suites.
-Deviations: None.
-
-### Why
-`claimedBounties()` returns a title, a date and a note, so the "Bounties you have claimed" list on the You tab shows *that* a claim happened but never what it was worth. `SCORING.weeklyBountyCap` means some claims credit less than the bounty's face value, and `#bountyCapHint` says so only in aggregate and only for the current week. Reopening the list to check which past claims actually scored is impossible.
-
-### Requirements
-- `src/app.js` — `claimedBounties(nameLower)` also returns `base` and `credit` per row, read out of `computeCredits(logs).info` (rule 6 — consume the map, never re-derive the cap). The key is `creditKey(x,logs.indexOf(x))`, the same lookup `activityMarkup()` uses; the helper filters and then sorts, so the position in `logs` must be taken before the sort, not from the sorted index.
-- `renderClaimed()` renders the credit in a `<span class="bounty-pts">+N</span>` third cell, exactly as `renderBountyWeek()` already does inside `.bounty-peek` — the class is a three-column grid, so no `src/styles.css` change is needed.
-- When `credit<base`, the row's `<small>` also carries the existing wording `weekly bounty cap` (the same phrase `activityMarkup()`'s `note` map uses), after the date and any note.
-- The existing dom assertions read `#claimedList` for the bounty title, the note, and the `bounty-peek` class; keep all three true.
-
-### Tests
-- `tests/client-state.state.test.js`: a claim inside the window returns `credit===base`; claims past `SCORING.weeklyBountyCap` in one week return a reduced or zero `credit` with `base` unchanged; a claim outside the challenge window returns `credit` 0; the existing `label`/ordering assertions still hold.
-- `tests/client-state.dom.test.js`: after `toggleClaimed()`, `#claimedList` shows the credited figure and, for a capped claim, the cap wording.
-
-### Do not
-Change `computeCredits()`, `bountyWeekProgress()`, or `#bountyCapHint`; show another person's claims; add a total or a streak line under the list; write copy about bounties not claimed or days without a claim (tone rule).
-
----
-
 ## 51. Caption the grade pyramid
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Caption the grade pyramid`. `pyramidCaption(rows)` sits next to `heatmapCaption()`/
+`trendCaption()`: `''` for an empty list, otherwise `` `${total} graded send${total===1?'':'s'} ·
+hardest ${rows[0].grade}` `` with `total` summed across every row's `count`. `<p id="pyramidSummary"
+class="hint"></p>` sits inside `#gradePyramidCard`, immediately after `#gradePyramid`, as a sibling
+(never inside it, so the existing `#gradePyramid`/`#personPyramid` `innerHTML` parity assertion
+stays true). `renderPyramid()` sets it from the `rows` it already computed and clears it to `''` on
+the hidden-card path, exactly as `renderHeatmap()` does with `#heatmapSummary`. index.html 150,365 →
+150,693 bytes (+328, 75.3% of the 200,000-byte budget). `npm test`: 5/5 suites.
+Deviations: None.
 
 ### Why
 Entry 36 gave the heatmap and both trend charts a visible plain-text caption (`#heatmapSummary`, `#trendSummary`, `#youTrendSummary`) because a `role="img"` `aria-label` is read by a screen reader and by nobody else. `#gradePyramid` was left out, so the card shows bars whose totals a sighted user has to add up by eye.

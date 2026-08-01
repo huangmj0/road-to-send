@@ -668,6 +668,20 @@ const domChecks = `(()=>{
   const youPy=document.querySelector('#gradePyramid'),personPy=document.querySelector('#personPyramid');
   assert.ok(youPy.innerHTML.length>0,'the You pyramid has rows to compare');
   assert.equal(youPy.innerHTML,personPy.innerHTML,'the pyramid rows match too');
+
+  // Entry 51: the pyramid gets the same plain-text caption treatment as the heatmap and trend
+  // charts, tracking the card so it clears when the card hides.
+  const pyramidCard=document.querySelector('#gradePyramidCard'),pyramidCap=document.querySelector('#pyramidSummary');
+  assert.equal(pyramidCard.classList.contains('hide'),false,'the pyramid card is showing');
+  assert.ok(pyramidCap.textContent.indexOf('V4')>=0,'and its caption names the hardest grade');
+  assert.equal(youPy.innerHTML,personPy.innerHTML,'the caption addition leaves the pyramid rows themselves unchanged');
+  logs=[];
+  render();
+  assert.equal(pyramidCard.classList.contains('hide'),true,'no graded climbs hides the pyramid card');
+  assert.equal(pyramidCap.textContent,'','and clears its caption');
+  logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  render();
+
   const youRec=document.querySelector('#recordsList'),personRec=document.querySelector('#personRecords');
   assert.ok(youRec.innerHTML.indexOf('records-row')>=0&&personRec.innerHTML.indexOf('records-row')>=0,'both records lists render through the shared row');
   closeModal('personModal');

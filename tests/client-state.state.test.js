@@ -416,6 +416,17 @@ const checks = `(()=>{
   assert.ok(capWeeks.indexOf('this week 5 points')>=0,'and where the current week stands');
   assert.ok(trendCaption([{week:'2026-W27',label:'W1',points:1}]).indexOf('1 point ')>=0,'a single point is singular here too');
 
+  // Entry 51: the grade pyramid gets the same plain-text caption treatment as the heatmap and
+  // trend charts, naming the total graded sends and the hardest grade.
+  assert.equal(pyramidCaption([]),'','no rows means no caption');
+  const oneSendCap=pyramidCaption([{grade:'V4',count:1}]);
+  assert.ok(oneSendCap.indexOf('1 graded send ')>=0,'a single send is singular');
+  assert.ok(oneSendCap.indexOf('sends')<0,'and has no stray plural');
+  assert.ok(oneSendCap.indexOf('V4')>=0,'and names the hardest grade');
+  const multiCap=pyramidCaption([{grade:'V5',count:2},{grade:'V3',count:3},{grade:'V1',count:1}]);
+  assert.ok(multiCap.indexOf('6 graded sends')>=0,'the caption totals sends across every grade');
+  assert.ok(multiCap.indexOf('V5')>=0,'and names rows[0].grade as the hardest, not the most frequent');
+
   // Entry 41: dailyBounties() hashes the date, so every future day's picks are already computable.
   // Someone planning a Thursday session can now see what Thursday offers.
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
