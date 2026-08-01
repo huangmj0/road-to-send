@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 55 — Say which protocol version this build expects — Done — 2026-08-01
-- 56 — Date the export snapshot — Todo
+- 56 — Date the export snapshot — Done — 2026-08-01
 
 Entries 1–40 shipped and now live under `docs/archive/`, together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. `IMPROVEMENTS.md` indexes them by title. Entry numbers never restart.
 
@@ -41,38 +40,15 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 55. Say which protocol version this build expects
-
-Status: Done — 2026-08-01
-Notes: Commit `Say which protocol version this build expects`. `renderSync()` appends ` This
-build expects v${[...SUPPORTED_API_VERSIONS][0]}.` to the end of the existing `#diagnosticDetail`
-sentence (after the challenge-day/timezone clause), leaving the leading `Protocol …` clause
-untouched. `testConnection()`'s outdated-script message now reads `` `Outdated Apps Script —
-deploy v${[...SUPPORTED_API_VERSIONS][0]}` `` instead of the hard-coded `deploy v11`. No template
-or CSS change. index.html 151,969 → 152,058 bytes (+89, 76.0% of the 200,000-byte budget). `npm
-test`: 5/5 suites.
-Deviations: None.
-
-### Why
-`unpackRemote()` rejects any payload whose version is not in `SUPPORTED_API_VERSIONS`, and `renderSync()` then reports `Apps Script update required` plus the code `RTS-REFRESH-VERSION`. Neither says which version this build wants, so the organizer reading the diagnostics has no number to deploy against. `testConnection()` does name one, but as the literal string `deploy v11`, which will quietly go stale the next time the version bumps.
-
-### Requirements
-- `src/app.js` — `renderSync()` appends the expected version to the existing `#diagnosticDetail` sentence, using `[...SUPPORTED_API_VERSIONS][0]`, the same expression `saveSetup()` and `exportData()` already use. Append only: `tests/client-state.shared.test.js` asserts `detail.indexOf('Protocol')===0`, so the `Protocol …` clause must keep leading.
-- `testConnection()`'s outdated-script message derives its version from that same expression instead of the hard-coded `deploy v11`.
-- No template change and no new element — this is text inside `#syncDiagnostics`, which already exists and already has its `role="status"`.
-
-### Tests
-- `tests/client-state.shared.test.js`: after a successful sync, `#diagnosticDetail` still starts with `Protocol` and now also names the expected version; after a payload with an unsupported version, the diagnostics name the expected version while `#diagnosticCode` still reads `RTS-REFRESH-VERSION`; `testConnection()` against a stale payload names the same version rather than a literal.
-- `tests/static-check.mjs`: the built script contains no `deploy v11` literal.
-
-### Do not
-Change `SUPPORTED_API_VERSIONS`, `unpackRemote()`, `syncFailureCode()`, or the `RTS-REFRESH-*` codes; touch `src/apps-script.js` or `src/schema.json` (rule 2); add a second `aria-live` region; surface the endpoint URL — the shared suite asserts it never appears in the diagnostics.
-
----
-
 ## 56. Date the export snapshot
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Date the export snapshot`. `exportData()`'s `a.download` is now
+`` `road-to-send-${challengeToday()}.json` ``, replacing the fixed `road-to-send-export.json`
+literal; the blob contents, `exportedAt`, the `finally` revoke, and both toast messages are
+unchanged. index.html 152,058 → 152,071 bytes (+13, 76.0% of the 200,000-byte budget). `npm test`:
+5/5 suites.
+Deviations: None.
 
 ### Why
 `exportData()` always names the download `road-to-send-export.json`. Take a snapshot before a risky change and another after, and the second either overwrites the first or lands as `road-to-send-export (1).json`; either way the folder listing says nothing about when each was taken. The timestamp exists only inside the file, which is exactly where you cannot see it while choosing between two of them.

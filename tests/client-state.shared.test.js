@@ -274,7 +274,7 @@ test('a blocked export says so instead of failing silently', async () => {
           addEventListener() {}, removeEventListener() {},
           createElement: () => {
             const el = makeElement();
-            el.click = () => {if (clickThrows) throw Error('downloads are blocked'); anchors.push(el.href)};
+            el.click = () => {if (clickThrows) throw Error('downloads are blocked'); anchors.push({href: el.href, download: el.download})};
             return el;
           },
         },
@@ -285,10 +285,13 @@ test('a blocked export says so instead of failing silently', async () => {
     };
   };
 
+  const now = new Date();
+  const todayFilename = `road-to-send-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.json`;
+
   const good = makeExportContext();
   await vm.runInNewContext(`${source}\nexportData();`, good.context, {filename: 'index.html'});
   assert.equal(good.context.document.querySelector('#toast').textContent, 'Export downloaded.', 'a working export reports success');
-  assert.deepEqual(good.anchors, ['blob:road-to-send/1'], 'and the download really fired');
+  assert.deepEqual(good.anchors, [{href: 'blob:road-to-send/1', download: todayFilename}], 'and the download really fired, named for challengeToday()');
   assert.deepEqual(good.revoked, ['blob:road-to-send/1'], 'the object URL is revoked on the success path');
 
   const blockedClick = makeExportContext({clickThrows: true});
