@@ -474,71 +474,36 @@ const checks = `(()=>{
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   logs=[];
 
-  // weeklyTrend aggregates crew-wide weekly totals from weekKey(startDate) through weekKey(today); today is an ARGUMENT, never the clock.
-  logs=[
-    {id:'v1',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'1'},
-    {id:'v2',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'1'},
-    {id:'v3',name:'Maya',type:'climb',date:'2026-07-08',createdAt:'1'},
-  ];
-  let trend=weeklyTrend('2026-07-15');
-  assert.deepEqual(trend.map(r=>r.week),['2026-06-29','2026-07-06','2026-07-13'],'weeks run consecutively from weekKey(startDate) through weekKey(today)');
-  assert.deepEqual(trend.map(r=>r.label),['W1','W2','W3'],'weeks are labeled W1 through Wn in order');
-  assert.equal(trend[1].points,6,'a Sunday entry lands in its Monday-start week and multi-person weeks sum together');
-  assert.equal(trend[2].points,2,'a Monday entry opens the next week, matching weekKey bucketing');
-  assert.equal(trend[0].points,0,'a week with no entries appears with zero points');
-  logs=[{id:'p1',name:'Alex|Jr',type:'climb',date:'2026-07-01',createdAt:'1'}];
-  assert.equal(weeklyTrend('2026-07-01')[0].points,3,'a crew name containing a pipe still aggregates into its week (the week key is the final key segment)');
-  logs=[
-    {id:'v1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
-    {id:'v2',name:'Alex',type:'mobility',date:'2026-07-20',createdAt:'1'},
-  ];
-  trend=weeklyTrend('2026-07-21');
-  assert.deepEqual(trend.map(r=>r.points),[3,0,0,1],'empty middle weeks appear as zero bars between active weeks');
-  assert.equal(weeklyTrend('2026-07-07').length,2,'the window is capped at the week of today, not the trip date');
-  assert.deepEqual(weeklyTrend('2026-06-30'),[],'before the start there is nothing to chart');
-  assert.deepEqual(weeklyTrend('garbage'),[],'an unparseable today yields no bars');
-  config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
-  assert.deepEqual(weeklyTrend('2026-07-15'),[],'a missing start date yields no bars');
-  config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
-  assert.deepEqual(weeklyTrend('2026-07-15'),[],'an inverted window yields no bars');
+  // Entry 74: every challenge day gets a rolling seven-day point, including quiet days.
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
-  logs=[];
-
-  // Entry 45: personalWeeklyTrend restricts the same rows to one climber, read straight out of
-  // the weeks map computeCredits() returns. today is an ARGUMENT here too, never the clock.
+  const curveBounty=SCORING.bounties[0];
   logs=[
-    {id:'q1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
-    {id:'q2',name:'Alex',type:'exercise',date:'2026-07-08',createdAt:'1'},
-    {id:'q3',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
-    {id:'q4',name:'Maya',type:'climb',date:'2026-07-13',createdAt:'1'},
+    {id:'m1',name:'Alex',type:'climb',date:'2026-07-01',createdAt:'1'},
+    {id:'m2',name:'Alex',type:'exercise',date:'2026-07-03',createdAt:'2'},
+    {id:'m3',name:'Alex',type:'bounty',bountyId:curveBounty.id,date:'2026-07-05',createdAt:'3'},
+    {id:'m4',name:'Maya',type:'climb',date:'2026-07-05',createdAt:'4'},
   ];
-  let mine=personalWeeklyTrend('alex','2026-07-15');
-  assert.deepEqual(mine.map(r=>r.week),['2026-06-29','2026-07-06','2026-07-13'],'one row per challenge week, the same span weeklyTrend charts');
-  assert.deepEqual(mine.map(r=>r.label),['W1','W2','W3'],'and the same W1..Wn labels, so the two charts read alike');
-  // Object is injected from the host realm, so Object.keys() hands back a host array that no
-  // deepEqual against a literal here can match. Compare the shape as a string instead.
-  assert.equal(Object.keys(mine[0]).sort().join('|'),'label|points|week','the row shape matches weeklyTrend row for row');
-  assert.deepEqual(mine.map(r=>r.points),[3,2,3],'each week carries only that person points, spread across the weeks they logged');
-  const creditWeeks=computeCredits(logs).weeks;
-  assert.equal(mine[1].points,creditWeeks.get('alex|2026-07-06')||0,'a week total is exactly what computeCredits credits that person for it');
-  assert.equal(mine[2].points,creditWeeks.get('alex|2026-07-13')||0,'and the shared Monday week is not double counted');
-  const hers=personalWeeklyTrend('maya','2026-07-15');
-  assert.deepEqual(hers.map(r=>r.points),[0,0,3],'another climber entries never leak into the first one rows');
-  assert.deepEqual(weeklyTrend('2026-07-15').map(r=>r.points),[3,2,6],'the crew chart still sums both climbers, unchanged by the personal one');
-  assert.deepEqual(personalWeeklyTrend('nobody','2026-07-15'),[],'a person with nothing logged charts nothing');
-  assert.deepEqual(personalWeeklyTrend('','2026-07-15'),[],'and neither does a blank name');
-  assert.deepEqual(personalWeeklyTrend('alex','2026-06-30'),[],'before the start there is nothing to chart');
-  assert.deepEqual(personalWeeklyTrend('alex','garbage'),[],'an unparseable today yields no bars');
-  assert.deepEqual(personalWeeklyTrend('alex',''),[],'a blank today yields no bars');
-  logs=[{id:'q5',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'}];
-  assert.equal(personalWeeklyTrend('alex','2026-07-07').length,2,'the window is capped at the week of today, not the trip date');
-  assert.deepEqual(personalWeeklyTrend('alex','2026-07-21').map(r=>r.points),[3,0,0,0],'a week they logged nothing is simply a zero row');
+  let curve=momentumCurve('alex','2026-07-05');
+  assert.equal(curve.length,5,'the curve has one point per challenge day through today');
+  assert.equal(Object.keys(curve[0]).sort().join('|'),'date|label|points','each curve point names its date, label, and total');
+  assert.deepEqual(curve.map(r=>r.date),['2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05'],'the curve neither skips a challenge day nor reaches beyond today');
+  assert.deepEqual(curve.map(r=>r.points),[3,3,5,5,8],'each point sums that person dayTotal over the trailing truncated window, including bounty credit');
+  curve=momentumCurve('alex','2026-07-10');
+  assert.equal(curve[curve.length-1].points,3,'the seventh prior day is excluded once a full window has moved past it');
+  assert.equal(momentumCurve('nobody','2026-07-05').length,5,'a person with no logs still gets an all-zero curve');
+  assert.equal(momentumCurve('nobody','2026-07-05').every(r=>r.points===0),true,'the all-zero curve is not an empty chart');
+  assert.equal(momentumCurve('alex','2026-08-05').length,31,'the curve stops at tripDate when today has passed it');
+  assert.deepEqual(momentumCurve('alex','2026-06-30'),[],'before the challenge there is no curve');
+  assert.deepEqual(momentumCurve('alex','garbage'),[],'an invalid date yields no curve');
+  assert.equal(weeklyTrend('2026-07-05')[4].points,11,'the crew chart uses the same helper and includes every person');
+  assert.equal(personalWeeklyTrend('alex','2026-07-05')[4].points,8,'the personal wrapper stays scoped to that climber');
+  logs=[{id:'pipe1',name:'Alex|Jr',type:'climb',date:'2026-07-01',createdAt:'1'}];
+  assert.equal(weeklyTrend('2026-07-01')[0].points,3,'a crew name containing a pipe still aggregates into its curve');
+  assert.equal(personalWeeklyTrend('alex|jr','2026-07-01')[0].points,3,'a personal curve keeps credited points for a name containing a pipe');
   config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
-  assert.deepEqual(personalWeeklyTrend('alex','2026-07-15'),[],'a missing start date yields no bars');
-  config={startDate:'2026-07-01',tripDate:'',goal:500,crew:[]};
-  assert.deepEqual(personalWeeklyTrend('alex','2026-07-15'),[],'a missing trip date yields no bars');
+  assert.deepEqual(momentumCurve('alex','2026-07-15'),[],'a missing start date yields no curve');
   config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
-  assert.deepEqual(personalWeeklyTrend('alex','2026-07-15'),[],'an inverted window yields no bars');
+  assert.deepEqual(momentumCurve('alex','2026-07-15'),[],'an inverted challenge yields no curve');
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   logs=[];
 
@@ -553,12 +518,11 @@ const checks = `(()=>{
   assert.ok(capDays.indexOf(fmtDay('2026-07-03'))>=0,'the caption names the best day');
   assert.ok(capDays.indexOf('8 points')>=0,'and what that day scored');
   assert.ok(capDays.indexOf('2 active days')>=0,'and how many days were active');
-  assert.equal(trendCaption([]),'','no weeks means no caption');
-  assert.equal(trendCaption([{week:'2026-W27',label:'W1',points:0}]),'','weeks with no points means no caption');
-  const capWeeks=trendCaption([{week:'2026-W27',label:'W1',points:12},{week:'2026-W28',label:'W2',points:31},{week:'2026-W29',label:'W3',points:5}]);
-  assert.ok(capWeeks.indexOf('W2')>=0&&capWeeks.indexOf('31 points')>=0,'the trend caption names the best week and its total');
-  assert.ok(capWeeks.indexOf('this week 5 points')>=0,'and where the current week stands');
-  assert.ok(trendCaption([{week:'2026-W27',label:'W1',points:1}]).indexOf('1 point ')>=0,'a single point is singular here too');
+  assert.equal(trendCaption([]),'','no days means no curve caption');
+  const capDaysCurve=trendCaption([{date:'2026-07-01',label:'Jul 1',points:12},{date:'2026-07-02',label:'Jul 2',points:31},{date:'2026-07-03',label:'Jul 3',points:5}]);
+  assert.ok(capDaysCurve.indexOf('Peak Jul 2')===0&&capDaysCurve.indexOf('31 points')>=0,'the trend caption names the peak day and value');
+  assert.ok(capDaysCurve.indexOf('current 5 points')>=0,'and reports the current value without weekly wording');
+  assert.ok(trendCaption([{date:'2026-07-01',label:'Jul 1',points:1}]).indexOf('1 point ')>=0,'a single point is singular here too');
 
   // Entry 51: the grade pyramid gets the same plain-text caption treatment as the heatmap and
   // trend charts, naming the total graded sends and the hardest grade.
@@ -575,14 +539,9 @@ const checks = `(()=>{
   assert.equal(pyramidLabel([]),'Grade pyramid: no graded climbs yet','an empty pyramid still has a useful text alternative');
   assert.equal(pyramidLabel([{grade:'V5',count:1},{grade:'V3',count:2}]),'Grade pyramid: 1 send at V5, 2 sends at V3','the label preserves order and singular/plural sends');
 
-  // Entry 53 review: #personTrend carries role="img", so its descendants collapse into one graphic
-  // and the "No points logged yet" paragraph never reaches a screen reader. The empty state has to
-  // ride in the accessible name instead.
-  assert.ok(personTrendLabel([]).indexOf('no points logged yet')>=0,'an empty chart says so in its own label');
-  assert.ok(personTrendLabel(undefined).indexOf('no points logged yet')>=0,'and a missing weeks list is treated as empty, not thrown on');
-  const trendLabel=personTrendLabel([{week:'2026-W27',label:'W1',points:12},{week:'2026-W28',label:'W2',points:0}]);
-  assert.ok(trendLabel.indexOf('W1 12')>=0&&trendLabel.indexOf('W2 0')>=0,'a populated chart still names every week and its points');
-  assert.ok(trendLabel.indexOf('no points logged yet')<0,'and does not claim to be empty');
+  assert.ok(personTrendLabel([]).indexOf('no challenge days yet')>=0,'an empty curve has a useful text alternative');
+  const trendLabel=personTrendLabel([{date:'2026-07-01',label:'Jul 1',points:12},{date:'2026-07-02',label:'Jul 2',points:0}]);
+  assert.ok(trendLabel.indexOf('peak 12')>=0&&trendLabel.indexOf('current 0')>=0,'the curve label names its peak and current values');
 
   // Entry 41: dailyBounties() hashes the date, so every future day's picks are already computable.
   // Someone planning a Thursday session can now see what Thursday offers.
