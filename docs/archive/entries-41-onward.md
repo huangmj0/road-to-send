@@ -578,3 +578,35 @@ Deviations: None.
 Change `computeCredits()`, `bountyWeekProgress()`, or `#bountyCapHint`; show another person's claims; add a total or a streak line under the list; write copy about bounties not claimed or days without a claim (tone rule).
 
 ---
+
+## 51. Caption the grade pyramid
+
+Status: Done — 2026-08-01
+Notes: Commit `Caption the grade pyramid`. `pyramidCaption(rows)` sits next to `heatmapCaption()`/
+`trendCaption()`: `''` for an empty list, otherwise `` `${total} graded send${total===1?'':'s'} ·
+hardest ${rows[0].grade}` `` with `total` summed across every row's `count`. `<p id="pyramidSummary"
+class="hint"></p>` sits inside `#gradePyramidCard`, immediately after `#gradePyramid`, as a sibling
+(never inside it, so the existing `#gradePyramid`/`#personPyramid` `innerHTML` parity assertion
+stays true). `renderPyramid()` sets it from the `rows` it already computed and clears it to `''` on
+the hidden-card path, exactly as `renderHeatmap()` does with `#heatmapSummary`. index.html 150,365 →
+150,693 bytes (+328, 75.3% of the 200,000-byte budget). `npm test`: 5/5 suites.
+Deviations: None.
+
+### Why
+Entry 36 gave the heatmap and both trend charts a visible plain-text caption (`#heatmapSummary`, `#trendSummary`, `#youTrendSummary`) because a `role="img"` `aria-label` is read by a screen reader and by nobody else. `#gradePyramid` was left out, so the card shows bars whose totals a sighted user has to add up by eye.
+
+### Requirements
+- `src/app.js` — a pure `pyramidCaption(rows)` in the shape of `heatmapCaption()`/`trendCaption()`: `''` for an empty list, otherwise a sentence naming the total number of graded sends and the hardest grade. `gradePyramid()` already returns rows hardest-first, so the hardest is `rows[0].grade`; pluralise `send`/`sends` the way the existing captions do.
+- `src/index.template.html` — `<p id="pyramidSummary" class="hint"></p>` immediately after `#gradePyramid`, still inside `#gradePyramidCard`, mirroring where `#heatmapSummary` sits. No new CSS: `.hint` is global.
+- `renderPyramid()` sets it from the same `rows` it already computed and clears it to `''` on the hidden-card path, exactly as `renderHeatmap()` does with `#heatmapSummary`.
+- The caption is a **sibling** of `#gradePyramid`, never inside it: `tests/client-state.dom.test.js` asserts `#gradePyramid`'s `innerHTML` equals `#personPyramid`'s, and putting the caption inside would break that.
+
+### Tests
+- `tests/client-state.state.test.js`: `pyramidCaption([])` is `''`; a one-send list is singular; a multi-grade list names the total across grades and `rows[0].grade` as the hardest.
+- `tests/client-state.dom.test.js`: with graded climbs, `#pyramidSummary` carries the caption and `#gradePyramid` still matches `#personPyramid`; with none, the card hides and `#pyramidSummary` is empty.
+- `tests/static-check.mjs`: `#pyramidSummary` sits between `#gradePyramid` and the close of the card, and `#gradePyramid` keeps its `role="img"` and `aria-label`.
+
+### Do not
+Add `aria-live` (the pyramid changes only when the user logs a climb, and `#todayRemaining` is the You card's one live region — see the comment above `renderYouPace()`); change `gradePyramid()`, `pyramidRow()`, or the existing `aria-label`; caption `#personPyramid` — that is a different surface and a later entry's business.
+
+---
