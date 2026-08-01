@@ -653,6 +653,30 @@ const domChecks = `(()=>{
   me='Bo';recordingFor='Bo';render();
   assert.equal(document.querySelector('#youRank').textContent,'#2 of 2','a roster member without logs remains in the ranked field');
 
+  // Entry 68: Bounty Hunter reads its rolling claim count without repointing the cap, leaderboard,
+  // or person-card fields that remain calendar-week views.
+  const savedChallengeToday=challengeToday;
+  challengeToday=()=> '2026-07-13';
+  me='Alex';recordingFor='Alex';endpoint='';leaderMetric='bounty';leaderScope='week';
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[
+    {id:'h1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'1'},
+    {id:'h2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-07',createdAt:'2'},
+    {id:'h3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-07',createdAt:'3'},
+    {id:'h4',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'4'},
+    {id:'h5',name:'Bo',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'1'},
+  ];
+  render();
+  const hunterLine=document.querySelector('#bountyHunter'),capHint=document.querySelector('#bountyCapHint'),rollingRows=document.querySelector('#leaderRows');
+  assert.ok(hunterLine.innerHTML.indexOf('Alex')>=0&&hunterLine.innerHTML.indexOf('4 bounties claimed')>=0,'the title line reads the rolling count');
+  assert.ok(capHint.textContent.indexOf('3 / '+SCORING.weeklyBountyCap+' bounty points this week')>=0,'the cap hint keeps its calendar-week credit');
+  const alexRow=rollingRows.innerHTML.slice(rollingRows.innerHTML.indexOf('data-person="Alex"'));
+  assert.ok(alexRow.indexOf('<strong>1</strong>')>=0,'the weekly Bounties leaderboard remains on its calendar-week field');
+  openPersonCard('Alex');
+  assert.ok(personSummaryEl.innerHTML.indexOf('1 this week')>=0,'the person card bounty figure remains weekly');
+  closeModal('personModal');
+  challengeToday=savedChallengeToday;leaderMetric='points';leaderScope='week';
+
   // Entry 48: the Crew feed names a person on every row, and those names open the same card the
   // leaderboard rows open. The You feed lists only your own entries, so its names stay plain text.
   // The delegated handler cannot be fired here (harness.js trap), so this asserts the emitted hook

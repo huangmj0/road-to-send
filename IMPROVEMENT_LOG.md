@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 67 — A rolling seven-day window — Done — 2026-08-01
-- 68 — Bounty Hunter counts the last seven days — Todo
+- 68 — Bounty Hunter counts the last seven days — Done — 2026-08-01
 - 69 — Three titles for the habits people keep — Todo
 - 70 — On Fire and Beast — Todo
 - 71 — Retire the podium medals — Todo
@@ -49,35 +48,11 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 67. A rolling seven-day window
-
-Status: Done — 2026-08-01
-Notes: Commit `A rolling seven-day window`. Archived entry 66. index.html 154,670 → 155,020 bytes
-(+350, 91.2% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Every time-boxed surface in the app runs on calendar weeks through `weekKey`. That makes recency unreadable: on a Monday, "this week" is decided by a single day of data, and the weekly trend chart's rightmost bar is always a partial week, so it reads as a decline until Sunday whatever anyone did. Entries 68–74 move the app's **state** surfaces — the ones answering "what is true right now" — to a trailing seven-day window, which always has seven days of evidence behind it. This entry lands the two pieces they all need and changes nothing on screen.
-
-### Requirements
-- `src/app.js` — pure helper `windowStart(today,days=7)`: `parseDateOnly(String(today||'').slice(0,10))`, return `''` if it does not parse, otherwise step back `days-1` and return `localDate(...)`. This is the `step()` idiom `streakInfo()` already uses (`src/app.js:90`) and the day walk in `heatmapDays()` (`src/app.js:86`). It never reads the clock — `today` is always an argument (rule 6).
-- Callers compare ISO date strings directly (`d>=start&&d<=today`), the way `dateInChallenge()` does at `src/app.js:24`. No new date parsing at the call sites.
-- `computeCreditsRaw()` gains **one additive returned map**, `dayTotal`, keyed `name|date`, holding every point credited to that person that day — category credit, bounty credit, and the balanced-day bonus — uncapped. Add to it at each of the three places credit is awarded: in the bounty branch before its `continue`, in the category branch beside `addMeter`, and in the balanced-day bonus branch. Return it alongside the existing six maps.
-- This map is necessary because nothing carries that figure today: `dayMeter` skips bounty points entirely (the bounty branch `continue`s before `addMeter`) and clamps to `DAILY_MAX`; `info` holds per-entry credit but not the `+2` bonus, which is added straight to `weeks`/`totals` and belongs to no entry; `weeks` has the true total but is keyed by `weekKey`, which is the thing this pass stops using.
-- **Additive only.** No existing map's values change, no existing helper changes behaviour, and nothing renders differently. Rule 3's carve-out is not needed here and must not be invoked.
-
-### Tests
-- `tests/client-state.state.test.js`: `windowStart('2026-07-13')` is `'2026-07-07'` — seven days inclusive, not eight; `windowStart('2026-07-13',1)` is `'2026-07-13'`; `windowStart('')` and `windowStart('not-a-date')` are `''`; a month boundary (`windowStart('2026-08-02')` is `'2026-07-27'`) proves the arithmetic is not string slicing.
-- `tests/client-state.state.test.js`: for a crafted day holding a climb, an exercise log, a mobility log and a bounty, `dayTotal` for that `name|date` equals category points **plus** the balanced-day bonus **plus** the bounty's credit — and is strictly greater than `dayMeter` for the same key, which is the omission this map exists to fix. A bounty credited `0` by the weekly cap contributes `0`. Summing `dayTotal` across the days of one calendar week equals the existing `weeks` value for that week and person, which pins the new map against the old maths.
-- No `tests/client-state.dom.test.js` or `tests/static-check.mjs` assertions: nothing renders differently.
-
-### Do not
-Change `dayMeter`, `weeks`, `totals`, `info`, `bountyWeekCount` or `bountyTotal` — a rolling window is a reading of the credit engine, never a fork of it (rule 6). Do not clamp `dayTotal` to `DAILY_MAX`; the clamp on `dayMeter` is a display decision for the day meter, and copying it here would silently drop bounty points. Do not call `new Date()` anywhere in this entry, do not add a `windowEnd()` helper (the end is always `today`), and do not change any user-visible string.
-
----
-
 ## 68. Bounty Hunter counts the last seven days
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Count Bounty Hunter over seven days`. Archived entry 67. index.html 155,020 →
+155,300 bytes (+280, 91.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 🏹 is decided on calendar weeks: `totalsModel()` reads `bountyWeekCount` at `weekKey(challengeToday())` (`src/app.js:42`), so on a Monday the tag reflects one day of claims and it resets to nobody every seven days regardless of what the crew is doing. The tag and the six-point weekly cap are already independent in the engine — `bountyUsed` enforces the cap while `bountyWeekCount` feeds the tag, and the tag counts every claim whether or not it scored, which `tests/client-state.state.test.js:65` pins. So the tag's window can move without touching scoring at all.
