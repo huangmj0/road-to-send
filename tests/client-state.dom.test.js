@@ -394,6 +394,13 @@ const domChecks = `(()=>{
   logs=[];
   render();
   assert.equal(groupProgress.classList.contains('nonzero'),false,'a true zero crew total removes the progress floor');
+  config={startDate:shift(-5),tripDate:shift(5),goal:1,crew:[{name:'Alex'}]};
+  logs=[{id:'goal-hit',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(document.querySelector('#groupPercent').classList.contains('reached'),true,'the headline percentage keeps its reached state at 100 percent');
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  render();
+  assert.equal(document.querySelector('#groupPercent').classList.contains('reached'),false,'the headline percentage clears its reached state below 100 percent');
 
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
   logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt2',name:'Maya',type:'climb',date:shift(-1),createdAt:'2'}];

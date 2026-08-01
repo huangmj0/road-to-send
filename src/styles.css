@@ -30,3 +30,4 @@
     .trend-baseline{stroke:var(--line-strong);vector-effect:non-scaling-stroke}.breakdown-bar i.nonzero{min-width:3px}.pyramid-bar i.nonzero{min-width:3px}.progress i.nonzero{min-width:3px}
     .card.table-card{padding:18px 0}#leaderTable td:nth-child(2){white-space:normal;overflow-wrap:anywhere}
     .activity{grid-template-columns:40px minmax(0,1fr) auto auto}.activity>div{min-width:0;overflow-wrap:anywhere}.dialog h2{min-width:0;overflow-wrap:anywhere}.setup-copy pre{overflow-wrap:anywhere}@media(max-width:430px){.activity{grid-template-columns:38px minmax(0,1fr) auto auto}}
+    .stat strong,.pts,#leaderTable td:nth-child(3),#leaderTable td:nth-child(4){font-variant-numeric:tabular-nums}.stat-grid .card{margin-bottom:0}.group-percent{color:var(--green);font:800 31px var(--head);font-variant-numeric:tabular-nums}

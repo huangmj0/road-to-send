@@ -273,4 +273,9 @@ assert.match(stylesheet,/\.setup-copy pre\{overflow-wrap:anywhere\}/,'setup code
 assert.match(html,/class="preview"[^>]+role="status"[^>]+aria-live="polite"/,'record preview remains a polite live region');
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'sync diagnostics remain a polite live region');
 assert.doesNotMatch(personCardSource,/trendEl\.setAttribute\('aria-label'/,'the role-less person trend wrapper receives no dead aria-label');
+// Entry 84: updating numeric figures does not shift their width, and the stat grid owns its row gap.
+assert.match(stylesheet,/\.stat strong,\.pts,#leaderTable td:nth-child\(3\),#leaderTable td:nth-child\(4\)\{font-variant-numeric:tabular-nums\}/,'stat, feed and leaderboard values use tabular figures');
+assert.match(stylesheet,/\.stat-grid \.card\{margin-bottom:0\}/,'stat-grid cards do not add a second vertical gap');
+assert.match(html,/id="groupPercent" class="group-percent"/,'the crew percentage has a headline class');
+assert.match(stylesheet,/\.group-percent\{color:var\(--green\);font:800 31px var\(--head\);font-variant-numeric:tabular-nums\}/,'the crew percentage is a tabular headline figure');
 console.log('Road to Send static accessibility and UX checks passed.');
