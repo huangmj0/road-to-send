@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 77 — Stop the momentum curve stretching its text and its points — Done — 2026-08-01
-- 78 — Draw the curve on day one, and the smallest bars at all — Todo
+- 78 — Draw the curve on day one, and the smallest bars at all — Done — 2026-08-01
 - 79 — Fit the leaderboard on a 320px screen — Todo
 - 80 — Raise the progress bar, the sorted column and the meter fills to a visible contrast — Todo
 - 81 — One focus ring, at a contrast you can see — Todo
@@ -52,40 +51,11 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 77. Stop the momentum curve stretching its text and its points
-
-Status: Done — 2026-08-01
-Notes: Commit `Fix momentum curve rendering`. Archived entry 76. index.html 155,413 → 155,411
-bytes (-2, 91.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-`trendSvg()` (`src/app.js:105`) emits `viewBox="0 0 100 100"` with `preserveAspectRatio="none"` into `.trend-svg{display:block;width:100%;height:160px;overflow:visible}` (`src/styles.css:18`). The vertical scale is pinned at 1.6 while the horizontal scale is the card width over 100, so everything inside the SVG is stretched horizontally by a measured **1.65× at 320px, 2.09× at 390px, 2.34× at 430px, 4.24× at 768px and above, and 2.96× for `#personTrend` at 1440px**. The line escapes because it carries `vector-effect:non-scaling-stroke`; the text and the point markers do not. At 1440px the "Current 93" label renders **245.6px wide by 11.0px tall** — letterforms smeared four times wider than they are tall — and `circle r="1.6"` renders as a **21.7 × 5.1px ellipse**, so the data points read as dashes rather than dots. The dots also overlap once the series passes **32 days** and overlap 2.2× at 70 days, which is the challenge length entry 74 designed the curve for. This is the stretched-text symptom the maintainer named.
-
-### Requirements
-- `src/app.js` (`trendSvg()`, `src/app.js:105`) and `src/styles.css:18`. All three mount points — `#weeklyTrend`, `#youTrend` and `#personTrend` — draw through this one helper and must keep doing so; do not special-case one.
-- **Keep `preserveAspectRatio="none"` for the filled area and the line.** An area chart is meant to stretch to its box, and `.trend-line` is already immune via `vector-effect:non-scaling-stroke` (`:18`). The bug is the two things that must not stretch: text and point markers.
-- **Move the two value labels out of the SVG.** Return them from `trendSvg()` as HTML siblings of the `<svg>` inside the same returned string — not as `<text>` — so they render at a true typographic size in every card and cannot be distorted or collide with the polyline. Today they are `<text class="trend-value peak">Peak N</text>` and `<text class="trend-value current">Current N</text>` positioned at `y=Math.min(98,now.y+8)`, which is 12.8px below the last point and overlaps the line and the final marker at every viewport. Because `renderTrend()`, `renderYouTrend()` and `renderPersonCard()` all assign the helper's output as `innerHTML` of a plain `<div class="trend">`, this needs no template change.
-  - This keeps `tests/client-state.dom.test.js:363` green (it reads `#youTrend`'s `innerHTML` for the strings `Peak 0` and `Current 0`) and `:958` green (it compares `#personTrend`'s `innerHTML` with `#youTrend`'s). Both must still pass — do not retire either.
-  - Retire the `.trend-value{font:700 6px system-ui,sans-serif}` / `.peak` / `.current` SVG text rules along with the `<text>` elements they styled, and style the HTML labels with the app's own tokens. Text wears text tokens — `var(--ink)` for the peak, `var(--muted)` for the current value — never the series colour, as entry 74 required.
-- **Replace the visible per-point `<circle class="trend-point" r="1.6">` markers with one full-height transparent hover band per day** — a `<rect>` per point spanning that day's slice of the chart, `fill="transparent"`, carrying the same `<title>` the circle carries today (`${label} · ${points} point${s}`). A rect used as an invisible hit target is unaffected by the horizontal stretch, and one band per day removes the marker overlap entirely at any series length.
-  - `tests/client-state.dom.test.js:368` asserts `'trend-line'` and `'<title>'` are present with the message "the SVG keeps a line and per-point hover affordance". **Per-day hover bands satisfy that assertion's stated intent, so no rule-3 carve-out is granted or needed here.** If your implementation cannot keep a per-point `<title>`, stop and mark the entry `Blocked` rather than retiring the assertion.
-  - Retire `.trend-point{fill:var(--orange-ink)}` (`:18`) with the circles it styled. That is the only assertion-free rule going out.
-- Inner marks stay `aria-hidden="true"` and the `<svg>` keeps `role="img"` with its `aria-label` from `trendAria()` (rule 7). No JS-driven animation; any transition stays CSS so the `@media(prefers-reduced-motion:reduce)` kill-switch at `:26` applies.
-- The chart must still fit its card with **no horizontal scroll** at any viewport — that was entry 74's reason for choosing an SVG and it still binds.
-- Append new CSS at the end of `src/styles.css`; do not reformat existing lines.
-
-### Tests
-- `tests/client-state.dom.test.js`: `#youTrend` contains an `<svg>` with `role="img"` and a non-empty `aria-label`; `Peak N` and `Current N` appear as visible text outside the `<svg>` element; the SVG contains no `<text>` element; there is one `<title>` per point; a repaint is idempotent. The existing `#personTrend` / `#youTrend` equality assertion keeps passing.
-- `tests/static-check.mjs`: `.trend-value{`, `.trend-point{` are no longer styled; the classes for the HTML labels are.
-
-### Do not
-Do not scale the text by hand with a per-viewport `font-size`, a transform, or a JS measurement — moving it out of the distorted coordinate space is the fix. Do not add a second `<script>` block (rule 5) or a charting dependency (rule 8). Do not add a number on every point, a second series, a second y-axis or a legend — entry 74 ruled all four out and there is still one series. Do not let the chart scroll horizontally. Do not reach past `challengeToday()` or `config.tripDate`. Tone rule: this entry redraws an existing chart and adds no copy — no nudge, no reminder, no absence count, and nothing that opens or speaks on its own.
-
----
-
 ## 78. Draw the curve on day one, and the smallest bars at all
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Fix day-one curve and bar floors`. Archived entry 77. index.html 155,411 →
+155,877 bytes (+466, 91.7% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 Two graphics silently draw the wrong thing for small values.
