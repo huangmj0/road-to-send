@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 58 — Caption the claimed bounty list — Done — 2026-07-31
-- 59 — Show a crewmate's claimed bounties in their card — Todo
+- 59 — Show a crewmate's claimed bounties in their card — Done — 2026-07-31
 - 60 — Announce the crewmate's grade pyramid — Todo
 - 61 — Mark today's bounties you have already claimed — Todo
 - 62 — Key the heatmap shades — Todo
@@ -57,37 +56,14 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 58. Caption the claimed bounty list
-
-Status: Done — 2026-07-31
-Notes: Commit `Caption the claimed bounty list`. Added `claimedCaption()` to count claims and sum
-their credited points, plus `#claimedSummary` below the claimed-list container. `renderClaimed()`
-fills the caption only while the list is open and clears it on close. index.html 152,071 → 152,439
-bytes (+368, 92.4% of the 165,000-byte budget). `npm test`: 5/5 suites.
-Deviations: None.
-
-### Why
-Opening "Bounties you have claimed" gives a list of rows and nothing else. Entries 36 and 51 gave the heatmap, both trend charts and the grade pyramid a one-line plain-text caption that states the total underneath the graphic, because reading a total off a list of rows is work the app can do. The claimed list is the last of those surfaces without one: to know how many bounties you have claimed all challenge, or how many of those points actually counted after the weekly cap, you count rows and add up the `+N` column by hand.
-
-### Requirements
-- `src/app.js` — add a pure helper `claimedCaption(rows)` taking the array `claimedBounties()` already returns (items shaped `{date,label,note,base,credit}`). It returns `''` for an empty array, and otherwise a single string naming the number of claims and the credited total: `` `${n} claim${n===1?'':'s'} · ${points} point${points===1?'':'s'} counted` ``, where `points` is the sum of `credit` across the rows. Follow `heatmapCaption()`/`trendCaption()`/`pyramidCaption()`: pure, no DOM, no `new Date()` (rule 6).
-- `src/index.template.html` — add `<p id="claimedSummary" class="hint"></p>` immediately after `<div id="claimedList" class="bounty-week hide"></div>`, inside the same bounty `<article>`. It sits before `#youEmptyState`, so the source-order assertion at `tests/static-check.mjs` line 124 keeps passing unchanged.
-- `src/app.js` — `renderClaimed()` writes the caption. It already computes `rows` only when open; the caption follows the same contract as the list it captions: set `#claimedSummary`'s `textContent` to `claimedCaption(rows)` when `claimedOpen` is true, and to `''` on the closed branch that clears `box.innerHTML`. Guard the lookup (`const cap=document.querySelector('#claimedSummary');if(cap)…`) the way the rest of that function guards its elements.
-- No new CSS: `.hint` is the class every other caption uses.
-
-### Tests
-- `tests/client-state.state.test.js`: `claimedCaption([])` is `''`; a two-row array totals both `credit` values and pluralises "claims"; a one-row array with `credit` 1 says "1 claim" and "1 point"; a row whose `credit` is below its `base` (weekly cap) contributes its **credit**, not its base.
-- `tests/client-state.dom.test.js`: extend the existing entry 46 claimed-list block. While closed, `#claimedSummary` is `''`; after `toggleClaimed()` it names the claim count; a repaint keeps it; closing empties it again. Keep every existing assertion in that block, including `claimedBox.innerHTML===''` while closed — the caption is a separate element and must not put anything inside `#claimedList`.
-- `tests/static-check.mjs`: `#claimedSummary` exists, follows `#claimedList` in source order, and a `function claimedCaption(` is present.
-
-### Do not
-Put the caption inside `#claimedList` (it would break the "renders nothing at all until it is opened" assertion), give it `aria-live` (it changes only on a tap the user made, and `renderClaimed()` runs on every `render()`), or state anything about bounties **not** claimed — no "0 of 3 today", no cap-remaining figure, no crew comparison. The tone rule binds here: this caption reports what the user did, in the panel they opened to look.
-
----
-
 ## 59. Show a crewmate's claimed bounties in their card
 
-Status: Todo
+Status: Done — 2026-07-31
+Notes: Commit `Show a crewmate's claimed bounties in their card`. Extracted the shared
+`claimedRow()` helper so the You panel and person cards render the same read-only claim rows;
+added a person-card section and caption with an empty state. Archived entry 58. index.html
+152,439 → 153,023 bytes (+584, 92.7% of the 165,000-byte budget). `npm test`: 5/5 suites.
+Deviations: None.
 
 ### Why
 Tapping a crewmate's name opens a card with their breakdown, records, weekly trend, pyramid and recent activity. Bounties appear there only as a number in the summary grid ("2 this week · 7 all time"), so you can see that someone claimed seven bounties and never which ones. Your own card has had that list since entry 46; the person card is the same information for someone else, and `claimedBounties()` already takes any name.
