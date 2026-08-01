@@ -374,7 +374,7 @@ const checks = `(()=>{
   assert.equal(rec.graded,true,'a graded climb enables the grade rows');
   assert.equal(rec.hardest,'V10','V10 beats V2 by GRADES index, not lexicographically');
   assert.equal(rec.hardestWeek,'V10','the week of 2026-07-15 (Mon 07-13) holds the V10 send');
-  assert.equal(rec.bestDay,8,'best single day is the dayMeter max — a balanced day tops out at 8');
+  assert.equal(rec.bestDay,8,'best single day is the dayTotal max — this balanced day totals 8');
   assert.equal(rec.bestWeek,8,'best week is the weeks-map max');
   rec=personalRecords('alex','2026-07-08');
   assert.equal(rec.hardest,'V10','hardest ever ignores the week filter');
@@ -399,7 +399,7 @@ const checks = `(()=>{
   assert.equal(rec.bestDay,0);
   assert.equal(rec.bestWeek,0);
 
-  // streakInfo counts consecutive days with >=1 credited point in dayMeter; today is an ARGUMENT, never the clock.
+  // streakInfo counts consecutive days with >=1 credited point in dayTotal; today is an ARGUMENT, never the clock.
   logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:1,best:1},'a single active day is a one-day streak');
   logs=[
@@ -456,7 +456,7 @@ const checks = `(()=>{
   assert.equal(heat.length,15,'a multi-week span is capped at today, not the trip date');
   assert.equal(heat[0].date,'2026-07-01','the span starts at the challenge start');
   assert.equal(heat[14].date,'2026-07-15','the span ends at today');
-  assert.equal(heat[1].points,3,'points come from dayMeter');
+  assert.equal(heat[1].points,3,'points come from dayTotal');
   assert.equal(heat[9].points,2);
   assert.equal(heat[2].points,0,'other people never color your cells');
   assert.equal(heatmapDays('alex','2026-08-15').length,31,'after the trip the span caps at the trip date');
@@ -468,6 +468,24 @@ const checks = `(()=>{
   assert.deepEqual(heatmapDays('alex','2026-07-15'),[],'an inverted window yields no cells');
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   logs=[];
+
+  // Entry 86: bounty credit belongs in daily totals but deliberately leaves the category meter empty.
+  logs=[
+    {id:'b1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-12',createdAt:'1'},
+    {id:'b2',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-12',createdAt:'2'},
+    {id:'b3',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'3'},
+  ];
+  const bountyCredits=computeCredits(logs),bountyDay=bountyCredits.dayTotal.get('alex|2026-07-12')||0,bountyHeat=heatmapDays('alex','2026-07-13').find(x=>x.date==='2026-07-12');
+  assert.equal(bountyCredits.dayMeter.get('alex|2026-07-12')||0,0,'bounties do not fill the category meter');
+  assert.equal(bountyDay,6,'the bounty-only day retains its credited points');
+  assert.equal(bountyHeat.points,bountyDay,'the heatmap reads the uncapped daily total');
+  assert.ok(heatLevel(bountyHeat.points)>0,'a bounty-only day has a visible heat level');
+  assert.ok(heatmapCaption([bountyHeat]).indexOf('1 active day')>=0,'the bounty-only day counts as active in the caption');
+  assert.deepEqual(streakInfo('alex','2026-07-13'),{current:2,best:2},'a bounty-only day continues the streak');
+  assert.equal(personalRecords('alex','2026-07-13').bestDay,bountyDay,'best day includes bounty-only credit');
+  me='Alex';
+  assert.equal(weekReviewModel('2026-07-15').mine.activeDays,1,'Week in Review counts the previous week bounty-only day as active');
+  me='';
 
   // Entry 74: every challenge day gets a rolling seven-day point, including quiet days.
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};

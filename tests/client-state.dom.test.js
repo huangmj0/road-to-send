@@ -343,6 +343,10 @@ const domChecks = `(()=>{
   assert.equal(heatCard.classList.contains('hide'),false,'the heatmap card is showing');
   assert.ok(heatCap.textContent.length>0,'so its caption says something');
   assert.ok(heatCap.textContent.indexOf('active day')>=0,'and reports the active-day count');
+  logs=[{id:'bounty-heat',name:'Alex',type:'bounty',bountyId:'send-it',date:shift(-1),createdAt:'1'}];
+  render();
+  const bountyHeatCell=document.querySelector('#youHeatmap').innerHTML.match(new RegExp('<i class="heat-cell heat([1-4])"[^>]*title="'+fmtDay(shift(-1))));
+  assert.ok(bountyHeatCell,'a bounty-only day is not rendered as an empty heat0 cell');
   const trendCard=document.querySelector('#weeklyTrendCard'),trendCap=document.querySelector('#trendSummary');
   assert.equal(trendCard.classList.contains('hide'),false,'the trend card is showing');
   assert.ok(trendCap.textContent.indexOf('Peak ')===0,'so its caption names the curve peak');
