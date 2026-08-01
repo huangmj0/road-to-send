@@ -470,3 +470,36 @@ Notes: Commit `Add On Fire and Beast titles`. Archived entry 69. index.html 157,
 Sum `dayTotal` inside `crewTitles()` — the rolling figure belongs on `totalsModel().sorted` as `recent`, where entry 72 also reads it, and a second derivation is the fork rule 6 forbids. Do not keep a trimmed champions panel "just for the values"; the values live on the tiles now, and leaving both is the duplication this entry exists to remove. Do not remove the leaderboard, its rank column, or its scope toggle — entry 72 handles the toggle. Do not report anyone's distance from a leader.
 
 ---
+
+## 78. Draw the curve on day one, and the smallest bars at all
+
+Status: Done — 2026-08-01
+Notes: Commit `Fix day-one curve and bar floors`. Archived entry 77. index.html 155,411 →
+155,877 bytes (+466, 91.7% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+Two graphics silently draw the wrong thing for small values.
+
+On the **first day of a challenge**, `trendSvg()` has one row, so `x=i=>rows.length===1?50` and the path string is `line="M50,<y>"` — a lone `moveto` with `fill:none`, which strokes nothing at all — while `area=line+' L100,88 L0,88 Z'` becomes a full-width **triangle** from the single point down to both bottom corners. A crew opening the app on day one sees an orange wedge and no line.
+
+The **baseline** the entry-74 spec called the chart's one required rule is `.trend-baseline{stroke:var(--line);stroke-width:1}` (`src/styles.css:18`), computing to **1.23:1** against the card, drawn coincident with the area's own lower edge at 1.25:1 — the two are indistinguishable. It also lacks `vector-effect:non-scaling-stroke`, so it renders at 1.6px while `.trend-line` beside it renders at 2px.
+
+The **bar charts** round their widths: `breakdownRow(…, Math.round(r.points/max*100))` and `pyramidRow(…, Math.round(r.count/max*100))` in `renderBreakdown()`/`renderPyramid()` (`src/app.js:92`, `:97`). A real nonzero value whose share is under 0.5% rounds to `width:0%` and **draws nothing**, and anything under a few percent is clipped to a sliver by `border-radius:999px` on a 12–14px-tall track. A climber with 1 bounty point against a 300-point climbing total sees an empty bar next to a "1" — the number says one thing and the bar says zero.
+
+### Requirements
+- **Sequencing: entry 77 lands first.** Both entries edit `trendSvg()` and the `.trend-*` rules. Do not start this while 77 is `Todo`.
+- `src/app.js` and `src/styles.css`.
+- **Day one:** when `rows.length===1`, emit a path that actually strokes and an area that is a rectangle, not a triangle — a horizontal segment across the full width at that point's `y` is the natural form for a single-day series. Keep the existing coordinate rounding.
+- **Baseline:** give `.trend-baseline` `vector-effect:non-scaling-stroke` so it renders 1px crisp like `.trend-line` does, and raise its stroke from `var(--line)` (`#174a3a1f`) to `var(--line-strong)` (`#174a3a24`) so it separates from the area's own lower edge. It stays a **recessive** rule, as entry 74 required. **Introduce no new colour token** — entry 74 forbade that for this chart and that still binds.
+- **Bar floor:** give `.breakdown-bar i` (`:11`), `.pyramid-bar i` (`:13`) and `.progress i` (`:9`) a minimum rendered width so a nonzero value is always visible — a `min-width` in the low single-digit pixels is enough, and it must apply **only when the value is nonzero**, so a genuine zero still draws nothing. Prefer fixing it in CSS over changing the percentage math; if you change the math, keep `0` mapping to `0`.
+- Rule 6: `renderBreakdown()` and `renderPyramid()` run from `render()`, which runs often. Whatever you add stays idempotent and cheap.
+- Append new CSS at the end of `src/styles.css`; do not reformat existing lines.
+
+### Tests
+- `tests/client-state.dom.test.js`: a config whose `startDate` equals `challengeToday()` yields exactly one point, and `#youTrend`'s SVG contains a `trend-line` path with more than a single `M` command and an area path that is not the `L100,88 L0,88 Z` triangle; a breakdown row whose points are a tiny fraction of the maximum still renders a bar with nonzero width, while a row worth zero points does not.
+- `tests/static-check.mjs`: `.trend-baseline` carries `vector-effect:non-scaling-stroke`; the three bar-fill rules carry the minimum-width floor. Assert the exact compact text.
+
+### Do not
+Do not hide the card on day one — `tests/client-state.dom.test.js:360`, `:378` and `:963` lock the all-zero personal curve as deliberate behaviour and must keep passing. Do not add a new colour token, a second series, a legend or a per-point number. Do not raise the baseline to a foreground weight; it is a rule, not data. Do not give a zero-point row a visible bar — inventing a value is worse than the bug. Tone rule: this entry changes geometry only; it adds no copy, no absence count and no prompt to participate.
+
+---
