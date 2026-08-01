@@ -29,8 +29,14 @@ shared Google Sheet and from their browsers' localStorage. `index.html` is the d
 - Invoke `$road-to-send-drain` for a context-light loop tick. It reads only queue state and delegates
   the entry or refill workflow to one fresh subagent, then stops. The outer automation or operator
   owns the next tick.
+- The three workflows do not run on the same model. Refill is the design step — its entries are
+  binding specs a later run executes literally — so it gets the most capable model available at high
+  reasoning effort. Entry executes an already-merged spec that `npm test` checks, so a mid-tier model
+  at high effort is enough. Drain reads one exit code and delegates, so a mid-tier model at moderate
+  effort covers it. Each skill states its own tier at the top; `docs/loop-prompt.md` explains why.
 - The Codex skills live under `.agents/skills/`; the Claude Code commands remain under
-  `.claude/commands/`. `docs/loop-prompt.md` is the shared operator guide.
+  `.claude/commands/`, with the subagent tiers pinned in `.claude/agents/`.
+  `docs/loop-prompt.md` is the shared operator guide.
 
 ## Loop working rules
 

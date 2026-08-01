@@ -53,6 +53,34 @@ orchestrator keeps, which is what lets one session run many iterations.
 Each drain implementation delegates by naming its own entry and refill workflow rather than
 restating either one. `tests/docs-check.mjs` asserts both agent surfaces preserve that boundary.
 
+## Which model runs which step
+
+The three workflows are not equally hard, so they do not run on the same model. The split follows
+where a mistake gets caught:
+
+- **Refill — the most capable model, high effort.** This is the design step. Every entry it writes
+  becomes a binding spec that a later run executes literally without re-litigating it, so a vague
+  `### Requirements` block, a named helper that does not exist, or two entries colliding in the same
+  DOM region each cost a full implementation iteration and a human review. It also runs rarely —
+  once per drained queue, against six to twelve entries — so its cost amortises to almost nothing.
+- **Entry — a mid-tier model, high effort.** It executes a spec a human already read and merged, and
+  `npm test` catches what it gets wrong before anyone else sees it. The saving comes from the model
+  tier, not from thinking less: effort stays high because the failures that matter here are the
+  `TRAP` notes, the helper reuse and the full `=== summary ===` read, and those reward care.
+- **Drain — a mid-tier model, medium effort.** It reads one exit code, delegates, keeps seven lines
+  and picks a delay. It runs on every tick, so it is the largest cumulative cost and the least
+  demanding work in the loop.
+
+In Claude Code this is enforced twice, because there are two ways in. `.claude/agents/queue-entry.md`
+and `queue-refill.md` pin the model and effort for the subagents `/drain` spawns, and the `model` and
+`effort` frontmatter on `.claude/commands/entry.md`, `refill.md` and `drain.md` pins the same values
+when a human invokes one directly. Change a tier in one place and change it in the other, or the two
+paths drift apart.
+
+Codex has no equivalent declarative field in `.agents/skills/*/agents/openai.yaml`, so the same
+split is stated in prose at the top of each Codex skill. There it is guidance for the operator
+choosing a model, not something the harness enforces.
+
 ## When the queue runs dry
 
 On exit 3, the drain workflow delegates a refill — but only after checking that no queue proposal
