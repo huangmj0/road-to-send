@@ -427,6 +427,15 @@ const checks = `(()=>{
   assert.ok(multiCap.indexOf('6 graded sends')>=0,'the caption totals sends across every grade');
   assert.ok(multiCap.indexOf('V5')>=0,'and names rows[0].grade as the hardest, not the most frequent');
 
+  // Entry 53 review: #personTrend carries role="img", so its descendants collapse into one graphic
+  // and the "No points logged yet" paragraph never reaches a screen reader. The empty state has to
+  // ride in the accessible name instead.
+  assert.ok(personTrendLabel([]).indexOf('no points logged yet')>=0,'an empty chart says so in its own label');
+  assert.ok(personTrendLabel(undefined).indexOf('no points logged yet')>=0,'and a missing weeks list is treated as empty, not thrown on');
+  const trendLabel=personTrendLabel([{week:'2026-W27',label:'W1',points:12},{week:'2026-W28',label:'W2',points:0}]);
+  assert.ok(trendLabel.indexOf('W1 12')>=0&&trendLabel.indexOf('W2 0')>=0,'a populated chart still names every week and its points');
+  assert.ok(trendLabel.indexOf('no points logged yet')<0,'and does not claim to be empty');
+
   // Entry 41: dailyBounties() hashes the date, so every future day's picks are already computable.
   // Someone planning a Thursday session can now see what Thursday offers.
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
