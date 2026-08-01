@@ -63,6 +63,10 @@ assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption')
 assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
 assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.page-head h1\{overflow-wrap:anywhere\}/,'the page head wraps long names while keeping its actions reachable');
 const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
+assert.match(stylesheet,/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/,'the global focus ring uses the shared high-contrast green treatment');
+assert.equal((stylesheet.match(/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/g)||[]).length,1,'the shared focus ring is declared once globally');
+assert.doesNotMatch(stylesheet,/:focus-visible[^}]*var\(--sky\)/,'no focus-visible rule uses the low-contrast sky token');
+assert.match(stylesheet,/button\.bounty:focus-visible\{outline:3px solid var\(--green\);outline-offset:-2px;border-radius:10px\}/,'the bounty row keeps its inset focus ring geometry');
 assert.match(stylesheet,/\.progress i\{[^}]*background:var\(--orange-ink\)/,'the progress fill uses the contrast-safe orange ink token');
 assert.match(stylesheet,/td\.sorted strong\{color:var\(--orange-ink\)\}/,'the sorted leaderboard value uses the contrast-safe orange ink token');
 assert.match(stylesheet,/\.point-meter i\.seg-exercise\.filled\{background:var\(--orange-ink\);border-color:var\(--orange-ink\)\}/,'the exercise meter fill uses orange ink');

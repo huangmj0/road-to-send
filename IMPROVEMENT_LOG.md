@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 80 — Raise the progress bar, the sorted column and the meter fills to a visible contrast — Done — 2026-08-01
-- 81 — One focus ring, at a contrast you can see — Todo
+- 81 — One focus ring, at a contrast you can see — Done — 2026-08-01
 - 82 — Stop three remaining surfaces pushing past their card — Todo
 - 83 — Stop announcing what did not change, and put the chart label where ARIA reads it — Todo
 - 84 — Line up the numbers and close the double gap in the stat grid — Todo
@@ -49,41 +48,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 80. Raise the progress bar, the sorted column and the meter fills to a visible contrast
-
-Status: Done — 2026-08-01
-Notes: Commit `Raise visible contrast`. Archived entry 79. index.html 155,985 → 156,050 bytes (+65, 91.8% of the 170,000-byte budget). Meter ratios against sand (climb/exercise/mobility/bonus) light 7.34/3.64/4.80/3.64, dark 5.26/5.69/4.94/5.69; orange-ink progress against sand 3.64/5.69 and sorted text against card 4.83/7.38. Heatmap adjacent ratios (base→1→2→3→4) light 1.22/1.23/1.23/1.22, dark 1.39/1.42/1.43/1.43. `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Three tokens — `--sky`, `--orange` and the heatmap's orange mix — were never re-stepped when the dark block was added, and they are the root of four separate contrast failures on the app's most-looked-at widgets.
-
-- `.progress i{background:var(--orange);…}` (`src/styles.css:9`) is the crew's headline KPI, and its fill measures **2.25:1** against the `--sand` track. This is a graphical object whose boundary *is* the value, so 3:1 is the floor. Swapping the fill to `var(--orange-ink)` gives **3.64:1** for **+4 bytes** — the best value-per-byte fix in the audit.
-- `td.sorted strong{color:var(--orange)}` (`:16`) measures **2.99:1** and fails AA outright as text. Every other orange *text* in the app already correctly uses `--orange-ink` — `.pts`, `.rank`, `.breakdown-pts`, `.pyramid-count`, `.records-value`, `.week-trend.down`, `.pace.behind`. This one selector is the outlier, and it is the leaderboard's currently-sorted score.
-- The point meter's category fills, `.point-meter i.seg-exercise.filled{background:var(--sky);…}` and `.point-meter i.seg-mobility.filled{background:var(--orange);…}` (`:19`), measure **1.48:1** and **2.25:1** against the `--sand` empty segment. Logging Exercise barely changes the widget the app puts at the top of the You tab. `.point-meter i.seg-bonus{border-style:dashed}` sits at **1.17:1**, so the balanced-day bonus signal effectively does not exist.
-- The heatmap ramp mixes toward `--orange` while its base `--sand` was re-stepped: `color-mix(in srgb,var(--orange) 30%/55%/80%,var(--sand))` (`:15`). Adjacent steps measure **1.29 / 1.23 / 1.22 / 1.16**, so a 6-point day and an 8-point day are the same colour to the eye.
-
-### Requirements
-- `src/styles.css` only. Every fix here is a token swap or a re-step of an existing mix; **introduce no new colour token** and change no `:root` value that other rules depend on.
-- `.progress i` (`:9`): `var(--orange)` → `var(--orange-ink)`. `--orange-ink` is already re-stepped for dark (`#c0481f` → `#ff9166` at `:27`), so both schemes get a chosen treatment.
-- `td.sorted strong` (`:16`): `var(--orange)` → `var(--orange-ink)`, joining the seven text rules that already do this.
-- `.point-meter i.seg-exercise.filled` and `.point-meter i.seg-mobility.filled` (`:19`): reach at least **3:1** against `--sand` in both schemes, using existing tokens. `--green` and `--orange-ink` are the two already-re-stepped candidates; the three categories must stay visually distinguishable from each other, so pick deliberately and state the resulting ratios in your `Notes:`.
-- `.point-meter i.seg-bonus` (`:19`): make the dashed empty state visible — the border must reach 3:1 against the segment it outlines. Keep it dashed; the dash is what distinguishes the bonus segment from the three category segments.
-- Heatmap (`:15`): re-step the three `color-mix` percentages so **every adjacent pair of levels, including `.heat-cell` → `.heat1` and `.heat3` → `.heat4`, is distinguishable**. Keep four levels and keep `heatLevel()` (`src/app.js:85`) unchanged — this is a colour re-step, not a threshold change.
-- Measure the ratios rather than estimating them, in both the light `:root` (`:2`) and the `@media(prefers-color-scheme:dark)` block (`:27`), and record them in your `Notes:`.
-- `--accent-solid` is **out of scope**: its two reported drops (4.35 → 3.59 and 4.83 → 3.26) both still clear 3:1, so it is a consistency observation, not a failure. Leave it alone.
-- Edit these declarations in place, character for character, and do not reformat the surrounding compact CSS.
-
-### Tests
-- `tests/static-check.mjs`: `.progress i` and `td.sorted strong` no longer reference `var(--orange)`; the point-meter segment rules and the heatmap mix percentages match the exact compact text you wrote. Assert that no rule outside `:root` still paints *text* with `var(--orange)`.
-
-### Do not
-Do not add a colour token, a gradient, a pattern or a texture. Do not change the number of heatmap levels or the thresholds in `heatLevel()`. Do not restyle `--accent-solid`, `.btn.primary` or the brand colours. Do not turn contrast into meaning — a darker bar must not come to signal anything the current bar does not already signal. Tone rule: this entry changes colour only and adds no copy; do not let a re-step introduce a "behind" or "not logged" visual state that the app does not have today.
-
----
-
 ## 81. One focus ring, at a contrast you can see
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Unify focus ring contrast`. Archived entry 80. index.html 156,050 → 155,931 bytes (-119, 91.7% of the 170,000-byte budget). Green ring ratios against bg/card/input/wash/orange-tint: light 8.77/9.73/9.91/8.18/8.42, dark 7.52/6.83/6.26/6.61/6.73. `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 Someone navigating by keyboard cannot reliably see where they are. The global ring `:focus-visible{outline:3px solid var(--sky);outline-offset:2px}` (`src/styles.css:3`) measures **1.96:1** against the page background, well under the 3:1 a non-text indicator needs, and `--sky` is one of the three tokens the dark block never re-steps, so it is the same weak blue in both schemes. Three different rings then coexist and disagree with each other:
