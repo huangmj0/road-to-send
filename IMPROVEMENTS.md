@@ -7,10 +7,11 @@ The entries live in `docs/archive/`, split by pass so that looking one up costs 
 instead of loading every entry ever shipped. `tests/docs-check.mjs` caps each file; when the open
 file approaches the cap, start the next one rather than raising it.
 
-## `docs/archive/entries-61-onward.md` — current
+## `docs/archive/entries-84-onward.md` — current
 
 The open file. Rule 10 archives each finished entry here.
 
+## `docs/archive/entries-61-onward.md` — v11 pass — entries 61–82
 ## `docs/archive/entries-41-onward.md` — v11 pass — entries 41–60
 
 ## `docs/archive/entries-1-14.md` — v11 pass — entries 1–14
