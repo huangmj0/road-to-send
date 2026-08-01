@@ -665,8 +665,7 @@ const domChecks = `(()=>{
     {id:'h5',name:'Bo',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'1'},
   ];
   render();
-  const hunterLine=document.querySelector('#bountyHunter'),capHint=document.querySelector('#bountyCapHint'),rollingRows=document.querySelector('#leaderRows');
-  assert.ok(hunterLine.innerHTML.indexOf('Alex')>=0&&hunterLine.innerHTML.indexOf('4 bounties claimed')>=0,'the title line reads the rolling count');
+  const capHint=document.querySelector('#bountyCapHint'),rollingRows=document.querySelector('#leaderRows');
   assert.ok(capHint.textContent.indexOf('3 / '+SCORING.weeklyBountyCap+' bounty points this week')>=0,'the cap hint keeps its calendar-week credit');
   const alexRow=rollingRows.innerHTML.slice(rollingRows.innerHTML.indexOf('data-person="Alex"'));
   assert.ok(alexRow.indexOf('<strong>4</strong>')>=0,'the recent Bounties leaderboard reads its rolling field');
@@ -701,16 +700,22 @@ const domChecks = `(()=>{
   closeModal('personModal');
   challengeToday=()=> '2026-07-13';
 
-  logs=[{id:'title1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},{id:'title2',name:'Bo',type:'exercise',date:'2026-07-13',createdAt:'1'}];
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
+  logs=[
+    {id:'title1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+    {id:'title2',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'2'},
+    {id:'title3',name:'Bo',type:'mobility',date:'2026-07-13',createdAt:'3'},
+  ];
   render();
-  const titleGrid=document.querySelector('#crewTitles'),titleMarkup=titleGrid.innerHTML;
-  assert.equal(titleMarkup.split('class="title-tile').length-1,5,'the Titles card renders category and standing tiles');
-  assert.ok(titleMarkup.indexOf('Rock Hound')>=0&&titleMarkup.indexOf('Alex')>=0&&titleMarkup.indexOf('1 of last 7 days')>=0,'a held tile names its holder and qualifying count');
-  assert.ok(titleMarkup.indexOf('Yogi')>=0&&titleMarkup.indexOf('>—</strong>')>=0,'an unheld tile shows a dash without absence copy');
-  assert.ok(titleMarkup.indexOf('On Fire')>=0&&titleMarkup.indexOf('Beast')>=0&&titleMarkup.indexOf('3 pts')>=0,'standing tiles name their holder and points value');
-  assert.ok(leaderRows.innerHTML.indexOf('data-person="Alex"')>=0&&leaderRows.innerHTML.indexOf('data-person="Bo"')>=0,'the leaderboard rows remain intact beside the new titles');
+  const rowFor=name=>{const start=leaderRows.innerHTML.indexOf('data-person="'+name+'"');return leaderRows.innerHTML.slice(start,leaderRows.innerHTML.indexOf('</tr>',start))},
+        alexTitleRow=rowFor('Alex'),boTitleRow=rowFor('Bo'),cyTitleRow=rowFor('Cy');
+  assert.ok(alexTitleRow.indexOf('class="title-tag"')>=0&&alexTitleRow.indexOf('Crusher · Gym Rat')>=0,'a multi-title holder lists its titles in category order');
+  assert.ok(boTitleRow.indexOf('class="title-tag"')>=0&&boTitleRow.indexOf('Yogi')>=0,'a single-title holder carries its own tag');
+  assert.equal(cyTitleRow.indexOf('class="title-tag"'),-1,'a person holding no title gets no tag and no placeholder');
+  assert.ok(leaderRows.innerHTML.indexOf('data-person="Alex"')>=0&&leaderRows.innerHTML.indexOf('data-person="Bo"')>=0,'the leaderboard rows remain intact beside the folded-in titles');
+  const beforeRepaint=leaderRows.innerHTML;
   render();
-  assert.equal(titleGrid.innerHTML,titleMarkup,'repainting the title grid is idempotent');
+  assert.equal(leaderRows.innerHTML,beforeRepaint,'repainting the leaderboard with titles is idempotent');
 
   // Entry 71: the rank column and Bounty Hunter mark carry the leaderboard without podium medals.
   leaderMetric='points';leaderScope='week';
