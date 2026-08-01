@@ -781,6 +781,27 @@ const domChecks = `(()=>{
   assert.equal(gradeField.value,'','an unlistable stored grade never reaches the select');
   gradeField.value='';
 
+  // Entry 52: a climb can carry a note too, so updateRecordPreview() stops hiding #noteFields for
+  // climb and draftActivity() carries the typed note through on that branch.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[];
+  const climbFieldsEl=document.querySelector('#climbFields'),noteFieldsEl=document.querySelector('#noteFields'),noteInput=document.querySelector('#activityNote');
+  typeRadio.value='climb';
+  noteInput.value='V4, first try on the slab';
+  updateRecordPreview();
+  assert.equal(noteFieldsEl.classList.contains('hide'),false,'the note field stays visible for a climb');
+  assert.equal(climbFieldsEl.classList.contains('hide'),false,'the grade field still shows for a climb');
+  assert.equal(draftActivity().note,'V4, first try on the slab','and the entry that would be saved carries the typed note');
+  typeRadio.value='exercise';
+  updateRecordPreview();
+  assert.equal(noteFieldsEl.classList.contains('hide'),false,'the note field stays visible for a non-climb type too');
+  assert.equal(climbFieldsEl.classList.contains('hide'),true,'the grade field hides for a non-climb type');
+  typeRadio.value='climb';
+  updateRecordPreview();
+  assert.equal(noteFieldsEl.classList.contains('hide'),false,'switching back to climb keeps the note field visible');
+  noteInput.value='';
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 
