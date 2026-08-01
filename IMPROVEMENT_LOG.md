@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 56 — Date the export snapshot — Done — 2026-08-01
-- 57 — Re-baseline the bundle budget for this queue — Todo
+- 57 — Re-baseline the bundle budget for this queue — Done — 2026-08-01
 - 58 — Caption the claimed bounty list — Todo
 - 59 — Show a crewmate's claimed bounties in their card — Todo
 - 60 — Announce the crewmate's grade pyramid — Todo
@@ -49,35 +48,16 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 56. Date the export snapshot
-
-Status: Done — 2026-08-01
-Notes: Commit `Date the export snapshot`. `exportData()`'s `a.download` is now
-`` `road-to-send-${challengeToday()}.json` ``, replacing the fixed `road-to-send-export.json`
-literal; the blob contents, `exportedAt`, the `finally` revoke, and both toast messages are
-unchanged. index.html 152,058 → 152,071 bytes (+13, 76.0% of the 200,000-byte budget). `npm test`:
-5/5 suites.
-Deviations: None.
-
-### Why
-`exportData()` always names the download `road-to-send-export.json`. Take a snapshot before a risky change and another after, and the second either overwrites the first or lands as `road-to-send-export (1).json`; either way the folder listing says nothing about when each was taken. The timestamp exists only inside the file, which is exactly where you cannot see it while choosing between two of them.
-
-### Requirements
-- `src/app.js` — `exportData()` builds the filename from `challengeToday()`: `road-to-send-<YYYY-MM-DD>.json`. Rule 6 applies: `challengeToday()`, never `new Date()`, so a shared-mode export is named for the Sheet's day the same way every other date in the app is.
-- The blob's contents, including its `exportedAt` ISO timestamp, are unchanged; so is the `URL.revokeObjectURL()` cleanup in the `finally` block and both toast messages.
-- One line changes. Do not restructure the try/catch — entry 31's assertions cover a blocked `click()` and a failing `Blob` separately, and both must keep passing.
-
-### Tests
-- `tests/client-state.shared.test.js`: extend the existing export test so the anchor stub records `download` alongside `href`, and assert the filename carries `challengeToday()` and still ends in `.json`; the success and both failure paths keep their current assertions unchanged.
-
-### Do not
-Add a time-of-day, a person's name, or a counter to the filename; change the export payload, its `version` field, or the `mode` field; add a localStorage key (rule 4); prompt anyone to take a snapshot.
-
----
-
 ## 57. Re-baseline the bundle budget for this queue
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Re-baseline the bundle budget for this queue`. `tests/size-check.mjs`'s `BUDGET`
+lowered 200,000 → 165,000; added a comment paragraph recording the measured 152,071 bytes on
+`main` after entry 56, the +13..+1,515-byte range of entries 58–65's nearest archive analogues, and
+the ~12,900-byte headroom that leaves. No `src/` change; `npm run build` produced no diff.
+index.html unchanged at 152,071 bytes (92.2% of the new 165,000-byte budget). `npm test`: 5/5
+suites.
+Deviations: None.
 
 ### Why
 `BUDGET` in `tests/size-check.mjs` is 200,000 bytes and `index.html` weighs 152,071 — the cap is 48,000 bytes above the artifact it guards, so it would not catch a change that doubled a card's markup. The comment on that constant says so itself: the 200,000 step was taken on maintainer instruction to buy a whole pass rather than to track the measured figure, and it asks the next budget entry to lower `BUDGET` back toward what `index.html` actually weighs. This is that entry, and it goes first so the tighter cap governs entries 58–65 rather than being set after they land.
