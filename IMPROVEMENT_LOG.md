@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 54 — Show a crewmate's most recent entries in their card — Done — 2026-08-01
-- 55 — Say which protocol version this build expects — Todo
+- 55 — Say which protocol version this build expects — Done — 2026-08-01
 - 56 — Date the export snapshot — Todo
 
 Entries 1–40 shipped and now live under `docs/archive/`, together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. `IMPROVEMENTS.md` indexes them by title. Entry numbers never restart.
@@ -42,43 +41,17 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 54. Show a crewmate's most recent entries in their card
-
-Status: Done — 2026-08-01
-Notes: Commit `Show a crewmate's most recent entries in their card`. `personRecent(nameLower,
-limit=5)` filters `logs` by `nameKey()`, sorted newest-first by `date` then `createdAt` exactly as
-`claimedBounties()` sorts, sliced to `limit`; each row's `label` is `CAT_LABELS[x.type]` plus the
-grade when present, or the bounty title resolved through the `x.bountyTitle ||
-bountyById(x.bountyId).title || 'Bounty'` chain, and `value` is `fmtDay(x.date)`. `#personModal`
-gets a `Recent activity` section (`h3.person-head` + `#personRecent.records`) as the final section,
-below `#personPyramid`. `renderPersonCard()` fills it with `recordsRow()` through the existing
-`set()` closure, falling back to the shared `<p class="hint">` shape. index.html 151,215 → 151,969
-bytes (+754, 76.0% of the 200,000-byte budget). `npm test`: 5/5 suites.
-Deviations: None.
-
-### Why
-The Crew feed mixes everyone together and its filter narrows by category, not by person. Entry 48 made a feed row open that climber's card, but the card then answers everything except the obvious follow-up question — what has this person actually been logging lately.
-
-### Requirements
-- Depends on entry 53: this section goes **below** `#personTrend`, as the last section of `#personModal`.
-- `src/app.js` — a pure `personRecent(nameLower,limit=5)` filtering `logs` by `nameKey()`, sorted newest-first by `date` then `createdAt` exactly as `claimedBounties()` sorts, sliced to `limit`. Each row is `{label,value}`: `label` is the entry's title — `CAT_LABELS[x.type]` plus the grade when there is one, or the bounty title resolved through the `x.bountyTitle || bountyById(x.bountyId).title || 'Bounty'` chain `claimedBounties()` already uses — and `value` is `fmtDay(x.date)` (rule 6: never `new Date()` for a challenge date).
-- `src/index.template.html` — `<h3 class="person-head">Recent activity</h3><div id="personRecent" class="records"></div>` as the final section of `#personModal`. No new CSS: `.records` is global.
-- `renderPersonCard()` renders the rows with the existing `recordsRow(label,value)` and falls back to the same `<p class="hint">` shape as the card's other sections.
-- **Do not reuse `activityMarkup()` here.** With `allowDelete` false it emits `<button class="climber" data-person=…>` rows, and `#personModal` sits outside the `#crew` element the single delegated handler is bound to, so those buttons would render dead. `recordsRow()` is the right shared helper for a two-column list.
-
-### Tests
-- `tests/client-state.state.test.js`: `personRecent()` returns at most `limit` rows, newest first with the `createdAt` tiebreak; resolves a bounty title through the same fallback chain; includes the grade on a climb; excludes other people; returns `[]` for a blank name and for an empty log.
-- `tests/client-state.dom.test.js`: `openPersonCard()` fills `#personRecent` with `records-row` markup naming that person's newest entry and not a crewmate's, and a person with no entries gets the hint fallback.
-- `tests/static-check.mjs`: `#personRecent` is the last section of `#personModal`, uses the `records` class, and the built script's `renderPersonCard()` line does not call `activityMarkup()`.
-
-### Do not
-Add a delete button, a "show more", a second delegated listener, or a `data-person` hook inside the dialog; show points on these rows (the breakdown above already carries them); pad the list to `limit` with placeholder rows, or add copy about days with nothing logged (tone rule).
-
----
-
 ## 55. Say which protocol version this build expects
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Say which protocol version this build expects`. `renderSync()` appends ` This
+build expects v${[...SUPPORTED_API_VERSIONS][0]}.` to the end of the existing `#diagnosticDetail`
+sentence (after the challenge-day/timezone clause), leaving the leading `Protocol …` clause
+untouched. `testConnection()`'s outdated-script message now reads `` `Outdated Apps Script —
+deploy v${[...SUPPORTED_API_VERSIONS][0]}` `` instead of the hard-coded `deploy v11`. No template
+or CSS change. index.html 151,969 → 152,058 bytes (+89, 76.0% of the 200,000-byte budget). `npm
+test`: 5/5 suites.
+Deviations: None.
 
 ### Why
 `unpackRemote()` rejects any payload whose version is not in `SUPPORTED_API_VERSIONS`, and `renderSync()` then reports `Apps Script update required` plus the code `RTS-REFRESH-VERSION`. Neither says which version this build wants, so the organizer reading the diagnostics has no number to deploy against. `testConnection()` does name one, but as the literal string `deploy v11`, which will quietly go stale the next time the version bumps.
