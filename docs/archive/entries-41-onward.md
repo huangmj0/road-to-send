@@ -706,3 +706,32 @@ The Crew feed mixes everyone together and its filter narrows by category, not by
 Add a delete button, a "show more", a second delegated listener, or a `data-person` hook inside the dialog; show points on these rows (the breakdown above already carries them); pad the list to `limit` with placeholder rows, or add copy about days with nothing logged (tone rule).
 
 ---
+
+## 55. Say which protocol version this build expects
+
+Status: Done — 2026-08-01
+Notes: Commit `Say which protocol version this build expects`. `renderSync()` appends ` This
+build expects v${[...SUPPORTED_API_VERSIONS][0]}.` to the end of the existing `#diagnosticDetail`
+sentence (after the challenge-day/timezone clause), leaving the leading `Protocol …` clause
+untouched. `testConnection()`'s outdated-script message now reads `` `Outdated Apps Script —
+deploy v${[...SUPPORTED_API_VERSIONS][0]}` `` instead of the hard-coded `deploy v11`. No template
+or CSS change. index.html 151,969 → 152,058 bytes (+89, 76.0% of the 200,000-byte budget). `npm
+test`: 5/5 suites.
+Deviations: None.
+
+### Why
+`unpackRemote()` rejects any payload whose version is not in `SUPPORTED_API_VERSIONS`, and `renderSync()` then reports `Apps Script update required` plus the code `RTS-REFRESH-VERSION`. Neither says which version this build wants, so the organizer reading the diagnostics has no number to deploy against. `testConnection()` does name one, but as the literal string `deploy v11`, which will quietly go stale the next time the version bumps.
+
+### Requirements
+- `src/app.js` — `renderSync()` appends the expected version to the existing `#diagnosticDetail` sentence, using `[...SUPPORTED_API_VERSIONS][0]`, the same expression `saveSetup()` and `exportData()` already use. Append only: `tests/client-state.shared.test.js` asserts `detail.indexOf('Protocol')===0`, so the `Protocol …` clause must keep leading.
+- `testConnection()`'s outdated-script message derives its version from that same expression instead of the hard-coded `deploy v11`.
+- No template change and no new element — this is text inside `#syncDiagnostics`, which already exists and already has its `role="status"`.
+
+### Tests
+- `tests/client-state.shared.test.js`: after a successful sync, `#diagnosticDetail` still starts with `Protocol` and now also names the expected version; after a payload with an unsupported version, the diagnostics name the expected version while `#diagnosticCode` still reads `RTS-REFRESH-VERSION`; `testConnection()` against a stale payload names the same version rather than a literal.
+- `tests/static-check.mjs`: the built script contains no `deploy v11` literal.
+
+### Do not
+Change `SUPPORTED_API_VERSIONS`, `unpackRemote()`, `syncFailureCode()`, or the `RTS-REFRESH-*` codes; touch `src/apps-script.js` or `src/schema.json` (rule 2); add a second `aria-live` region; surface the endpoint URL — the shared suite asserts it never appears in the diagnostics.
+
+---
