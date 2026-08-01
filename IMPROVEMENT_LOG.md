@@ -249,7 +249,7 @@ The You panel's "Crew rank" stat reads `#3`, and the person card's summary grid 
 
 ### Tests
 - `tests/client-state.state.test.js`: `rankLabel(3,12)` is `'#3 of 12'`; `rankLabel(1,1)` is `'#1 of 1'`; `rankLabel(0,5)`, `rankLabel(-1,5)` and `rankLabel(3,2)` are all `'—'`. Also assert `personSummary()` returns a `field` equal to the crew size for a known name, and `null` for an unknown one as it does today.
-- `tests/client-state.dom.test.js`: with a two-person crew both holding logs, `#youRank` reads `#1 of 2` for the leader; the existing entry 20 assertion that `#personSummary` contains `#1` keeps passing, and one added assertion checks it now also contains `of 2`. A climber with no logs in a crew of two still shows `—`.
+- `tests/client-state.dom.test.js`: with a two-person crew both holding logs, `#youRank` reads `#1 of 2` for the leader; the existing entry 20 assertion that `#personSummary` contains `#1` keeps passing, and one added assertion checks it now also contains `of 2`. A crew member with no logs is still ranked — `totalsModel()` seeds `sorted` from every `config.crew` name, so in a two-person crew where the other has logs they read `#2 of 2`, not `—`. `—` is reserved for a signed-in name that is absent from the field entirely, which is the `rank` of `0` case above.
 - No new `tests/static-check.mjs` assertion: the stat-grid order assertion at line 160 already covers `#youRank`'s placement and this entry does not move it.
 
 ### Do not
