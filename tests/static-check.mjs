@@ -34,6 +34,8 @@ assert.match(html,/aria-label="Close shared setup"/);
 assert.match(html,/aria-label="Close delete confirmation"/);
 assert.match(html,/id="confirmOk"[^>]*type="button"/,'the confirm dialog confirms with a real button');
 assert.match(html,/id="confirmCancel"[^>]*type="button"/,'the confirm dialog cancels with a real button');
+assert.match(html,/id="confirmBody"[\s\S]*id="confirmNote"[\s\S]*id="confirmCancel"/,'the confirmation note sits between its body and actions');
+assert.match(script,/This cannot be undone\./,'the shared delete warning is selected in the script');
 assert.match(script,/function requestDelete\(/,'deleting an entry goes through the confirm request helper');
 assert.match(html,/aria-label="Close person details"/);
 assert.match(script,/function closeIfScrim\(/,'clicking the backdrop closes the dialog it belongs to');

@@ -9,6 +9,35 @@ is renumbered, reworded, or re-run. This is closed history and never a queue —
 
 ---
 
+## 64. Say the size of the field next to a rank
+
+Status: Done — 2026-08-01
+Notes: Commit `Say the size of the field next to a rank`. Added a pure rank label that names the
+ranked roster field in the You stat and person card, while preserving zero-log crew members in the
+field. Archived entry 62. index.html 154,286 → 154,455 bytes (+169, 93.6% of the 165,000-byte
+budget). `npm test`: 5/5 suites.
+Deviations: None.
+
+### Why
+The You panel's "Crew rank" stat reads `#3`, and the person card's summary grid reads `Rank #3`. Third out of four and third out of twelve are different facts, and the app knows which it is — `totalsModel().sorted` is the ranked field — but never says. The number the crew looks at most is the one carrying the least context.
+
+### Requirements
+- **Sequencing:** entries 59 and 60 have already edited `renderPersonCard()` and `#personModal`. This entry changes the Rank cell's text only, so it applies on top of both.
+- `src/app.js` — add a pure helper `rankLabel(rank,field)` returning `'—'` when `rank` is not a positive integer or `field` is smaller than `rank`, and otherwise `` `#${rank} of ${field}` ``.
+- `render()` — the `#youRank` assignment becomes `rankLabel(rank,model.sorted.length)`; when `rank` is `0` (the signed-in climber is not in the field) `rankLabel` already yields `'—'`, which is the current behaviour, so the surrounding ternary can go.
+- `personSummary()` — add `field:model.sorted.length` to the object it returns; `renderPersonCard()`'s Rank cell becomes `cell('Rank',rankLabel(data.rank,data.field))`. `data.rank` is `i+1` and `i` came from that same array, so the two always agree.
+- `field` is the size of the ranked roster: everyone in `config.crew` plus anyone who appears in `logs`, which is exactly what `totalsModel()` already assembles. It does not depend on who has logged anything.
+
+### Tests
+- `tests/client-state.state.test.js`: `rankLabel(3,12)` is `'#3 of 12'`; `rankLabel(1,1)` is `'#1 of 1'`; `rankLabel(0,5)`, `rankLabel(-1,5)` and `rankLabel(3,2)` are all `'—'`. Also assert `personSummary()` returns a `field` equal to the crew size for a known name, and `null` for an unknown one as it does today.
+- `tests/client-state.dom.test.js`: with a two-person crew both holding logs, `#youRank` reads `#1 of 2` for the leader; the existing entry 20 assertion that `#personSummary` contains `#1` keeps passing, and one added assertion checks it now also contains `of 2`. A crew member with no logs is still ranked — `totalsModel()` seeds `sorted` from every `config.crew` name, so in a two-person crew where the other has logs they read `#2 of 2`, not `—`. `—` is reserved for a signed-in name that is absent from the field entirely, which is the `rank` of `0` case above.
+- No new `tests/static-check.mjs` assertion: the stat-grid order assertion at line 160 already covers `#youRank`'s placement and this entry does not move it.
+
+### Do not
+Report how many of the field have logged anything, how many are inactive, or any figure that changes with participation — `model.sorted.length` is roster size and must stay roster size. The tone rule's aggregation clause is what this entry lives closest to: a crew-wide participation figure is out of scope even with the names removed. Do not add rank to the leaderboard rows (they already show `#N` in the rank column) or to `shareSummary()`.
+
+---
+
 ## 62. Key the heatmap shades
 
 Status: Done — 2026-07-31
