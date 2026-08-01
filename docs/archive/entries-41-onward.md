@@ -546,3 +546,35 @@ Deviations: None.
 Name a person, a count, or a date in the copy; add a call to action, a "log one" button, or anything the user could read as a prompt to participate — this sentence reports the state of a filter the user just set, in the panel they set it in, and nothing more (tone rule). Do not touch `filterByType()`, the chip row, or the show-more clamp.
 
 ---
+
+## 50. Show what each claimed bounty scored
+
+Status: Done — 2026-07-31
+Notes: Commit `Show what each claimed bounty scored`. `claimedBounties(nameLower)` now reads
+`computeCredits(logs).info` once and maps each of the person's bounty logs through
+`creditKey(x,logs.indexOf(x))` before sorting, attaching `base` and `credit` to every row; the
+existing newest-first sort (date, then `createdAt`) still runs on the enriched rows, so ordering is
+unchanged. `renderClaimed()` adds a third `<span class="bounty-pts">+N</span>` cell, matching
+`renderBountyWeek()`'s `.bounty-peek` markup exactly (no `src/styles.css` change needed — the grid
+is already global), and appends `` · weekly bounty cap`` to the row's `<small>` whenever
+`credit<base`. index.html 150,076 → 150,365 bytes (+289, 75.2% of the 200,000-byte budget). `npm
+test`: 5/5 suites.
+Deviations: None.
+
+### Why
+`claimedBounties()` returns a title, a date and a note, so the "Bounties you have claimed" list on the You tab shows *that* a claim happened but never what it was worth. `SCORING.weeklyBountyCap` means some claims credit less than the bounty's face value, and `#bountyCapHint` says so only in aggregate and only for the current week. Reopening the list to check which past claims actually scored is impossible.
+
+### Requirements
+- `src/app.js` — `claimedBounties(nameLower)` also returns `base` and `credit` per row, read out of `computeCredits(logs).info` (rule 6 — consume the map, never re-derive the cap). The key is `creditKey(x,logs.indexOf(x))`, the same lookup `activityMarkup()` uses; the helper filters and then sorts, so the position in `logs` must be taken before the sort, not from the sorted index.
+- `renderClaimed()` renders the credit in a `<span class="bounty-pts">+N</span>` third cell, exactly as `renderBountyWeek()` already does inside `.bounty-peek` — the class is a three-column grid, so no `src/styles.css` change is needed.
+- When `credit<base`, the row's `<small>` also carries the existing wording `weekly bounty cap` (the same phrase `activityMarkup()`'s `note` map uses), after the date and any note.
+- The existing dom assertions read `#claimedList` for the bounty title, the note, and the `bounty-peek` class; keep all three true.
+
+### Tests
+- `tests/client-state.state.test.js`: a claim inside the window returns `credit===base`; claims past `SCORING.weeklyBountyCap` in one week return a reduced or zero `credit` with `base` unchanged; a claim outside the challenge window returns `credit` 0; the existing `label`/ordering assertions still hold.
+- `tests/client-state.dom.test.js`: after `toggleClaimed()`, `#claimedList` shows the credited figure and, for a capped claim, the cap wording.
+
+### Do not
+Change `computeCredits()`, `bountyWeekProgress()`, or `#bountyCapHint`; show another person's claims; add a total or a streak line under the list; write copy about bounties not claimed or days without a claim (tone rule).
+
+---

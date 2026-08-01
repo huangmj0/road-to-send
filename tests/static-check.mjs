@@ -159,6 +159,7 @@ assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="re
 assert.match(html,/data-panel="you"[\s\S]*class="stat-grid"[\s\S]*id="youTotal"[\s\S]*id="youRank"[\s\S]*id="youStreak"[\s\S]*id="youBestStreak"[\s\S]*data-panel="record"/,'the current and best streak stat cards join the stat grid on the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*id="gradePyramid"[\s\S]*id="recordsCard"/,'the grade pyramid card sits between the category breakdown and the personal records card on the You panel');
 assert.match(html,/id="gradePyramid"[^>]*role="img"[^>]*aria-label=/,'the grade pyramid is announced as a graphic');
+assert.match(html,/id="gradePyramid" class="pyramid"[^>]*><\/div><p id="pyramidSummary" class="hint"><\/p><\/article>/,'the pyramid caption sits between the graphic and the close of the card');
 assert.match(html,/data-panel="you"[\s\S]*id="gradePyramidCard"[\s\S]*id="heatmapCard"[\s\S]*id="youHeatmap"/,'the daily activity heatmap card sits after the grade pyramid on the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="gradePyramidCard"[\s\S]*id="recordsCard"[\s\S]*id="heatmapCard"/,'the personal records card sits between the grade pyramid and the heatmap on the You panel');
 assert.match(html,/id="youHeatmap"[^>]*role="img"[^>]*aria-label=/,'the daily activity heatmap is announced as a graphic');
