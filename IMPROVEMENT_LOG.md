@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 59 — Show a crewmate's claimed bounties in their card — Done — 2026-07-31
-- 60 — Announce the crewmate's grade pyramid — Todo
+- 60 — Announce the crewmate's grade pyramid — Done — 2026-07-31
 - 61 — Mark today's bounties you have already claimed — Todo
 - 62 — Key the heatmap shades — Todo
 - 64 — Say the size of the field next to a rank — Todo
@@ -56,36 +55,14 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 59. Show a crewmate's claimed bounties in their card
-
-Status: Done — 2026-07-31
-Notes: Commit `Show a crewmate's claimed bounties in their card`. Extracted the shared
-`claimedRow()` helper so the You panel and person cards render the same read-only claim rows;
-added a person-card section and caption with an empty state. Archived entry 58. index.html
-152,439 → 153,023 bytes (+584, 92.7% of the 165,000-byte budget). `npm test`: 5/5 suites.
-Deviations: None.
-
-### Why
-Tapping a crewmate's name opens a card with their breakdown, records, weekly trend, pyramid and recent activity. Bounties appear there only as a number in the summary grid ("2 this week · 7 all time"), so you can see that someone claimed seven bounties and never which ones. Your own card has had that list since entry 46; the person card is the same information for someone else, and `claimedBounties()` already takes any name.
-
-### Requirements
-- **Sequencing:** entry 58 lands first and introduces `claimedCaption()`. This entry consumes it; if it is somehow missing, implement entry 58 first rather than writing a second caption helper.
-- `src/app.js` — extract the claimed-row markup from `renderClaimed()` into a pure helper `claimedRow(r)` taking one `claimedBounties()` item and returning the existing `<div class="bounty-peek">…</div>` string **verbatim**, including the `🎯` icon, the `esc()` calls, the `· weekly bounty cap` suffix when `r.credit<r.base`, and the `+${r.credit}` cell. `renderClaimed()` then maps over it. This is the entry 30 pattern: one row shape, two owners.
-- `src/index.template.html` — in `#personModal`, between `<div id="personBreakdown" class="breakdown"></div>` and `<h3 class="person-head">Personal records</h3>`, add `<h3 class="person-head">Bounties claimed</h3><div id="personClaimed" class="bounty-week"></div><p id="personClaimedSummary" class="hint"></p>`. It must go **there** and not after `#personPyramid`: `tests/static-check.mjs` line 184 pins the recent-activity section as the last one in the dialog, and line 180 pins records → trend → pyramid. Reuse `.bounty-week` and `.hint`; no new CSS.
-- `src/app.js` — `renderPersonCard()` fills both. Compute the rows once from the card's own lowercased name (the same expression `personRecent(...)` is already called with), then `set('#personClaimed', rows.length?rows.map(claimedRow).join(''):'<p class="hint">No bounty claims yet.</p>')` using the local `set()` helper, and put `claimedCaption(rows)` in `#personClaimedSummary` via `textContent`. `renderPersonCard()` re-runs on every `render()` while the card is open, so keep it idempotent (rule 6).
-
-### Tests
-- `tests/client-state.dom.test.js`: with two climbers who have each claimed a bounty, `openPersonCard()` on one shows only that person's claim in `#personClaimed`, the other person's bounty title is absent, `#personClaimedSummary` names the count, and the markup contains `bounty-peek` but neither `data-claim-bounty` nor `data-del` — a crewmate's card is read-only. A person with no claims renders the plain empty state and an empty caption. Then assert the shared row: for the same climber, the string `renderClaimed()` puts in `#claimedList` equals the string `renderPersonCard()` puts in `#personClaimed`, the way entry 30 compares `#youBreakdown` with `#personBreakdown`.
-- `tests/static-check.mjs`: `#personClaimed` and `#personClaimedSummary` exist and fall between `#personBreakdown` and `#personRecords` in source order; `function claimedRow(` is present; and `(script.match(/class="bounty-peek"/g)||[]).length` is exactly `2`, with a comment naming the two owners — `renderBountyWeek()` for upcoming days and `claimedRow()` for claims.
-
-### Do not
-Make a crewmate's claimed rows tappable or deletable, add a claim button inside the person card, or add a fourth copy of the `bounty-peek` markup. Do not report what a crewmate has not claimed, how far they are from the weekly cap, or how they compare to anyone — the tone rule allows this section only because it lists what that person did, in a card the viewer opened by tapping their name.
-
----
-
 ## 60. Announce the crewmate's grade pyramid
 
-Status: Todo
+Status: Done — 2026-07-31
+Notes: Commit `Announce the crewmate's grade pyramid`. Added the shared `pyramidLabel()` helper
+for both pyramid graphics, including the person-card empty state; `#personPyramid` is now a named
+graphic with its live label refreshed on render. Archived entry 59. index.html 153,023 → 153,245
+bytes (+222, 92.9% of the 165,000-byte budget). `npm test`: 5/5 suites.
+Deviations: None.
 
 ### Why
 `#gradePyramid` on the You panel is `role="img"` and `renderPyramid()` gives it an `aria-label` listing every grade and count. The identical chart in the person card, `#personPyramid`, is a bare `<div class="pyramid">`: no role, no label. A screen-reader user tapping a crewmate's name gets the summary grid, the breakdown bars and the trend chart announced, then reaches a block of unlabelled bars. Rule 7 requires the text alternative, and the label text already exists — it is inlined in `renderPyramid()`.
