@@ -165,6 +165,10 @@ assert.match(script,/function categoryDays\(/,'credited category-day counting is
 assert.match(script,/function crewTitles\(/,'the title rows are derived by a pure helper');
 const titlesConstant=script.match(/const TITLE_CATEGORIES=\[.*?\];/)?.[0]||'';
 assert.doesNotMatch(titlesConstant,/🧗|💪|🧘/,'title glyphs do not reuse the activity icons');
+assert.doesNotMatch(html,/id="leaderChampions"/,'the redundant champions panel is gone from the template');
+assert.doesNotMatch(html,/\.champions\{|\.champ-line\{/,'the retired champions panel has no CSS rules');
+assert.match(html,/\.champ-scope\{color:var\(--muted\);font-size:10px/,'title scope labels retain their compact styling');
+assert.match(script,/recent:recentTotals\.get\(lower\)\|\|0/,'totals rows expose rolling points from day totals');
 assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
 assert.match(html,/data-panel="crew"[\s\S]*id="goalPace"[\s\S]*?id="goalProjection"[^>]*role="status"[^>]*aria-live="polite"/,'the goal projection line follows the pace line in the crew panel and is announced');
 assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring config');

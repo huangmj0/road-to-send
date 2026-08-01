@@ -144,6 +144,20 @@ const checks = `(()=>{
   config=Object.assign({},config,{crew:[]});
   assert.ok(crewTitles('2026-07-13').every(row=>row.holders.length===0),'an empty configured roster leaves every category title unheld');
   config=titlesConfig;
+  logs=[
+    {id:'old1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'old2',name:'Alex',type:'climb',date:'2026-07-03',createdAt:'1'},
+    {id:'fire1',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
+    {id:'fire2',name:'Cara',type:'climb',date:'2026-07-13',createdAt:'1'},
+  ];
+  const standingModel=totalsModel(),standingTitles=crewTitles('2026-07-13'),onFire=standingTitles.find(row=>row.id==='on-fire'),beast=standingTitles.find(row=>row.id==='beast');
+  assert.equal(standingModel.sorted.find(row=>row.name==='Bob').recent,3,'a bounty in the window is included in the rolling points field');
+  assert.deepEqual(onFire.holders,['Bob','Cara'],'tied recent-points leaders share On Fire');
+  assert.equal(onFire.detail,'3 pts','On Fire reports the rolling points value');
+  assert.deepEqual(beast.holders,['Alex'],'the all-challenge leader holds Beast even when quiet for eight days');
+  assert.equal(beast.detail,'6 pts','Beast reports the all-challenge points value');
+  logs=[];
+  assert.ok(crewTitles('2026-07-13').filter(row=>row.id==='on-fire'||row.id==='beast').every(row=>row.holders.length===0),'zero-point standing titles have no holders');
   challengeToday=savedToday;
   logs=savedLogs;
 

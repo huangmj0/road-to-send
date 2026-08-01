@@ -678,9 +678,11 @@ const domChecks = `(()=>{
   logs=[{id:'title1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},{id:'title2',name:'Bo',type:'exercise',date:'2026-07-13',createdAt:'1'}];
   render();
   const titleGrid=document.querySelector('#crewTitles'),titleMarkup=titleGrid.innerHTML;
-  assert.equal(titleMarkup.split('class="title-tile').length-1,3,'the Titles card renders one tile per category title');
+  assert.equal(titleMarkup.split('class="title-tile').length-1,5,'the Titles card renders category and standing tiles');
   assert.ok(titleMarkup.indexOf('Rock Hound')>=0&&titleMarkup.indexOf('Alex')>=0&&titleMarkup.indexOf('1 of last 7 days')>=0,'a held tile names its holder and qualifying count');
   assert.ok(titleMarkup.indexOf('Yogi')>=0&&titleMarkup.indexOf('>—</strong>')>=0,'an unheld tile shows a dash without absence copy');
+  assert.ok(titleMarkup.indexOf('On Fire')>=0&&titleMarkup.indexOf('Beast')>=0&&titleMarkup.indexOf('3 pts')>=0,'standing tiles name their holder and points value');
+  assert.ok(leaderRows.innerHTML.indexOf('data-person="Alex"')>=0&&leaderRows.innerHTML.indexOf('data-person="Bo"')>=0,'the leaderboard rows remain intact beside the new titles');
   render();
   assert.equal(titleGrid.innerHTML,titleMarkup,'repainting the title grid is idempotent');
   challengeToday=savedChallengeToday;leaderMetric='points';leaderScope='week';

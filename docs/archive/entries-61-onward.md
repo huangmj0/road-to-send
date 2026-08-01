@@ -9,6 +9,41 @@ is renumbered, reworded, or re-run. This is closed history and never a queue —
 
 ---
 
+## 69. Three titles for the habits people keep
+
+Status: Done — 2026-08-01
+Notes: Commit `Add crew habit titles`. Archived entry 68. index.html 155,300 → 157,644 bytes
+(+2,344, 92.7% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+The app names exactly one thing a person can be: Bounty Hunter. Points reward showing up and the balanced-day bonus rewards spreading it around, but nothing names the crewmate who climbs four times a week or the one who actually does their mobility. Those are the habits the trip is training for, and the data to see them is already in the credit engine.
+
+### Requirements
+- **Sequencing:** entries 67 and 68 land first — `windowStart()` and the Titles card. This entry adds tiles to that card.
+- **Most days in the window, ties shared.** A title goes to whoever has the most credited days of that category in the last seven days, and everyone tied for the top holds it. Nobody holds it when every count is zero — the same `maxB>0` guard `totalsModel()` already applies to 🏹 (`src/app.js:42`). There is deliberately **no minimum, floor or qualifying bar**: in a quiet week the title still goes to whoever did the most, exactly as Bounty Hunter goes to someone with a single claim. One rule governs all six titles in this card rather than two.
+- `src/app.js` — pure helper `categoryDays(nameLower,type,today)`: count that person's logs of that `type` whose date is inside `[windowStart(today), today]` **and** whose `computeCredits(logs).info` credit is greater than zero. A credited entry *is* a distinct day, because the engine credits only the first log of each category per day (`daySeen`, `src/app.js:28`) — so this counts days without needing a second day-set. It is the same derive-from-`info` pattern `bountyWeekProgress()` uses at `src/app.js:55`.
+- `src/app.js` — pure helper `crewTitles(today)` returning one row per title: `{id,glyph,title,scope,holders,detail}`. The three category titles live in a module-level constant in `app.js` — **not** `scoring.json` (rule 2); keeping them here is what lets a later entry adjust them without an organizer redeploy:
+
+  | Title | Glyph | Category |
+  |---|---|---|
+  | Rock Hound | 🪨 | `climb` |
+  | Gym Rat | ⚙️ | `exercise` |
+  | Yogi | 🌿 | `mobility` |
+- Glyphs are **not** `CAT_ICONS` (🧗 💪 🧘). Those already mean "logged a climb" throughout the log and bounty cards, and reusing them would read as an activity rather than a title.
+- `src/index.template.html` / `src/styles.css` — the Titles card holds a tile grid: `grid-template-columns:repeat(auto-fit,minmax(150px,1fr))`, which wraps to one column at 320px and needs no media query. Each tile carries the glyph, the title name, the holders (or `—`), and the qualifying figure (`4 of last 7 days`) so the title explains itself. The window label reuses the existing `.champ-scope` treatment — 10px, weight 800, uppercase, `.06em` tracking, `--muted` — because the window is the genuinely confusing part of this feature, and encoding it in the design beats a paragraph of copy. Held tiles take the `--orange-tint`/`--orange-ring` fill already used by `.me-row`; unheld tiles stay flat. Match the stylesheet's compact single-line formatting.
+- Names and figures use `--ink`/`--muted`. The glyph and the tile fill carry identity — never colour the text by standing.
+- The container carries `aria-live="polite"`; decorative glyphs are `aria-hidden="true"` with the title name in text (rule 7).
+
+### Tests
+- `tests/client-state.state.test.js`: `categoryDays` counts a climb logged on each of four days in the window as `4`; a second climb the same day does not raise the count (it is credited `0`); another person's logs are excluded; an unknown name is `0`. Take the window boundary from entry 67 rather than re-deriving it: with `today` at `2026-07-13` a log dated `2026-07-07` is the oldest one inside the window and `2026-07-06` is outside — assert both. `crewTitles()` gives Rock Hound to whoever has the most climb days in the window and not to the runner-up; two people tied at the top both hold it; every title reports empty holders on an empty roster and when nobody logged that category in the window. **Assert the no-minimum case explicitly**: one person with a single mobility day and nobody else logging mobility holds Yogi — that is the intended rule, and pinning it stops a later reader from filing it as a bug.
+- `tests/client-state.dom.test.js`: with a crafted roster, the Titles card renders a tile per title, a held tile names its holder and its count, an unheld tile renders `—`, and a repaint is idempotent (`render()` runs often — rule 6). The `#bountyHunter` assertions from entry 68 keep passing.
+- `tests/static-check.mjs`: the tile container exists inside the Titles card with `aria-live="polite"`; the grid rule and the tile classes are styled in CSS; `function categoryDays(` and `function crewTitles(` are present; and none of 🧗 💪 🧘 appears in the titles constant.
+
+### Do not
+Add a minimum, a floor or a qualifying bar to any title — a quiet week's holder is the intended behaviour, not a defect, and it is the behaviour 🏹 has always had. Put the titles constant in `src/scoring.json` (rule 2), rank the holders of one title against each other, or break a tie. Do not write copy about a title nobody holds, how far anyone is from the leader, or how many days someone has left — the tone rule forbids the absence framing and aggregating it does not launder it; an unheld tile shows `—` and says nothing. Do not add a localStorage key (rule 4), a media query where `auto-fit` does the work, or a fourth category.
+
+---
+
 ## 67. A rolling seven-day window
 
 Status: Done — 2026-08-01
