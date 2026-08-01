@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 52 — Let a climb carry a note — Done — 2026-08-01
-- 53 — Show a crewmate's weekly points in their card — Todo
+- 53 — Show a crewmate's weekly points in their card — Done — 2026-08-01
 - 54 — Show a crewmate's most recent entries in their card — Todo
 - 55 — Say which protocol version this build expects — Todo
 - 56 — Date the export snapshot — Todo
@@ -44,39 +43,18 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 52. Let a climb carry a note
-
-Status: Done — 2026-08-01
-Notes: Commit `Let a climb carry a note`. `updateRecordPreview()` now unconditionally
-`note.classList.remove('hide')` instead of hiding `#noteFields` for climb; `draftActivity()`'s
-climb branch sets `base.note=noteValue()` alongside `base.hardestGrade`. `src/index.template.html`
-drops `hide` from `#noteFields`'s class list, matching `#climbFields`'s default-visible state for
-the pre-script default type. `activityMarkup()`, `submitActivity()`, `src/apps-script.js` and
-`src/schema.json` were already correct and untouched. index.html 150,693 → 150,696 bytes (+3, 75.3%
-of the 200,000-byte budget). `npm test`: 5/5 suites.
-Deviations: None.
-
-### Why
-`activityMarkup()`'s climb branch already renders `x.note` after the grade, and `validateActivity()` in `src/apps-script.js` already accepts and stores a note on every activity type. But `updateRecordPreview()` hides `#noteFields` whenever the selected type is `climb`, and `draftActivity()` sets `base.note` only for the bounty and fall-through branches — so the note a climb row is built to display can never be written. "V4, first try on the slab" has nowhere to go.
-
-### Requirements
-- `src/app.js` — `updateRecordPreview()` stops hiding `#noteFields` for climb, so the note field is available for all four types. `draftActivity()` sets `base.note=noteValue()` on the climb branch alongside `base.hardestGrade`.
-- `src/index.template.html` — drop `hide` from `#noteFields`'s class list, since the pre-script default type is `climb` and the field now belongs there. Its `<label for="activityNote">` stays exactly as it is (`tests/static-check.mjs` requires it).
-- `submitActivity()` already sends `note:draft.note||''` and already clears `#activityNote` after a save — do not touch it.
-- **No carve-out from rule 2 is needed or granted.** `src/apps-script.js` and `src/schema.json` already permit a ≤120-character note on any type; `noteValue()` already truncates to 120. Do not edit either file.
-
-### Tests
-- `tests/client-state.dom.test.js`: with the climb radio selected, `updateRecordPreview()` leaves `#noteFields` unhidden and `draftActivity()` carries the typed note; the grade field is still shown for climb and still hidden for the other types; switching to exercise and back keeps the note field visible.
-- `tests/client-state.state.test.js`: `activityMarkup()` on a climb with both a grade and a note renders both, in that order, escaped (the existing escaping assertion at the climb row already covers injection — extend, do not replace).
-
-### Do not
-Make the note required, raise the 120-character cap, or prefill it; add a note to the activity-type picker copy; touch `src/apps-script.js`, `src/schema.json`, or `src/scoring.json` (rule 2); add a localStorage key (rule 4).
-
----
-
 ## 53. Show a crewmate's weekly points in their card
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Show a crewmate's weekly points in their card`. `personSummary()` adds
+`weeks:personalWeeklyTrend(key,today)`. `#personModal` gets a `Weekly points` section (`h3` +
+`.trend-scroll` > `#personTrend`) between `#personRecords` and the `Grade pyramid` heading.
+`renderPersonCard()`'s `set()` closure now returns the element it filled so the aria-label can be
+set from the same lookup; `#personTrend` gets `trendColumns(data.weeks)` and an `aria-label` built
+the way `renderYouTrend()` builds one, or the shared `<p class="hint">` fallback when there are no
+weeks to chart. index.html 150,696 → 151,127 bytes (+431, 75.6% of the 200,000-byte budget). `npm
+test`: 5/5 suites.
+Deviations: None.
 
 ### Why
 `personalWeeklyTrend(nameLower,today)` already computes any climber's week-by-week points, and `#youTrendCard` renders it for the signed-in user through `trendColumns()`/`trendAria()`. A crewmate's card (`#personModal`) shows rank, records, breakdown and pyramid — every static figure — but no week-over-week shape, so the one view that shows whether someone is building or coasting exists only for yourself.

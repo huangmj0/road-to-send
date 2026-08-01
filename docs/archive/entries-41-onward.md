@@ -610,3 +610,34 @@ Entry 36 gave the heatmap and both trend charts a visible plain-text caption (`#
 Add `aria-live` (the pyramid changes only when the user logs a climb, and `#todayRemaining` is the You card's one live region — see the comment above `renderYouPace()`); change `gradePyramid()`, `pyramidRow()`, or the existing `aria-label`; caption `#personPyramid` — that is a different surface and a later entry's business.
 
 ---
+
+## 52. Let a climb carry a note
+
+Status: Done — 2026-08-01
+Notes: Commit `Let a climb carry a note`. `updateRecordPreview()` now unconditionally
+`note.classList.remove('hide')` instead of hiding `#noteFields` for climb; `draftActivity()`'s
+climb branch sets `base.note=noteValue()` alongside `base.hardestGrade`. `src/index.template.html`
+drops `hide` from `#noteFields`'s class list, matching `#climbFields`'s default-visible state for
+the pre-script default type. `activityMarkup()`, `submitActivity()`, `src/apps-script.js` and
+`src/schema.json` were already correct and untouched. index.html 150,693 → 150,696 bytes (+3, 75.3%
+of the 200,000-byte budget). `npm test`: 5/5 suites.
+Deviations: None.
+
+### Why
+`activityMarkup()`'s climb branch already renders `x.note` after the grade, and `validateActivity()` in `src/apps-script.js` already accepts and stores a note on every activity type. But `updateRecordPreview()` hides `#noteFields` whenever the selected type is `climb`, and `draftActivity()` sets `base.note` only for the bounty and fall-through branches — so the note a climb row is built to display can never be written. "V4, first try on the slab" has nowhere to go.
+
+### Requirements
+- `src/app.js` — `updateRecordPreview()` stops hiding `#noteFields` for climb, so the note field is available for all four types. `draftActivity()` sets `base.note=noteValue()` on the climb branch alongside `base.hardestGrade`.
+- `src/index.template.html` — drop `hide` from `#noteFields`'s class list, since the pre-script default type is `climb` and the field now belongs there. Its `<label for="activityNote">` stays exactly as it is (`tests/static-check.mjs` requires it).
+- `submitActivity()` already sends `note:draft.note||''` and already clears `#activityNote` after a save — do not touch it.
+- **No carve-out from rule 2 is needed or granted.** `src/apps-script.js` and `src/schema.json` already permit a ≤120-character note on any type; `noteValue()` already truncates to 120. Do not edit either file.
+
+### Tests
+- `tests/client-state.dom.test.js`: with the climb radio selected, `updateRecordPreview()` leaves `#noteFields` unhidden and `draftActivity()` carries the typed note; the grade field is still shown for climb and still hidden for the other types; switching to exercise and back keeps the note field visible.
+- `tests/client-state.state.test.js`: `activityMarkup()` on a climb with both a grade and a note renders both, in that order, escaped (the existing escaping assertion at the climb row already covers injection — extend, do not replace).
+
+### Do not
+Make the note required, raise the 120-character cap, or prefill it; add a note to the activity-type picker copy; touch `src/apps-script.js`, `src/schema.json`, or `src/scoring.json` (rule 2); add a localStorage key (rule 4).
+
+---
+

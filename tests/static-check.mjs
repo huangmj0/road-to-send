@@ -174,6 +174,11 @@ assert.match(html,/id="youTrendCard"[\s\S]*class="trend-scroll"[^>]*>\s*<div id=
 assert.match(html,/id="youTrend"[\s\S]*id="youTrendSummary"/,'the personal trend caption follows its chart');
 assert.match(script,/function personalWeeklyTrend\(/,'a pure helper restricts the weekly rows to one climber');
 assert.match(script,/function trendColumns\(/,'both trend charts draw their bars from one markup helper');
+// Entry 53: the person card gets the same weekly trend chart, sitting between the personal
+// records and the grade pyramid.
+assert.match(html,/id="personRecords"[\s\S]*id="personTrend"[\s\S]*id="personPyramid"/,'the person card weekly trend chart falls between personal records and the grade pyramid');
+assert.match(html,/id="personTrend"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the person card weekly trend chart is announced as a graphic with a non-empty label');
+assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="personTrend"/,'the person card trend chart sits inside the scrollable trend wrapper');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderPointsBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Points toggle is a real button with aria-pressed');

@@ -834,6 +834,7 @@ const checks = `(()=>{
   assert.deepEqual(card.streak,streakInfo('alex',onDay(0)),'the card streak is streakInfo, not a second implementation');
   assert.equal(card.trend,weekTrend('alex',onDay(0)),'the card trend is weekTrend');
   assert.equal(card.trend,'up','a bigger week than the one before reads as up');
+  assert.deepEqual(card.weeks,personalWeeklyTrend('alex',onDay(0)),'the card weekly trend is personalWeeklyTrend, not a second implementation');
   assert.equal(card.breakdown.rows.reduce((sum,r)=>sum+r.points,0),card.total,'the breakdown rows plus the bonus row sum to the total');
   assert.equal(card.breakdown.bonus,SCORING.balancedDayBonus,'a balanced day shows up as the bonus row');
   assert.deepEqual(card.pyramid.map(r=>r.grade),['V7','V5','V3'],'the pyramid is ordered hardest first');
