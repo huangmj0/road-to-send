@@ -179,6 +179,10 @@ assert.match(script,/function trendColumns\(/,'both trend charts draw their bars
 assert.match(html,/id="personRecords"[\s\S]*id="personTrend"[\s\S]*id="personPyramid"/,'the person card weekly trend chart falls between personal records and the grade pyramid');
 assert.match(html,/id="personTrend"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the person card weekly trend chart is announced as a graphic with a non-empty label');
 assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="personTrend"/,'the person card trend chart sits inside the scrollable trend wrapper');
+// Entry 54: the person card lists that climber's most recent entries as the final section.
+assert.match(html,/id="personPyramid"[^>]*><\/div><h3 class="person-head">Recent activity<\/h3><div id="personRecent" class="records"><\/div><\/div><\/div>/,'the person card recent-activity section is the last one in the dialog, right after the grade pyramid');
+const personCardSource=script.split('\n').find(line=>line.startsWith('function renderPersonCard('))||'';
+assert.equal(personCardSource.indexOf('activityMarkup('),-1,'renderPersonCard renders recent activity without reusing the dead-button activityMarkup() helper');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderPointsBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Points toggle is a real button with aria-pressed');

@@ -819,6 +819,23 @@ const domChecks = `(()=>{
   assert.ok(document.querySelector('#personTrend').innerHTML.indexOf('class="hint"')>=0,'a climber with nothing logged gets the hint fallback instead of an empty chart');
   closeModal('personModal');
 
+  // Entry 54: the person card lists that climber's most recent entries as its final section, and
+  // falls back to the hint used elsewhere in the card when they have logged nothing.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-10),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[{id:'pr1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-2),createdAt:'1'},{id:'pr2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'pr3',name:'Bo',type:'climb',hardestGrade:'V9',date:shift(-1),createdAt:'3'}];
+  render();
+  openPersonCard('Alex');
+  const personRecentEl=document.querySelector('#personRecent');
+  assert.ok(personRecentEl.innerHTML.indexOf('records-row')>=0,'the section renders with the shared records-row markup');
+  assert.ok(personRecentEl.innerHTML.indexOf(CAT_LABELS.exercise)>=0,'names that climber newest entry');
+  assert.equal(personRecentEl.innerHTML.indexOf('V9'),-1,'and not a crewmate entry');
+  logs=[];
+  render();
+  openPersonCard('Bo');
+  assert.ok(document.querySelector('#personRecent').innerHTML.indexOf('class="hint"')>=0,'a climber with no entries gets the hint fallback instead of an empty list');
+  closeModal('personModal');
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 

@@ -197,6 +197,46 @@ const checks = `(()=>{
   logs=[];
   assert.equal(claimedBounties('alex').length,0,'an empty log yields no claims');
 
+  // Entry 54: personRecent lists one person's most recent log entries across every type, newest
+  // first with the same date/createdAt tiebreak claimedBounties() uses, resolving a bounty title
+  // through the same bountyTitle -> bountyById -> 'Bounty' chain.
+  logs=[
+    {id:'r1',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-10',createdAt:'1'},
+    {id:'r2',name:'Alex',type:'exercise',date:'2026-07-11',createdAt:'1'},
+    {id:'r3',name:'Alex',type:'mobility',date:'2026-07-12',createdAt:'1'},
+    {id:'r4',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'},
+    {id:'r5',name:'Alex',type:'climb',date:'2026-07-14',createdAt:'1'},
+    {id:'r6',name:'Maya',type:'climb',hardestGrade:'V9',date:'2026-07-15',createdAt:'1'},
+  ];
+  let recent=personRecent('alex');
+  assert.equal(recent.length,5,'Maya is excluded, leaving all 5 of Alex rows within the default limit');
+  assert.deepEqual(recent.map(r=>r.label),['Climbing','Send It','Mobility','Exercise','Climbing · V5'],'newest first, an ungraded climb has no grade suffix, and a graded one does');
+  assert.equal(recent[0].value,fmtDay('2026-07-14'),'the day is labelled with fmtDay(), not the raw ISO date');
+  assert.equal(recent.filter(r=>r.label.indexOf('V9')>=0).length,0,'a crewmate entry never appears among the rows');
+  let limited=personRecent('alex',2);
+  assert.equal(limited.length,2,'limit caps the row count');
+  assert.deepEqual(limited.map(r=>r.label),['Climbing','Send It'],'limit keeps only the newest rows');
+
+  // The title resolves from bountyId when bountyTitle is absent, and falls back for a missing id.
+  logs=[{id:'r7',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(personRecent('alex')[0].label,bountyById('send-it').title,'a missing bountyTitle resolves through bountyById');
+  logs=[{id:'r8',name:'Alex',type:'bounty',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(personRecent('alex')[0].label,'Bounty','a claim with no id at all still lists');
+
+  // Same-day entries fall back to createdAt, newest first, exactly as claimedBounties() does.
+  logs=[
+    {id:'r9',name:'Alex',type:'climb',hardestGrade:'V1',date:'2026-07-13',createdAt:'1'},
+    {id:'r10',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-13',createdAt:'2'},
+  ];
+  assert.equal(personRecent('alex')[0].label,'Climbing · V2','a later createdAt sorts first within one day');
+
+  // Nobody, a blank name, and an empty log all come back empty rather than undefined.
+  logs=[{id:'r11',name:'Maya',type:'climb',hardestGrade:'V9',date:'2026-07-13',createdAt:'1'}];
+  assert.equal(personRecent('alex').length,0,'a person with no entries of their own gets an empty list');
+  assert.equal(personRecent('').length,0,'a blank name matches nobody, not the crew');
+  logs=[];
+  assert.equal(personRecent('alex').length,0,'an empty log yields no rows');
+
   // gradePyramid counts ALL of the person's graded climb logs, hardest-first by GRADES index.
   logs=[
     {id:'g1',name:'Alex',type:'climb',hardestGrade:'V9',date:'2026-07-13',createdAt:'1'},
