@@ -682,6 +682,27 @@ const domChecks = `(()=>{
   leaderMetric='points';leaderScope='week';render();
   const recentRows=leaderRows.innerHTML;
   assert.ok(recentRows.indexOf('data-person="Bo"')<recentRows.indexOf('data-person="Alex"'),'the recent scope ranks points inside the last seven days above points eight days old');
+
+  // Entry 73: both trend consumers name the same adjacent seven-day comparison, and neither
+  // renders an arrow while the earlier window still falls before the challenge.
+  challengeToday=()=> '2026-07-15';
+  logs=[
+    {id:'trend-old',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'trend-new',name:'Alex',type:'climb',date:'2026-07-15',createdAt:'2'},
+    {id:'trend-more',name:'Alex',type:'exercise',date:'2026-07-15',createdAt:'3'},
+  ];
+  leaderMetric='points';leaderScope='week';render();
+  assert.ok(leaderRows.innerHTML.indexOf('aria-label="up vs last 7 days"')>=0,'the leaderboard arrow names its rolling window');
+  openPersonCard('Alex');
+  assert.ok(personSummaryEl.innerHTML.indexOf('Up vs last 7 days')>=0,'the person-card trend names its rolling window');
+  closeModal('personModal');
+  challengeToday=()=> '2026-07-07';render();
+  assert.equal(leaderRows.innerHTML.indexOf('week-trend'),-1,'the leaderboard suppresses the arrow during the first challenge week');
+  openPersonCard('Alex');
+  assert.equal(personSummaryEl.innerHTML.indexOf('week-trend'),-1,'the person card suppresses the arrow during the first challenge week');
+  closeModal('personModal');
+  challengeToday=()=> '2026-07-13';
+
   logs=[{id:'title1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},{id:'title2',name:'Bo',type:'exercise',date:'2026-07-13',createdAt:'1'}];
   render();
   const titleGrid=document.querySelector('#crewTitles'),titleMarkup=titleGrid.innerHTML;
