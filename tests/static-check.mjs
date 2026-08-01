@@ -262,4 +262,10 @@ assert.match(html,/<link[^>]+rel="icon"[^>]+href="data:image\/svg\+xml,/,'an inl
 assert.match(html,/<meta[^>]+name="color-scheme"[^>]+content="[^"]*dark[^"]*"/,'a color-scheme meta opts the page into dark rendering');
 assert.match(html,/@media\(prefers-color-scheme:dark\)/,'a dark-mode media query overrides the theme variables');
 assert.match(html,/env\(safe-area-inset-bottom\)/,'mobile navigation respects safe areas');
+// Entry 82: every narrow surface can shrink and wrap within its card.
+assert.match(stylesheet,/\.activity\{grid-template-columns:40px minmax\(0,1fr\) auto auto\}/,'base feed rows allow the note track to shrink');
+assert.match(stylesheet,/\.activity>div\{min-width:0;overflow-wrap:anywhere\}/,'feed copy shrinks and wraps an unbroken note without clipping it');
+assert.match(stylesheet,/@media\(max-width:430px\)\{\.activity\{grid-template-columns:38px minmax\(0,1fr\) auto auto\}\}/,'phone feed rows retain the shrinkable note track');
+assert.match(stylesheet,/\.dialog h2\{min-width:0;overflow-wrap:anywhere\}/,'dialog headings can shrink and break long names');
+assert.match(stylesheet,/\.setup-copy pre\{overflow-wrap:anywhere\}/,'setup code breaks an unspaced run without losing its scroll container');
 console.log('Road to Send static accessibility and UX checks passed.');
