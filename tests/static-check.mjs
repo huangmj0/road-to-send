@@ -185,6 +185,9 @@ assert.match(html,/id="personBreakdown"[\s\S]*id="personClaimed"[\s\S]*id="perso
 assert.match(html,/id="personRecords"[\s\S]*id="personTrend"[\s\S]*id="personPyramid"/,'the person card weekly trend chart falls between personal records and the grade pyramid');
 assert.match(html,/id="personTrend"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the person card weekly trend chart is announced as a graphic with a non-empty label');
 assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="personTrend"/,'the person card trend chart sits inside the scrollable trend wrapper');
+assert.match(html,/id="personPyramid"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the person card grade pyramid is announced as a graphic with a non-empty label');
+assert.match(script,/function pyramidLabel\(/,'a pure helper owns the pyramid text alternative');
+assert.equal((script.match(/Grade pyramid: /g)||[]).length,1,'the pyramid label text has one owner');
 // Entry 54: the person card lists that climber's most recent entries as the final section.
 assert.match(html,/id="personPyramid"[^>]*><\/div><h3 class="person-head">Recent activity<\/h3><div id="personRecent" class="records"><\/div><\/div><\/div>/,'the person card recent-activity section is the last one in the dialog, right after the grade pyramid');
 const personCardSource=script.split('\n').find(line=>line.startsWith('function renderPersonCard('))||'';

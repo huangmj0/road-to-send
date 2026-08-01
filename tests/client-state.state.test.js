@@ -473,6 +473,10 @@ const checks = `(()=>{
   assert.ok(multiCap.indexOf('6 graded sends')>=0,'the caption totals sends across every grade');
   assert.ok(multiCap.indexOf('V5')>=0,'and names rows[0].grade as the hardest, not the most frequent');
 
+  // Entry 60: both pyramid containers use one label helper, including the person-card empty state.
+  assert.equal(pyramidLabel([]),'Grade pyramid: no graded climbs yet','an empty pyramid still has a useful text alternative');
+  assert.equal(pyramidLabel([{grade:'V5',count:1},{grade:'V3',count:2}]),'Grade pyramid: 1 send at V5, 2 sends at V3','the label preserves order and singular/plural sends');
+
   // Entry 53 review: #personTrend carries role="img", so its descendants collapse into one graphic
   // and the "No points logged yet" paragraph never reaches a screen reader. The empty state has to
   // ride in the accessible name instead.
