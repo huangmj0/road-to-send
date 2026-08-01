@@ -374,6 +374,30 @@ const domChecks = `(()=>{
   render();
   assert.equal(youTrendEl.innerHTML,youCurve,'a repaint redraws the same curve instead of appending marks');
   assert.equal(youTrendCard.classList.contains('hide'),false,'and leaves the card open');
+
+  // Entry 78: a one-day curve has a real horizontal stroke and a rectangular fill.
+  config={startDate:challengeToday(),tripDate:shift(5),goal:1000,crew:[{name:'Alex'}]};
+  logs=[{id:'day-one',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'}];
+  render();
+  const dayOneSvg=youTrendEl.innerHTML.slice(0,youTrendEl.innerHTML.indexOf('</svg>')+6);
+  const dayOneLine=dayOneSvg.match(/<path class="trend-line" d="([^"]+)"/)[1],dayOneArea=dayOneSvg.match(/<path class="trend-area" d="([^"]+)"/)[1];
+  assert.match(dayOneLine,/^M0,[^ ]+ L100,[^ ]+$/,'a day-one curve strokes all the way across the chart');
+  assert.match(dayOneArea,/^M0,[^ ]+ L100,[^ ]+ L100,88 L0,88 Z$/,'a day-one curve fills a rectangle instead of the old triangle');
+  const tinyBreakdown=breakdownRow('','Tiny',1,0),zeroBreakdown=breakdownRow('','Zero',0,0);
+  assert.match(tinyBreakdown,/class="nonzero" style="width:0%"/,'a nonzero breakdown row keeps its visible floor when rounding yields zero percent');
+  assert.doesNotMatch(zeroBreakdown,/class="nonzero"/,'a zero-point breakdown row still has no rendered floor');
+  const tinyPyramid=pyramidRow('V0',1,0),zeroPyramid=pyramidRow('V0',0,0),groupProgress=document.querySelector('#groupProgress');
+  assert.match(tinyPyramid,/class="nonzero" style="width:0%"/,'a nonzero pyramid row keeps the same visible floor');
+  assert.doesNotMatch(zeroPyramid,/class="nonzero"/,'a zero-send pyramid row still has no rendered floor');
+  assert.equal(groupProgress.style.width,'0%','a tiny crew total can round to zero percent');
+  assert.equal(groupProgress.classList.contains('nonzero'),true,'but a positive crew total keeps the progress floor');
+  logs=[];
+  render();
+  assert.equal(groupProgress.classList.contains('nonzero'),false,'a true zero crew total removes the progress floor');
+
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+  logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt2',name:'Maya',type:'climb',date:shift(-1),createdAt:'2'}];
+  render();
   assert.equal(personalWeeklyTrend('alex',challengeToday()).slice(-1)[0].points,3,'the personal curve counts only this climber points in its current window');
   assert.equal(weeklyTrend(challengeToday()).slice(-1)[0].points,6,'while the crew curve includes both climbers in its current window');
   me='Maya';recordingFor='Maya';
