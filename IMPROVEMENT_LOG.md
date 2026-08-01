@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 79 — Fit the leaderboard on a 320px screen — Done — 2026-08-01
-- 80 — Raise the progress bar, the sorted column and the meter fills to a visible contrast — Todo
+- 80 — Raise the progress bar, the sorted column and the meter fills to a visible contrast — Done — 2026-08-01
 - 81 — One focus ring, at a contrast you can see — Todo
 - 82 — Stop three remaining surfaces pushing past their card — Todo
 - 83 — Stop announcing what did not change, and put the chart label where ARIA reads it — Todo
@@ -50,39 +49,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 79. Fit the leaderboard on a 320px screen
-
-Status: Done — 2026-08-01
-Notes: Commit `Fit leaderboard on 320px`. Archived entry 78. index.html 155,877 → 155,985 bytes (+108, 91.8% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-The Crew leaderboard needs a sideways scroll on a small phone. Its table has an intrinsic width of **496px** — Rank 58, Climber 287, Recent 71, Overall 80 — against roughly 264px of available card width at 320px, so **232px is hidden at 320px, 162px at 390px and 122px at 430px**, and at 320px the Recent column *starts* 81px past the right edge. The two score columns, which are the whole point of a leaderboard, are off-screen. This is the horizontal-scroll symptom the maintainer named.
-
-Two independent causes. First, the Climber column is set by the longest **name** — 240px of max-content plus the 19px 🏹 marker plus padding — because `th,td{…white-space:nowrap}` (`src/styles.css:3`) forbids it wrapping. It is **not** caused by the title tag added in `e445abb`, whose intrinsic width is only 141.4px; both the visual and the leaderboard audits cleared that commit independently. Second, `.table-card{padding:18px 0}` (`:3`) deliberately gives the table zero horizontal padding, and `@media(max-width:430px){….card{padding:17px}…}` (`:8`) silently overrides it on every phone — equal specificity `(0,0,1,0)`, a media query adds none, and source order decides. The table loses **34px** of width on exactly the screens that can least afford it, and the card head ends up inset 37px while the cells are inset 29px.
-
-### Requirements
-- `src/styles.css` only. No template change, no JS change.
-- **Restore the intended zero horizontal padding on phones** by raising specificity rather than by reordering: `.card.table-card{padding:18px 0}`, appended at the end of the stylesheet. That alone buys back 34px. Do not edit or move the `:8` media block.
-- **Let the climber name wrap.** `th,td{…white-space:nowrap}` (`:3`) has to be relaxed for the second column only: `white-space:normal` plus `overflow-wrap:anywhere` on `#leaderTable td:nth-child(2)`. `anywhere` is required and `break-word` will not do — only `anywhere` lowers the cell's **min-content** width, which is what the table layout algorithm reads. Precedent for the idiom is `.person-cell strong{…overflow-wrap:anywhere}` (`:7`).
-  - The name is rendered inside `button.climber`, which is `display:inline-flex` (`:7`). Verify the wrap actually reaches the text and add `min-width:0` on `.climber` if it does not. Measure; do not assume.
-  - `.title-tag{display:block;white-space:normal;…}` (`:16`) already wraps and needs nothing.
-- **Success criterion, measured not eyeballed:** at a 320px viewport with the crew's longest real name, `#leaderTable`'s `scrollWidth` is no greater than `.table-scroll`'s `clientWidth`, and all four columns are visible. `.table-scroll{overflow-x:auto}` (`:3`) stays as the safety net; the goal is that it never has to engage.
-- `tests/static-check.mjs:220` pins `.leader-toggles{display:flex;flex-wrap:nowrap` as exact text. **This entry does not touch it and no carve-out is granted.** `.table-card .card-head{flex-wrap:wrap;row-gap:12px}` (`:16`) already lets the whole toggle group drop to its own row, which is why the four pills fit at every viewport once entry 76 lands; any declaration you add to `.leader-toggles` must come **after** `flex-wrap:nowrap` in the same rule or live in a separate appended rule.
-- Opportunistic and optional: the tightest point in the phone range is **361px**, not 375 or 390 — that is where the `@media(max-width:360px){.leader-toggles .seg-btn{padding-left:4px;padding-right:4px}}` relief (`:16`) stops and padding jumps from 4px to 13px a side. Widening that relief to about 380px is cheap. It gates nothing and is cosmetic only; skip it if it costs assertions.
-- Append at the end of `src/styles.css`; do not reformat existing lines.
-
-### Tests
-- `tests/static-check.mjs`: `.card.table-card{padding:18px 0}` is present; the second-column wrap rule is present with `overflow-wrap:anywhere`. Assert the exact compact text.
-- `tests/client-state.dom.test.js`: a crew containing a very long single-word name still renders four `<td>`s per row and keeps the `class="hunter"` marker and any `.title-tag` inside the second cell.
-
-### Do not
-Do not replace the table with CSS grid or flex — `tests/static-check.mjs:232` asserts the page contains exactly **one** `<table>`, and `minmax()` is not available to table columns anyway. Do not truncate, ellipsise or initialise anybody's name. Do not shorten the `<th>` labels to `7d` / `All`: the saving is only 30px, the table's runtime `aria-label` already carries the scope in long form, and a screen reader announcing "7d" per cell is a regression. Do not rename the `#leaderWeekBtn` toggle — `tests/static-check.mjs:213` pins `>Recent</button>` and `:214` bans the string `>Weekly<`. Do not drop a column, and do not hide one at small widths. Tone rule: the leaderboard shows what people did; do not add an absence column, a participation figure, or a "not logged yet" state to it while you are in there.
-
----
-
 ## 80. Raise the progress bar, the sorted column and the meter fills to a visible contrast
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Raise visible contrast`. Archived entry 79. index.html 155,985 → 156,050 bytes (+65, 91.8% of the 170,000-byte budget). Meter ratios against sand (climb/exercise/mobility/bonus) light 7.34/3.64/4.80/3.64, dark 5.26/5.69/4.94/5.69; orange-ink progress against sand 3.64/5.69 and sorted text against card 4.83/7.38. Heatmap adjacent ratios (base→1→2→3→4) light 1.22/1.23/1.23/1.22, dark 1.39/1.42/1.43/1.43. `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 Three tokens — `--sky`, `--orange` and the heatmap's orange mix — were never re-stepped when the dark block was added, and they are the root of four separate contrast failures on the app's most-looked-at widgets.
