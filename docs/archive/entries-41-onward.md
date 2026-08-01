@@ -641,3 +641,35 @@ Make the note required, raise the 120-character cap, or prefill it; add a note t
 
 ---
 
+## 53. Show a crewmate's weekly points in their card
+
+Status: Done — 2026-08-01
+Notes: Commit `Show a crewmate's weekly points in their card`. `personSummary()` adds
+`weeks:personalWeeklyTrend(key,today)`. `#personModal` gets a `Weekly points` section (`h3` +
+`.trend-scroll` > `#personTrend`) between `#personRecords` and the `Grade pyramid` heading.
+`renderPersonCard()`'s `set()` closure now returns the element it filled so the aria-label can be
+set from the same lookup; `#personTrend` gets `trendColumns(data.weeks)` and an `aria-label` built
+the way `renderYouTrend()` builds one, or the shared `<p class="hint">` fallback when there are no
+weeks to chart. index.html 150,696 → 151,127 bytes (+431, 75.6% of the 200,000-byte budget). `npm
+test`: 5/5 suites.
+Deviations: None.
+
+### Why
+`personalWeeklyTrend(nameLower,today)` already computes any climber's week-by-week points, and `#youTrendCard` renders it for the signed-in user through `trendColumns()`/`trendAria()`. A crewmate's card (`#personModal`) shows rank, records, breakdown and pyramid — every static figure — but no week-over-week shape, so the one view that shows whether someone is building or coasting exists only for yourself.
+
+### Requirements
+- `src/app.js` — `personSummary()` adds one field, `trend` is taken; call it `weeks:personalWeeklyTrend(key,today)`. Adding a field is safe: every existing assertion reads `personSummary()` by named field.
+- `src/index.template.html` — inside `#personModal`, after `#personRecords` and before the existing `Grade pyramid` heading: `<h3 class="person-head">Weekly points</h3><div class="trend-scroll"><div id="personTrend" class="trend" role="img" aria-label="Weekly points"></div></div>`. No new CSS — `.trend-scroll`, `.trend` and `.person-head` are all global.
+- `renderPersonCard()` fills `#personTrend` with `trendColumns(data.weeks)` and sets its `aria-label` from `trendAria()` the way `renderYouTrend()` does; with no rows it emits the same `<p class="hint">` fallback shape the card's other empty sections use. Reuse `renderPersonCard()`'s existing `set()` closure rather than a second `querySelector` ladder.
+- Sequence: this entry and entry 54 both add a section to `#personModal`. Take them in order — 54 assumes this section is already the one between `#personRecords` and the pyramid.
+
+### Tests
+- `tests/client-state.dom.test.js`: `openPersonCard()` for a climber with logs across two weeks fills `#personTrend` with the same markup `#youTrend` holds for that same person, and a climber with no logs gets the hint fallback rather than an empty box.
+- `tests/client-state.state.test.js`: `personSummary().weeks` deep-equals `personalWeeklyTrend()` for the same name and day — the card reads the shared helper, not a second implementation.
+- `tests/static-check.mjs`: `#personTrend` carries `role="img"` and an `aria-label`, sits inside a `.trend-scroll`, and falls between `#personRecords` and `#personPyramid` in document order.
+
+### Do not
+Add a heatmap, a projection, or a pace line to the card; compare the person to you, to the crew, or to a crew average; add `aria-live` to a dialog that only exists because the user tapped a name; change `personalWeeklyTrend()`, `trendColumns()` or `trendAria()`.
+
+---
+
