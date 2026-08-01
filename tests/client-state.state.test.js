@@ -467,6 +467,20 @@ const checks = `(()=>{
   assert.ok(multiCap.indexOf('6 graded sends')>=0,'the caption totals sends across every grade');
   assert.ok(multiCap.indexOf('V5')>=0,'and names rows[0].grade as the hardest, not the most frequent');
 
+  // Entry 58: the claimed-bounty list gets the same plain-text caption treatment, naming the
+  // claim count and the credited total -- credited, not the face value, so a capped claim counts
+  // for less than its base.
+  assert.equal(claimedCaption([]),'','no rows means no caption');
+  const twoClaimsCap=claimedCaption([{date:'d1',label:'Send It',note:'',base:3,credit:3},{date:'d2',label:'Outdoor Send',note:'',base:3,credit:3}]);
+  assert.ok(twoClaimsCap.indexOf('2 claims')>=0,'the caption totals claims and pluralises');
+  assert.ok(twoClaimsCap.indexOf('6 points')>=0,'and sums their credited points');
+  const oneClaimCap=claimedCaption([{date:'d1',label:'Send It',note:'',base:1,credit:1}]);
+  assert.ok(oneClaimCap.indexOf('1 claim ')>=0,'a single claim is singular');
+  assert.ok(oneClaimCap.indexOf('claims')<0,'and has no stray plural');
+  assert.ok(oneClaimCap.indexOf('1 point ')>=0,'a single point is singular too');
+  const cappedClaimCap=claimedCaption([{date:'d1',label:'Century Club',note:'',base:3,credit:0}]);
+  assert.ok(cappedClaimCap.indexOf('0 points')>=0,'a claim past the weekly cap counts its credited zero, not its base');
+
   // Entry 53 review: #personTrend carries role="img", so its descendants collapse into one graphic
   // and the "No points logged yet" paragraph never reaches a screen reader. The empty state has to
   // ride in the accessible name instead.

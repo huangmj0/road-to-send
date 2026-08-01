@@ -201,11 +201,12 @@ const domChecks = `(()=>{
     {id:'k3',name:'Maya',type:'bounty',bountyId:claimedId,bountyTitle:'Maya only',date:shift(-1),createdAt:'3'},
   ];
   render();
-  const claimedBox=document.querySelector('#claimedList');
+  const claimedBox=document.querySelector('#claimedList'),claimedSummaryEl=document.querySelector('#claimedSummary');
   // setAttribute is a no-op in this stub, so the open state is asserted where it actually lives.
   assert.equal(claimedOpen,false,'the claimed list starts closed');
   assert.equal(claimedBox.innerHTML,'','and renders nothing at all until it is opened');
   assert.equal(claimedBox.classList.contains('hide'),true,'the container stays hidden');
+  assert.equal(claimedSummaryEl.textContent,'','and the caption is empty too, while closed');
   toggleClaimed();
   assert.equal(claimedOpen,true,'tapping the toggle opens it');
   assert.equal(claimedBox.classList.contains('hide'),false,'and reveals the container');
@@ -215,17 +216,21 @@ const domChecks = `(()=>{
   assert.equal(claimedBox.innerHTML.indexOf('Maya only'),-1,'another person’s claims never appear here');
   assert.equal(claimedBox.innerHTML.indexOf('data-claim-bounty'),-1,'claimed rows are plain rows, never claim buttons');
   assert.equal(claimedBox.innerHTML.indexOf('data-del'),-1,'and carry no delete affordance');
+  assert.ok(claimedSummaryEl.textContent.indexOf('1 claim ')>=0,'Entry 58: the caption names the claim count, singular for one');
   render();
   assert.ok(claimedBox.innerHTML.indexOf(claimedTitle)>=0,'a repaint keeps an open list open');
   assert.equal(claimedBox.innerHTML.split('bounty-peek').length-1,1,'and redraws one row rather than appending a second');
+  assert.ok(claimedSummaryEl.textContent.indexOf('1 claim ')>=0,'and the caption survives the repaint');
   toggleClaimed();
   assert.equal(claimedOpen,false,'tapping again closes it');
   assert.equal(claimedBox.innerHTML,'','and it empties again');
+  assert.equal(claimedSummaryEl.textContent,'','and the caption empties too');
   // Someone with nothing claimed opens to a plain empty state, not a zero-of-total figure.
   logs=[{id:'k4',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
   toggleClaimed();
   assert.equal(claimedOpen,true,'it still opens for a climber with no claims');
   assert.equal(claimedBox.innerHTML.indexOf('bounty-peek'),-1,'listing no rows');
+  assert.equal(claimedSummaryEl.textContent,'','Entry 58: no claims means no caption');
   toggleClaimed();
   assert.equal(claimedBox.innerHTML,'','and closes back to nothing');
 
@@ -242,6 +247,8 @@ const domChecks = `(()=>{
   assert.ok(claimedBox.innerHTML.indexOf('bounty-pts">+0</span>')>=0,'the claim past the weekly cap shows its reduced credit');
   assert.ok(claimedBox.innerHTML.indexOf('weekly bounty cap')>=0,'and names the weekly bounty cap as the reason');
   assert.equal(claimedBox.innerHTML.split('weekly bounty cap').length-1,1,'only the capped row carries the cap wording');
+  assert.ok(claimedSummaryEl.textContent.indexOf('3 claims')>=0,'Entry 58: the caption counts every claim, including the capped one');
+  assert.ok(claimedSummaryEl.textContent.indexOf('6 points')>=0,'and totals credited points, so the capped claim contributes zero, not its base of 3');
   toggleClaimed();
   assert.equal(claimedOpen,false,'closes again');
 

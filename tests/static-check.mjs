@@ -125,6 +125,9 @@ assert.match(html,/id="bountyWeek"[\s\S]*id="claimedToggle"[\s\S]*id="claimedLis
 assert.match(html,/#bountyWeekToggle,#claimedToggle\{min-height:44px\}/,'the claimed toggle reuses the 44px touch target');
 assert.match(script,/function claimedBounties\(/,'a pure helper lists the claims');
 assert.match(script,/function renderClaimed\(/,'a render function owns the claimed list');
+// Entry 58: a plain-text caption under the claimed list, following #claimedList in source order.
+assert.match(html,/id="claimedList"[^>]*>[\s\S]*?id="claimedSummary"/,'the claimed-list caption follows the list itself');
+assert.match(script,/function claimedCaption\(/,'a pure helper builds the claimed-list caption');
 assert.match(script,/function shareProgress\(/,'the Share button goes through the system share sheet first');
 assert.match(script,/function writeStore\(/,'the shared storage helper exists');
 assert.equal((script.match(/localStorage\.setItem/g)||[]).length,1,'storage writes funnel through one helper');
