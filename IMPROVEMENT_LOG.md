@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 68 — Bounty Hunter counts the last seven days — Done — 2026-08-01
-- 69 — Three titles for the habits people keep — Todo
+- 69 — Three titles for the habits people keep — Done — 2026-08-01
 - 70 — On Fire and Beast — Todo
 - 71 — Retire the podium medals — Todo
 - 72 — Recent, not Weekly — Todo
@@ -48,36 +47,12 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 68. Bounty Hunter counts the last seven days
-
-Status: Done — 2026-08-01
-Notes: Commit `Count Bounty Hunter over seven days`. Archived entry 67. index.html 155,020 →
-155,300 bytes (+280, 91.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-🏹 is decided on calendar weeks: `totalsModel()` reads `bountyWeekCount` at `weekKey(challengeToday())` (`src/app.js:42`), so on a Monday the tag reflects one day of claims and it resets to nobody every seven days regardless of what the crew is doing. The tag and the six-point weekly cap are already independent in the engine — `bountyUsed` enforces the cap while `bountyWeekCount` feeds the tag, and the tag counts every claim whether or not it scored, which `tests/client-state.state.test.js:65` pins. So the tag's window can move without touching scoring at all.
-
-### Requirements
-- **Sequencing:** entry 67 lands `windowStart()` first. This entry consumes it; if it is missing, implement 67 rather than inlining the date arithmetic.
-- `src/app.js` — `totalsModel()` gains a **new** row field `recentBounties`: that person's `type==='bounty'` logs whose date falls in `[windowStart(challengeToday()), challengeToday()]`, counting every claim credited or capped, exactly as `bountyWeekCount` does today. `hunters`/`huntCount` are computed from `recentBounties` instead of `bounties`; the `maxB>0` guard is unchanged, so nobody holds the tag when every count is zero.
-- **Leave the existing `bounties` field on calendar weeks — do not repoint it.** It has two other consumers that are still weekly at this point in the pass, and repointing it would publish rolling counts under calendar-week labels the moment this entry merges: the leaderboard's `Bounties` metric, labelled `Weekly` until entry 72, and `personSummary()`, which the person card renders as "N this week". Entry 72 switches the leaderboard metric to `recentBounties` and relabels it in the same commit. The person card's figure **stays weekly on purpose** — the six-point cap it reflects is weekly, so "this week" is the true label there. Entries ship independently, so an intermediate state that lies is a defect, not a rounding error.
-- `src/index.template.html` — the card's `<h2>Bounty Hunter</h2>` becomes `<h2>Titles</h2>` and its `<span class="hint">This week</span>` becomes `Last 7 days`. **Keep `#bountyHunter`** as the first row inside the card; it is asserted in `tests/static-check.mjs`, and renaming ids is churn across the suites for no user-visible benefit. Entries 69 and 70 fill the rest of this card.
-- **The weekly bounty cap stays on calendar weeks.** `SCORING.weeklyBountyCap` lives in the frozen `src/scoring.json` and the cap is real scoring maths — making it rolling would retroactively rescore live crew points (rules 1 and 2). `#bountyCapHint` keeps its "this week" wording and `bountyWeekProgress()` keeps reading `weekKey`. The cap resetting on Monday while the tag rolls is deliberate; the two surfaces must never both say "week".
-- `weekReviewModel()` keeps its own calendar-week hunter (`src/app.js:50`) — it reviews a bounded week and needs a bounded figure.
-
-### Tests
-- `tests/client-state.state.test.js`: with `challengeToday()` stubbed at `2026-07-13`, a claim dated `2026-07-07` — **six** days old, the first day of the window — counts toward `recentBounties`, and one dated `2026-07-06` does not. Seven days *inclusive* means `today-6` is the earliest date in the window, which is what entry 67 pins; a test written to expect a seven-day-old claim to count would silently specify an **eight**-day window, and every downstream entry in this pass would inherit it. A claim capped to `0` credit still counts, keeping the existing "every completion counts toward Bounty Hunter" guarantee at line 65 true under the new window; two people tied both appear in `hunters`; `huntCount` is `0` and `hunters` empty when nobody has claimed in the window. Assert in the same test that `bounties` still reports the **calendar-week** count for that roster, so the deliberate split between the two fields is pinned rather than merely described. Every existing assertion in that block keeps passing.
-- `tests/client-state.dom.test.js`: `#bountyHunter` renders the holder line from the rolling count, while the You tab's `#bountyCapHint`, the leaderboard's `Bounties` metric and the person card's bounty figure all still report the **calendar-week** number — assert them together, because this entry's whole risk is one field quietly changing meaning for consumers it was not meant to touch.
-- `tests/static-check.mjs`: the card's heading reads `Titles`, its hint reads `Last 7 days`, and `#bountyHunter` still exists inside it.
-
-### Do not
-Touch `bountyUsed`, `SCORING.weeklyBountyCap`, or anything in `computeCreditsRaw()`'s bounty branch that decides credit (rule 2 — `scoring.json` is the browser/backend contract, and changing it forces an API version bump and an organizer redeploy). **Do not repoint the existing `bounties` field**, and do not "tidy up" by pointing the leaderboard metric or the person card at `recentBounties` here — that is entry 72's job for the leaderboard, and never the person card's. Do not make `#bountyCapHint` or the claimed list say "last 7 days"; they report the cap, which is weekly. Do not rename `#bountyHunter`, and do not change `weekReviewModel()`.
-
----
 
 ## 69. Three titles for the habits people keep
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Add crew habit titles`. Archived entry 68. index.html 155,300 → 157,644 bytes
+(+2,344, 92.7% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 The app names exactly one thing a person can be: Bounty Hunter. Points reward showing up and the balanced-day bonus rewards spreading it around, but nothing names the crewmate who climbs four times a week or the one who actually does their mobility. Those are the habits the trip is training for, and the data to see them is already in the credit engine.
