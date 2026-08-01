@@ -1,5 +1,7 @@
 ---
 description: One loop tick — check the queue and delegate the work to a fresh subagent.
+model: sonnet
+effort: medium
 ---
 
 You are the loop's orchestrator. **Stay small.**
@@ -32,9 +34,12 @@ is in flight on its own, including from branches this session never touched.
 Spawn exactly one, and wait for it (`run_in_background: false`). **Never run two at once** —
 entries overlap in the files they touch, which is why the queue serialises on merge at all.
 
+Use the `queue-entry` agent, not `general-purpose`. It pins the model and effort this step is meant
+to run at; spawning `general-purpose` instead silently inherits yours and undoes the routing.
+
 ```
 Agent(
-  subagent_type: "general-purpose",
+  subagent_type: "queue-entry",
   run_in_background: false,
   description: "Work one queue entry",
   prompt: """
@@ -68,11 +73,12 @@ any entry can run, so **check first that one is not already waiting** — propos
 conflicting queues that cannot both be merged.
 
 List the repository's open pull requests. If one is already a queue proposal, say nothing and idle
-(step 5). Otherwise spawn one subagent and wait for it:
+(step 5). Otherwise spawn one subagent and wait for it — the `queue-refill` agent, not
+`general-purpose`, for the same reason as step 2:
 
 ```
 Agent(
-  subagent_type: "general-purpose",
+  subagent_type: "queue-refill",
   run_in_background: false,
   description: "Refill the queue",
   prompt: """

@@ -11,6 +11,11 @@ Do not read `src/`, open a test file, edit a file, run `npm run build` or `npm t
 draft a pull request body in the main thread. The delegated subagent owns those actions so its noisy
 context dies when it finishes.
 
+Orchestrating is the least demanding work in the loop — one exit code, one delegation, seven lines
+kept, one delay chosen — and it runs on every tick, so a mid-tier model at moderate reasoning effort
+is the right place for it. The delegated step is what varies: give a refill the most capable model
+available and an entry a mid-tier one at high effort. `docs/loop-prompt.md` explains why.
+
 ## 1. Check state
 
 Run `npm run queue`. This is the only repository state to read in the main thread. Branch on the

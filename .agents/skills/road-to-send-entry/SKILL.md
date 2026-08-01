@@ -7,6 +7,14 @@ description: Implement exactly one queued Road to Send improvement, verify it, c
 
 Work exactly one entry from `IMPROVEMENT_LOG.md`, then stop.
 
+## A mid-tier model is enough here, at high reasoning effort
+
+This step executes a spec a human already read and merged, and `npm test` catches what it gets wrong
+before anyone else sees it — so it does not need the model the refill step needs. Keep the reasoning
+effort high anyway: the failures that actually happen here are the `TRAP` header notes, reusing the
+helpers the entry names, and reading the whole `=== summary ===` block instead of the first failure.
+`docs/loop-prompt.md` explains the split across all three workflows.
+
 ## 1. Orient
 
 Run `npm run queue`. It refreshes `origin/main` and reports where the loop stands. Branch on its

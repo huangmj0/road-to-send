@@ -7,6 +7,15 @@ description: Propose new Road to Send Todo entries after the improvement queue i
 
 Add new `Todo` entries to `IMPROVEMENT_LOG.md`, then stop. Do not implement any of them.
 
+## Run this on the most capable model available
+
+This is the loop's design step. Every entry written here becomes a binding spec that a later
+`$road-to-send-entry` run executes literally, on a cheaper model, without re-litigating it — so a
+vague `### Requirements` block, a named helper that does not exist, or two entries colliding in the
+same DOM region each cost a full implementation iteration and a human review. A refill runs once per
+drained queue, against six to twelve entries, so the cost amortises to almost nothing. `docs/loop-prompt.md`
+explains the split across all three workflows.
+
 ## Hard boundary
 
 The pull request changes `IMPROVEMENT_LOG.md` and nothing else. A run that invents work and ships it

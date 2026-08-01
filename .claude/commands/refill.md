@@ -1,5 +1,7 @@
 ---
 description: Propose new Todo entries for IMPROVEMENT_LOG.md in a queue-only PR, then stop.
+model: opus
+effort: high
 ---
 
 Refill `IMPROVEMENT_LOG.md` with new `Todo` entries, then stop. **You are not implementing

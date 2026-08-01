@@ -1,5 +1,7 @@
 ---
 description: Work exactly one entry from IMPROVEMENT_LOG.md, then stop.
+model: sonnet
+effort: high
 ---
 
 Work exactly ONE entry from `IMPROVEMENT_LOG.md`, then stop.
