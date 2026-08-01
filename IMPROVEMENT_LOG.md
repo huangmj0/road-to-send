@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 78 — Draw the curve on day one, and the smallest bars at all — Done — 2026-08-01
-- 79 — Fit the leaderboard on a 320px screen — Todo
+- 79 — Fit the leaderboard on a 320px screen — Done — 2026-08-01
 - 80 — Raise the progress bar, the sorted column and the meter fills to a visible contrast — Todo
 - 81 — One focus ring, at a contrast you can see — Todo
 - 82 — Stop three remaining surfaces pushing past their card — Todo
@@ -51,42 +50,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 78. Draw the curve on day one, and the smallest bars at all
-
-Status: Done — 2026-08-01
-Notes: Commit `Fix day-one curve and bar floors`. Archived entry 77. index.html 155,411 →
-155,877 bytes (+466, 91.7% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Two graphics silently draw the wrong thing for small values.
-
-On the **first day of a challenge**, `trendSvg()` has one row, so `x=i=>rows.length===1?50` and the path string is `line="M50,<y>"` — a lone `moveto` with `fill:none`, which strokes nothing at all — while `area=line+' L100,88 L0,88 Z'` becomes a full-width **triangle** from the single point down to both bottom corners. A crew opening the app on day one sees an orange wedge and no line.
-
-The **baseline** the entry-74 spec called the chart's one required rule is `.trend-baseline{stroke:var(--line);stroke-width:1}` (`src/styles.css:18`), computing to **1.23:1** against the card, drawn coincident with the area's own lower edge at 1.25:1 — the two are indistinguishable. It also lacks `vector-effect:non-scaling-stroke`, so it renders at 1.6px while `.trend-line` beside it renders at 2px.
-
-The **bar charts** round their widths: `breakdownRow(…, Math.round(r.points/max*100))` and `pyramidRow(…, Math.round(r.count/max*100))` in `renderBreakdown()`/`renderPyramid()` (`src/app.js:92`, `:97`). A real nonzero value whose share is under 0.5% rounds to `width:0%` and **draws nothing**, and anything under a few percent is clipped to a sliver by `border-radius:999px` on a 12–14px-tall track. A climber with 1 bounty point against a 300-point climbing total sees an empty bar next to a "1" — the number says one thing and the bar says zero.
-
-### Requirements
-- **Sequencing: entry 77 lands first.** Both entries edit `trendSvg()` and the `.trend-*` rules. Do not start this while 77 is `Todo`.
-- `src/app.js` and `src/styles.css`.
-- **Day one:** when `rows.length===1`, emit a path that actually strokes and an area that is a rectangle, not a triangle — a horizontal segment across the full width at that point's `y` is the natural form for a single-day series. Keep the existing coordinate rounding.
-- **Baseline:** give `.trend-baseline` `vector-effect:non-scaling-stroke` so it renders 1px crisp like `.trend-line` does, and raise its stroke from `var(--line)` (`#174a3a1f`) to `var(--line-strong)` (`#174a3a24`) so it separates from the area's own lower edge. It stays a **recessive** rule, as entry 74 required. **Introduce no new colour token** — entry 74 forbade that for this chart and that still binds.
-- **Bar floor:** give `.breakdown-bar i` (`:11`), `.pyramid-bar i` (`:13`) and `.progress i` (`:9`) a minimum rendered width so a nonzero value is always visible — a `min-width` in the low single-digit pixels is enough, and it must apply **only when the value is nonzero**, so a genuine zero still draws nothing. Prefer fixing it in CSS over changing the percentage math; if you change the math, keep `0` mapping to `0`.
-- Rule 6: `renderBreakdown()` and `renderPyramid()` run from `render()`, which runs often. Whatever you add stays idempotent and cheap.
-- Append new CSS at the end of `src/styles.css`; do not reformat existing lines.
-
-### Tests
-- `tests/client-state.dom.test.js`: a config whose `startDate` equals `challengeToday()` yields exactly one point, and `#youTrend`'s SVG contains a `trend-line` path with more than a single `M` command and an area path that is not the `L100,88 L0,88 Z` triangle; a breakdown row whose points are a tiny fraction of the maximum still renders a bar with nonzero width, while a row worth zero points does not.
-- `tests/static-check.mjs`: `.trend-baseline` carries `vector-effect:non-scaling-stroke`; the three bar-fill rules carry the minimum-width floor. Assert the exact compact text.
-
-### Do not
-Do not hide the card on day one — `tests/client-state.dom.test.js:360`, `:378` and `:963` lock the all-zero personal curve as deliberate behaviour and must keep passing. Do not add a new colour token, a second series, a legend or a per-point number. Do not raise the baseline to a foreground weight; it is a rule, not data. Do not give a zero-point row a visible bar — inventing a value is worse than the bug. Tone rule: this entry changes geometry only; it adds no copy, no absence count and no prompt to participate.
-
----
-
 ## 79. Fit the leaderboard on a 320px screen
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Fit leaderboard on 320px`. Archived entry 78. index.html 155,877 → 155,985 bytes (+108, 91.8% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 The Crew leaderboard needs a sideways scroll on a small phone. Its table has an intrinsic width of **496px** — Rank 58, Climber 287, Recent 71, Overall 80 — against roughly 264px of available card width at 320px, so **232px is hidden at 320px, 162px at 390px and 122px at 430px**, and at 320px the Recent column *starts* 81px past the right edge. The two score columns, which are the whole point of a leaderboard, are off-screen. This is the horizontal-scroll symptom the maintainer named.

@@ -229,6 +229,8 @@ assert.match(html,/id="leaderBountyBtn"[^>]*type="button"[^>]*aria-pressed=/,'th
 assert.match(html,/id="leaderMetricToggle"[^>]*aria-label=/,'the points/bounties metric toggle is a labelled group');
 assert.match(html,/id="leaderScopeToggle"[^>]*aria-label=/,'the weekly/overall scope toggle is a labelled group');
 assert.match(html,/\.leader-toggles\{display:flex;flex-wrap:nowrap/,'the four leaderboard buttons stay on one row');
+assert.match(stylesheet,/\.card\.table-card\{padding:18px 0\}/,'the leaderboard card keeps zero horizontal padding on phones');
+assert.match(stylesheet,/#leaderTable td:nth-child\(2\)\{white-space:normal;overflow-wrap:anywhere\}/,'the climber column can wrap an unbroken name at its min-content width');
 assert.equal(script.indexOf('podiumMedals'),-1,'the leaderboard no longer builds podium medals');
 assert.equal(html.indexOf('.medal{'),-1,'podium medals no longer have CSS');
 assert.match(html,/data-panel="you"[\s\S]*id="youEmptyState"[\s\S]*id="personalActivity"[\s\S]*data-panel="record"/,'the You onboarding empty state sits in the recent-activity area of the You panel');

@@ -762,6 +762,7 @@ const domChecks = `(()=>{
   assert.ok(weeklyMedalFree.indexOf('>#1</td>')<weeklyMedalFree.indexOf('>#2</td>')&&weeklyMedalFree.indexOf('>#2</td>')<weeklyMedalFree.indexOf('>#3</td>'),'the weekly rank column remains in order');
   assert.ok(weeklyMedalFree.indexOf('class="me"')>=0,'the signed-in climber remains highlighted');
   assert.ok(weeklyMedalFree.indexOf('class="hunter"')>=0,'the Bounty Hunter glyph remains beside its holder');
+
   leaderScope='overall';render();
   const overallMedalFree=leaderRows.innerHTML;
   assert.equal(overallMedalFree.indexOf('🥇'),-1,'the overall rows contain no gold medal');
@@ -769,6 +770,22 @@ const domChecks = `(()=>{
   assert.equal(overallMedalFree.indexOf('🥉'),-1,'the overall rows contain no bronze medal');
   assert.equal(overallMedalFree.indexOf('class="medal"'),-1,'the overall rows emit no medal span');
   assert.ok(overallMedalFree.indexOf('>#1</td>')<overallMedalFree.indexOf('>#2</td>')&&overallMedalFree.indexOf('>#2</td>')<overallMedalFree.indexOf('>#3</td>'),'the overall rank column remains in order');
+
+  // Entry 79: a long unbroken name keeps every leaderboard value in its table row, including
+  // the title and Bounty Hunter markers which both belong inside its second cell.
+  const longestName='EthelstanhaughSupercalifragilisticexpialidocious';
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:longestName},{name:'Bo'}]};
+  logs=[
+    {id:'long1',name:longestName,type:'climb',date:'2026-07-13',createdAt:'1'},
+    {id:'long2',name:longestName,type:'exercise',date:'2026-07-13',createdAt:'2'},
+    {id:'long3',name:longestName,type:'mobility',date:'2026-07-13',createdAt:'3'},
+    {id:'long4',name:longestName,type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'4'},
+  ];
+  render();
+  const longPersonAt=leaderRows.innerHTML.indexOf('data-person="'+longestName+'"'),longRowStart=leaderRows.innerHTML.lastIndexOf('<tr',longPersonAt),longRow=leaderRows.innerHTML.slice(longRowStart,leaderRows.innerHTML.indexOf('</tr>',longPersonAt)),longCells=longRow.split('</td>');
+  assert.equal((longRow.match(/<td/g)||[]).length,4,'a long-name leaderboard row keeps all four cells');
+  assert.ok(longCells[1].indexOf('class="hunter"')>=0&&longCells[1].indexOf('class="title-tag"')>=0,'the hunter and title tag stay inside the climber cell');
+
   challengeToday=savedChallengeToday;leaderMetric='points';leaderScope='week';
 
   // Entry 48: the Crew feed names a person on every row, and those names open the same card the
