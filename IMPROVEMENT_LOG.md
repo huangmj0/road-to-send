@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 62 — Key the heatmap shades — Done — 2026-07-31
-- 64 — Say the size of the field next to a rank — Todo
+- 64 — Say the size of the field next to a rank — Done — 2026-08-01
 - 65 — Stop promising a local delete cannot be undone — Todo
 - 66 — Re-baseline the bundle budget for the rolling-window pass — Todo
 - 67 — A rolling seven-day window — Todo
@@ -53,37 +52,14 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 ---
 
-## 62. Key the heatmap shades
-
-Status: Done — 2026-07-31
-Notes: Commit `Key the heatmap shades`. Added a static, non-interactive heatmap shade key using
-the existing five shade classes, with one accessible text alternative. Archived entry 61 into the
-new current `entries-61-onward.md` pass because the previous archive would exceed the 90,000-byte
-cap. index.html 153,623 → 154,286 bytes (+663, 93.5% of the 165,000-byte budget). `npm test`:
-5/5 suites.
-Deviations: None.
-
-### Why
-The daily activity heatmap paints five shades from `heatLevel()`, and nothing on the page says what they mean. A darker square is more points, but how many is a guess, and the `title` tooltip that carries the real figure never appears on a touch device — which is what this crew uses. Entry 36 gave the heatmap a caption naming the best day; a shade key is the other half, and every other graphic on the page (`.trend` bars, `.breakdown` bars, `.pyramid` bars) carries its number in the row.
-
-### Requirements
-- `src/index.template.html` — inside `#heatmapCard`, between `<div id="youHeatmap" …></div>` and `<p id="heatmapSummary" class="hint"></p>`, add a static key: a container `<div id="heatmapLegend" class="heat-legend" role="img" aria-label="Shade key: lighter squares are fewer points, darker squares are more">`, holding the word `Less`, five `<i aria-hidden="true">` swatches carrying the existing classes `heat-cell heat0` through `heat-cell heat4`, and the word `More`. The `Less`/`More` words sit in `<span aria-hidden="true">` — the container's `aria-label` is the text alternative, so the key announces once, not seven times (rule 7).
-- The key lives inside `#heatmapCard`, so it hides and shows with the card `renderHeatmap()` already toggles. **No JavaScript change at all** — this is template plus CSS only.
-- `src/styles.css` — add one compact rule block in the existing style: `.heat-legend` is a flex row, small gap, `.hint`-sized muted text, right-aligned or left-aligned to match the card, with the swatches sized around 12px square and inheriting `.heat-cell`'s existing border-radius and colours. Do not restate the `heat0`–`heat4` background colours; reuse the classes. Match the file's single-line compact formatting — `tests/static-check.mjs` matches exact CSS text elsewhere and reformatting breaks unrelated assertions.
-- Nothing here is interactive, so the 44px rule does not apply; keep it non-interactive.
-
-### Tests
-- `tests/static-check.mjs`: `#heatmapLegend` exists, carries `role="img"` and a non-empty `aria-label`, and falls between `#youHeatmap` and `#heatmapSummary` in source order — which also keeps line 62's existing heatmap/caption assertion true. Assert the five swatch classes `heat0`–`heat4` all appear inside the card, and that the legend's swatches are `aria-hidden="true"`.
-- No client-state assertions: there is no new helper and no render path to exercise.
-
-### Do not
-Add a JS-driven legend, a hover-only tooltip, or a sixth shade; change `heatLevel()`'s thresholds or the `heat0`–`heat4` colours (the state suite pins the buckets at lines 336–344); or put the key on the Crew tab, where there is no heatmap. Do not caption it with anything about days with no points — "Less" is a scale label, and a count of blank days is the absence framing the tone rule rules out.
-
----
-
 ## 64. Say the size of the field next to a rank
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Say the size of the field next to a rank`. Added a pure rank label that names the
+ranked roster field in the You stat and person card, while preserving zero-log crew members in the
+field. Archived entry 62. index.html 154,286 → 154,455 bytes (+169, 93.6% of the 165,000-byte
+budget). `npm test`: 5/5 suites.
+Deviations: None.
 
 ### Why
 The You panel's "Crew rank" stat reads `#3`, and the person card's summary grid reads `Rank #3`. Third out of four and third out of twelve are different facts, and the app knows which it is — `totalsModel().sorted` is the ranked field — but never says. The number the crew looks at most is the one carrying the least context.

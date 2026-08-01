@@ -617,6 +617,7 @@ const domChecks = `(()=>{
   logs=[{id:'q1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-1),createdAt:'1'},{id:'q2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'q3',name:'Bo',type:'climb',hardestGrade:'V2',date:shift(-1),createdAt:'3'}];
   render();
   const leaderRows=document.querySelector('#leaderRows');
+  assert.equal(document.querySelector('#youRank').textContent,'#1 of 2','the You rank names the roster field');
   assert.ok(leaderRows.innerHTML.indexOf('data-person="Alex"')>=0,'every leaderboard row carries a per-person hook');
   assert.ok(leaderRows.innerHTML.indexOf('<button class="climber"')>=0,'the climber name is a real button, not a clickable row');
   assert.equal(leaderRows.innerHTML.indexOf('tabindex'),-1,'the row itself gets no fake tab stop');
@@ -627,6 +628,7 @@ const domChecks = `(()=>{
   assert.ok(personBreakdown.innerHTML.length>0,'the card renders a category breakdown');
   assert.ok(personBreakdown.innerHTML.indexOf(CAT_LABELS.climb)>=0,'the breakdown names a category');
   assert.ok(personSummaryEl.innerHTML.indexOf('#1')>=0,'the summary names the rank');
+  assert.ok(personSummaryEl.innerHTML.indexOf('of 2')>=0,'the summary names the roster field');
   assert.ok(document.querySelector('#personPyramid').innerHTML.indexOf('V5')>=0,'the pyramid lists the hardest send');
   assert.ok(document.querySelector('#personRecords').innerHTML.length>0,'the card renders the personal records rows');
   const summaryBefore=personSummaryEl.innerHTML;
@@ -637,6 +639,8 @@ const domChecks = `(()=>{
   assert.ok(personTitle.textContent.indexOf('Alex')>=0,'an unknown name leaves the open card untouched');
   closeModal('personModal');
   assert.equal(personModal.classList.contains('open'),false,'closing the dialog clears the open class');
+  me='Bo';recordingFor='Bo';render();
+  assert.equal(document.querySelector('#youRank').textContent,'#2 of 2','a roster member without logs remains in the ranked field');
 
   // Entry 48: the Crew feed names a person on every row, and those names open the same card the
   // leaderboard rows open. The You feed lists only your own entries, so its names stay plain text.

@@ -901,6 +901,7 @@ const checks = `(()=>{
   const card=personSummary('Alex',onDay(0));
   assert.equal(card.name,'Alex','the card keeps the roster spelling of the name');
   assert.equal(card.rank,1,'the card ranks by all-time points, matching the You-tab rank');
+  assert.equal(card.field,2,'the card exposes the ranked roster size');
   assert.equal(card.week,11+bp,'the week figure is the leaderboard row week figure');
   assert.equal(card.total,14+bp,'the all-time figure is the leaderboard row total');
   assert.equal(card.bounties,1,'the weekly bounty count comes from the same model row');
@@ -917,6 +918,13 @@ const checks = `(()=>{
   assert.equal(personSummary('bo',onDay(0)).rank,2,'the runner-up ranks second');
   assert.equal(personSummary('Nobody',onDay(0)),null,'an unknown name has no card');
   assert.equal(personSummary('   ',onDay(0)),null,'a blank name has no card');
+
+  // Entry 64: rank labels include the complete ranked field, never just participation.
+  assert.equal(rankLabel(3,12),'#3 of 12');
+  assert.equal(rankLabel(1,1),'#1 of 1');
+  assert.equal(rankLabel(0,5),'—');
+  assert.equal(rankLabel(-1,5),'—');
+  assert.equal(rankLabel(3,2),'—');
 
   // Entry 21: the Record-tab preview copy is a pure ladder over a plain draft summary — no DOM.
   assert.equal(creditPreviewCopy({type:'climb',hasTarget:true,inWindow:true,base:3,credit:3,reason:''}),'Counts in full · +3 today','full credit keeps its wording');
