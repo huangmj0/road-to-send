@@ -4,6 +4,7 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const appSource = fs.readFileSync(new URL('../src/app.js', `file://${__filename}`), 'utf8');
 const values = new Map();
 const context = {
   assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Intl,
@@ -15,6 +16,27 @@ const context = {
   },
   setTimeout() {}, clearTimeout() {},
 };
+
+// Exercise the editable source directly: generated index.html is checked separately.
+const sanitizerSource = appSource.match(/^function sanitizeActivities\(value\)\{.*\}$/m)[0];
+const sanitizerContext = {
+  GRADES: ['V0','V1','V2','V3'],
+  parseDateOnly: value => /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null,
+  bountyById: id => id === 'send-it' ? {id, title: 'Send It', category: 'climb'} : null,
+};
+vm.runInNewContext(sanitizerSource, sanitizerContext, {filename: 'src/app.js'});
+const sanitized = sanitizerContext.sanitizeActivities([
+  null,
+  {name: null, type: 'climb', date: '2026-07-13'},
+  {name: 'Alex', type: 'climb', date: 'not-a-date'},
+  {name: 'Alex', type: 'bounty', bountyId: 'not-real', date: '2026-07-13'},
+  {id: 42, name: ' Alex ', type: 'climb', hardestGrade: '<bad>', date: '2026-07-13', createdAt: 7},
+  {name: 'Maya', type: 'bounty', bountyId: 'send-it', bountyTitle: '<spoofed>', category: 'mobility', date: '2026-07-14'},
+]);
+assert.deepEqual(JSON.parse(JSON.stringify(sanitized)), [
+  {id: '42', name: 'Alex', type: 'climb', date: '2026-07-13', createdAt: '7'},
+  {name: 'Maya', type: 'bounty', date: '2026-07-14', bountyId: 'send-it', bountyTitle: 'Send It', category: 'climb'},
+], 'malformed rows are dropped and accepted fields are normalized from trusted scoring data');
 
 const checks = `(()=>{
   assert.equal(activityPoints({type:'climb'}),3);
@@ -81,7 +103,18 @@ const checks = `(()=>{
 
   assert.equal(weekKey('2026-07-13'),'2026-07-13');
   assert.equal(weekKey('2026-07-19'),'2026-07-13');
-  assert.equal(dateInTimeZone(new Date('2026-03-08T07:30:00Z'),'America/Los_Angeles'),'2026-03-07');
+  assert.equal(weekKey('2026-03-08'),'2026-03-02','Sunday remains in the week that began the prior Monday');
+  assert.equal(weekKey('2026-03-09'),'2026-03-09','Monday starts a new scoring week');
+
+  // Los Angeles calendar dates remain stable across both US daylight-saving transitions.
+  assert.equal(dateInTimeZone(new Date('2026-03-08T07:59:00Z'),'America/Los_Angeles'),'2026-03-07','spring transition: UTC is still Saturday locally before midnight PST');
+  assert.equal(dateInTimeZone(new Date('2026-03-08T08:00:00Z'),'America/Los_Angeles'),'2026-03-08','spring transition: local calendar advances at midnight PST');
+  assert.equal(dateInTimeZone(new Date('2026-03-08T09:59:00Z'),'America/Los_Angeles'),'2026-03-08','spring transition: instant before the skipped hour stays Sunday');
+  assert.equal(dateInTimeZone(new Date('2026-03-08T10:00:00Z'),'America/Los_Angeles'),'2026-03-08','spring transition: instant after the skipped hour stays Sunday');
+  assert.equal(dateInTimeZone(new Date('2026-11-01T06:59:00Z'),'America/Los_Angeles'),'2026-10-31','fall transition: UTC is still Saturday locally before midnight PDT');
+  assert.equal(dateInTimeZone(new Date('2026-11-01T07:00:00Z'),'America/Los_Angeles'),'2026-11-01','fall transition: local calendar advances at midnight PDT');
+  assert.equal(dateInTimeZone(new Date('2026-11-01T08:59:00Z'),'America/Los_Angeles'),'2026-11-01','fall transition: instant before the repeated hour stays Sunday');
+  assert.equal(dateInTimeZone(new Date('2026-11-01T09:00:00Z'),'America/Los_Angeles'),'2026-11-01','fall transition: instant after the repeated hour stays Sunday');
 
   const parsed=parseRemoteConfig({startDate:'2026-07-01',tripDate:'2026-07-31',goal:750,crew:[{name:'Alex'},'alex',{name:'Maya'}]},[]);
   assert.equal(parsed.value.crew.length,2,'crew names are canonicalized case-insensitively');
@@ -89,7 +122,7 @@ const checks = `(()=>{
   assert.equal(parsed.value.crew[0].pullMode,undefined,'participants are name-only');
   assert.throws(()=>unpackRemote({version:8,features:[],activities:[],config:null}),/version/,'v8 requires redeployment');
   assert.throws(()=>unpackRemote({version:9,features:[],activities:[],config:null}),/version/,'v9 requires redeployment');
-  assert.equal(unpackRemote({version:10,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1);
+  assert.equal(unpackRemote({version:10,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,0,'incomplete remote rows are rejected');
 
   // Local upgrade: v8 config migrates (pull mode dropped); logs start fresh; identity persists.
   localStorage.setItem('roadToSendConfigV8',JSON.stringify({startDate:'2026-07-01',tripDate:'2026-07-31',goal:600,crew:[{name:'Alex',pullMode:'super-hard'}]}));
@@ -110,8 +143,10 @@ vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
 // Record tab's date/bounty behavior can be asserted alongside the You tab.
 function makeElement() {
   const classes = new Set();
+  const listeners = new Map();
   return {
     value: '', textContent: '', innerHTML: '', disabled: false, style: {}, dataset: {},
+    offsetParent: {}, isConnected: true,
     classList: {
       add: (...cs) => cs.forEach(c => classes.add(c)),
       remove: (...cs) => cs.forEach(c => classes.delete(c)),
@@ -119,7 +154,10 @@ function makeElement() {
       toggle: (c, force) => {const on = force === undefined ? !classes.has(c) : Boolean(force); on ? classes.add(c) : classes.delete(c); return on},
     },
     setAttribute() {}, removeAttribute() {}, getAttribute() {return null},
-    addEventListener() {}, removeEventListener() {}, focus() {},
+    addEventListener(type, handler) {listeners.set(type, handler)}, removeEventListener(type) {listeners.delete(type)},
+    focus() {documentStub.activeElement = this},
+    fire(type, event) {const handler=listeners.get(type);if(handler)handler(event)},
+    contains() {return false},
     querySelectorAll() {return []},
   };
 }
@@ -129,12 +167,14 @@ const domValues = new Map();
 const documentStub = {
   visibilityState: 'visible',
   activeElement: null,
+  body: makeElement(),
   querySelector: selector => {if (!domElements.has(selector)) domElements.set(selector, makeElement()); return domElements.get(selector)},
   querySelectorAll: () => [],
   addEventListener: (type, handler) => documentListeners.set(type, handler),
   removeEventListener: () => {},
   createElement: () => makeElement(),
 };
+documentStub.activeElement=documentStub.body;
 const domContext = {
   assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Intl,
   location: {search: '', href: 'https://example.test/', hash: ''},
@@ -189,6 +229,30 @@ const domChecks = `(()=>{
   assert.equal(recordDate(),shift(-10),'record date clamps to the window end');
   populateBountySelect();
   assert.equal(label.textContent,'Bounties for '+fmtDay(shift(-10)),'label names the clamped bounty day');
+
+  // Use the editable modal implementation without regenerating index.html.
+  ${appSource.match(/^function focusableIn\(container\)\{.*\}$/m)[0]}
+  ${appSource.match(/^function openModal\(id\)\{.*\}$/m)[0]}
+  ${appSource.match(/^function closeModal\(id\)\{.*\}$/m)[0]}
+  const modal=document.querySelector('#focusTestModal'),first=document.querySelector('#focusFirst'),last=document.querySelector('#focusLast'),invoker=document.querySelector('#focusInvoker');
+  modal.querySelectorAll=()=>[first,last];
+  modal.contains=element=>element===first||element===last;
+  invoker.focus();
+  openModal('focusTestModal');
+  assert.equal(document.activeElement,first,'opening a modal moves focus to its first control');
+  let prevented=false;
+  last.focus();
+  modal.fire('keydown',{key:'Tab',shiftKey:false,preventDefault(){prevented=true}});
+  assert.equal(document.activeElement,first,'Tab wraps from the final control to the first');
+  assert.equal(prevented,true,'focus wrapping prevents the browser default');
+  closeModal('focusTestModal');
+  assert.equal(document.activeElement,invoker,'closing restores the invoking control');
+
+  document.body.focus();
+  openModal('focusTestModal');
+  assert.equal(document.activeElement,first,'startup-opened modal moves focus off BODY');
+  closeModal('focusTestModal');
+  assert.notEqual(document.activeElement,document.body,'startup close does not restore BODY as an artificial invoker');
 })()`;
 
 vm.runInNewContext(`${source}\n${domChecks}`, domContext, {filename: 'index.html'});

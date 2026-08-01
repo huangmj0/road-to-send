@@ -23,6 +23,18 @@ function loadScript() {
   return context;
 }
 
+function loadSourceScript() {
+  const scoring = fs.readFileSync(new URL('../src/scoring.json', `file://${__filename}`), 'utf8').trim();
+  const schema = JSON.parse(fs.readFileSync(new URL('../src/schema.json', `file://${__filename}`), 'utf8'));
+  const source = fs.readFileSync(new URL('../src/apps-script.js', `file://${__filename}`), 'utf8')
+    .replaceAll('__SCORING_CONFIG__', scoring)
+    .replaceAll('__API_VERSION__', String(schema.properties.version.const));
+  const context = {SpreadsheetApp: {getActive: () => ({getSpreadsheetTimeZone: () => 'UTC'})}};
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  return context;
+}
+
 test('embedded v10 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();
   assert.equal(vm.runInContext('API_VERSION', context), 10);
@@ -78,6 +90,120 @@ test('challenge window remains inclusive', () => {
   assert.equal(context.validateActivityWindow({date: '2026-07-01'}).date, '2026-07-01');
   assert.equal(context.validateActivityWindow({date: '2026-07-31'}).date, '2026-07-31');
   assert.throws(() => context.validateActivityWindow({date: '2026-08-01'}), error => error.code === 'outside_challenge_window');
+});
+
+test('sheet writes neutralize formula-like participant names and activity notes', () => {
+  const context = loadSourceScript();
+  const writes = {};
+  const range = label => ({
+    clearContent() {},
+    setValues(values) { writes[label] = values; },
+  });
+  const settings = {getLastRow: () => 4, getRange: () => range('settings')};
+  const participants = {clearContents() {}, getRange: (row) => range(row === 1 ? 'participantHeaders' : 'participants')};
+  const activities = {
+    getLastColumn: () => 3,
+    getRange: () => ({getValues: () => [['name', 'note', 'type']]}),
+    appendRow(row) { writes.activity = row; },
+  };
+  context.tab = name => ({Settings: settings, Participants: participants, Activities: activities})[name];
+  context.formatSheets = () => {};
+
+  const config = context.writeConfig({startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: '=IMPORTDATA("bad")'}, {name: 'Alex'}]});
+  assert.deepEqual(Array.from(writes.participants, row => Array.from(row)), [["'=IMPORTDATA(\"bad\")"], ['Alex']]);
+  assert.equal(config.crew[0].name, '=IMPORTDATA("bad")');
+
+  const item = {name: '+cmd', note: '@malicious', type: 'exercise'};
+  assert.equal(context.appendActivity(item), item);
+  assert.deepEqual(Array.from(writes.activity), ["'+cmd", "'@malicious", 'exercise']);
+  assert.equal(context.sheetSafeText('ordinary text'), 'ordinary text');
+});
+
+test('doPost serializes structured errors and delete results', () => {
+  const context = loadSourceScript();
+  let released = 0;
+  context.LockService = {getDocumentLock: () => ({waitLock() {}, releaseLock() { released += 1; }})};
+  context.ContentService = {
+    MimeType: {JSON: 'json'},
+    createTextOutput(text) {
+      return {text, setMimeType() { return this; }};
+    },
+  };
+  context.setup = () => {};
+
+  const post = body => JSON.parse(context.doPost({postData: {contents: JSON.stringify(body)}}).text);
+  const invalid = post({action: 'delete', id: ''});
+  assert.deepEqual(JSON.parse(JSON.stringify(invalid)), {
+    version: 10,
+    ok: false,
+    error: {
+      code: 'invalid_delete',
+      message: 'An activity id is required',
+      details: [{field: 'id', reason: 'is required'}],
+    },
+  });
+
+  const values = [['id', 'name'], ['known-id', 'Alex']];
+  let deletedRow = 0;
+  context.tab = () => ({
+    getDataRange: () => ({getValues: () => values}),
+    deleteRow(row) { deletedRow = row; },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(post({action: 'delete', id: 'missing-id'}))), {
+    version: 10,
+    ok: false,
+    error: {code: 'not_found', message: 'Activity not found'},
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(post({action: 'delete', id: 'known-id'}))), {
+    version: 10,
+    ok: true,
+    deleted: 'known-id',
+  });
+  assert.equal(deletedRow, 2);
+  assert.equal(released, 3);
+});
+
+test('activity rows tolerate reordered headers and malformed cell values', () => {
+  const context = loadSourceScript();
+  const headers = ['note', 'points', 'date', 'name', 'unknown'];
+  const normalized = context.normalizeActivityRow(['hello', 'not-a-number', 'not-a-date', 'Alex', '=ignored'], headers);
+  assert.deepEqual(JSON.parse(JSON.stringify(normalized)), {
+    id: '',
+    name: 'Alex',
+    type: '',
+    category: '',
+    points: 0,
+    date: 'not-a-date',
+    createdAt: '',
+    hardestGrade: '',
+    bountyId: '',
+    bountyTitle: '',
+    note: 'hello',
+  });
+
+  context.tab = () => ({getDataRange: () => ({getValues: () => [headers, ['', '', '', '', ''], ['ok', '2', '2026-07-03', 'Maya', 'extra']]})});
+  const rows = context.rows();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, 'Maya');
+  assert.equal(rows[0].points, 2);
+  assert.equal(rows[0].date, '2026-07-03');
+});
+
+test('readConfig reports malformed settings and participant rows as structured errors', () => {
+  const context = loadSourceScript();
+  const sheets = {
+    Settings: [['key', 'value'], ['challengeStart', '2026-02-30'], ['tripDate', '2026-01-31'], ['groupGoal', '49.5']],
+    Participants: [['name'], ['Alex'], ['alex'], [''], ['This participant name is much too long']],
+  };
+  context.tab = name => ({getDataRange: () => ({getValues: () => sheets[name]})});
+  const result = context.readConfig();
+  assert.equal(result.config, null);
+  assert.deepEqual(Array.from(result.errors, error => ({field: error.field, cell: error.cell, reason: error.reason})), [
+    {field: 'challengeStart', cell: 'Settings!B2', reason: 'must be a real calendar date'},
+    {field: 'groupGoal', cell: 'Settings!B4', reason: 'must be a whole number'},
+    {field: 'crew', cell: 'Participants!A3', reason: 'name must be unique'},
+    {field: 'crew', cell: 'Participants!A5', reason: 'name must be 30 characters or fewer'},
+  ]);
 });
 
 test('v9 setup archives prior activity and benchmark sheets exactly once and rewrites to name-only participants', () => {

@@ -4,6 +4,10 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check:generated": "node scripts/check-generated.mjs",
-    "test": "npm run check:generated && node --test tests/backend-script.test.js tests/client-state.test.js tests/protocol-fixtures.test.js tests/smoke.test.js && node tests/static-check.mjs"
+    "test": "npm run check:generated && node --test tests/backend-script.test.js tests/client-state.test.js tests/protocol-fixtures.test.js tests/smoke.test.js && node tests/static-check.mjs",
+    "test:visual": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }

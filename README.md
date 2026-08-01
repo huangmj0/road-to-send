@@ -39,6 +39,18 @@ Paste the v10 script over the old Apps Script and deploy a new version from **De
 
 Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
 
+### Organizer backup and recovery
+
+The Google Sheet is the shared source of truth. Local browser storage is only a convenience cache and is not a backup of the crew's data.
+
+- **Export before changes:** In Google Sheets, use **File → Download → Microsoft Excel (.xlsx)** to capture the whole workbook. For an additional point-in-time copy that stays in Google Drive, use **File → Make a copy**. Do this before replacing the Apps Script, changing sheet structure, or performing a migration.
+- **Keep the working Sheet recoverable:** Google Sheets version history can restore accidental cell edits or deletions. Use **File → Version history → See version history**, name important pre-upgrade versions, and restore or copy values from the required version. The app's deleted activity rows do not have a separate trash screen, so version history or a workbook copy is the recovery path.
+- **Restore a workbook copy:** Prefer restoring into a new Google Sheet instead of overwriting the damaged one. Confirm that `Settings`, `Participants`, and `Activities` contain the expected data, install the current embedded Apps Script in that Sheet, deploy it as a web app, and test its `/exec` URL before sharing a newly generated crew link. An `.xlsx` export can be imported into a new Sheet with **File → Import**; check dates, tab names, and participant names after import.
+- **Roll back a bad script deployment:** In Apps Script, open **Deploy → Manage deployments**, edit the web-app deployment, and select a previously working version. The `/exec` URL remains unchanged. If the Sheet itself was migrated or damaged, rolling back only the script is not enough; restore a pre-change workbook copy and deploy against that copy instead.
+- **Recover after a partial save:** If the app says **Saved to the Sheet, but refresh failed**, do not submit the activity again. Check the `Activities` tab, then use the Crew sync control. If the row is present, the write succeeded; if it is absent, retry only after connectivity is restored.
+
+Treat both the crew link and the Apps Script `/exec` URL as bearer links: anyone who has one may be able to read shared data or perform the actions the app exposes. When access may have leaked, create a new deployment (and, for stronger isolation, a new Sheet), distribute a new crew link privately, and archive the old deployment in **Deploy → Manage deployments**. Do not put endpoints, exported workbooks, or Sheet contents in source control or public issue reports.
+
 ## API v10
 
 Reads return:
@@ -71,9 +83,10 @@ The editable sources live in `src/`. `npm run build` generates the self-containe
 ```bash
 npm run build
 npm test
+npm run test:visual
 python3 -m http.server 8000
 ```
 
-Open `http://localhost:8000/`. `npm test` verifies the generated artifact, client scoring/state, Apps Script validation and migration, protocol fixtures, shared workflow, accessibility, and required mobile UI hooks.
+Open `http://localhost:8000/`. `npm test` verifies the generated artifact, client scoring/state, Apps Script validation and migration, protocol fixtures, shared workflow, accessibility, and required mobile UI hooks. `npm run test:visual` starts its own local server and compares the You, Record, and Crew tabs against committed Chromium screenshots at 375×812 and 390×844. After installing dependencies on a new machine, run `npx playwright install chromium` once before the visual test. Review intentional UI changes with `npm run test:visual -- --update-snapshots`, inspect every changed baseline, and commit the approved images.
 
 Pushes to `main` are expected to deploy through GitHub Pages. Shared-mode backend changes also require copying and redeploying the embedded Apps Script.

@@ -16,26 +16,26 @@ The interface describes a ten-week challenge, but the data model only has a trip
 
 ## P1 — Improve maintainability and automated coverage
 
-Status: implemented with source generation, shared contracts, smoke coverage, and CI.
+Status: implemented with source generation, shared contracts, behavioral and smoke coverage, mobile visual baselines, and CI. Keep tests and screenshots current as behavior changes.
 
 The application, styles, and embedded Apps Script currently live in one compact HTML file. That makes reviews and behavioral tests unnecessarily difficult.
 
-- Split browser code, styles, and Apps Script source into formatted files while preserving a simple deploy artifact.
-- Define one versioned schema for settings, participants, activities, and error responses.
-- Centralize scoring constants so browser and backend cannot drift.
-- Keep unit coverage for settings validation, duration boundaries, scoring caps, balanced-week bonuses, bounties, benchmarks, malformed rows, and local-calendar date formatting current.
-- Add contract fixtures for current, legacy, malformed, and partial Apps Script responses.
-- Add browser-driven visual regression coverage for the You, Record, and Crew tabs at common mobile widths.
-- Run the static UX checks and future behavioral tests in continuous integration.
+- [x] Split browser code, styles, and Apps Script source into formatted files while preserving a simple deploy artifact.
+- [x] Define one versioned schema for settings, participants, activities, and error responses.
+- [x] Centralize scoring constants so browser and backend cannot drift.
+- [x] Keep behavioral coverage current as scoring and migration rules evolve. Current tests cover scoring caps, challenge boundaries, bounties, malformed remote rows, local-calendar formatting, and key backend write/error paths; broader Sheets integration cases remain useful.
+- [x] Add contract fixtures for current, legacy, malformed, and partial Apps Script responses.
+- [x] Add browser-driven visual regression coverage for the You, Record, and Crew tabs at common mobile widths.
+- [x] Run the static UX and behavioral tests in continuous integration.
 
 ## P2 — Clarify recovery and data ownership
 
-Status: implemented with separated caches, retry-safe messaging, diagnostics, and recovery documentation.
+Status: implemented for the current architecture with separated caches, retry-safe messaging, diagnostics, and an organizer backup/restore runbook. Periodically verify the runbook against Google Sheets and Apps Script UI changes.
 
-- Distinguish “save failed” from “saved, but refresh failed” to prevent duplicate retries.
-- Provide export, backup, and restore instructions for organizers.
-- Keep local demo entries separate from cached shared entries.
-- Show protocol version, last successful sync, and a copyable sanitized error code in diagnostics.
+- [x] Distinguish “save failed” from “saved, but refresh failed” to prevent duplicate retries.
+- [x] Provide export, backup, restore, and deployment rollback instructions for organizers.
+- [x] Keep local demo entries separate from cached shared entries.
+- [x] Show protocol version, last successful sync, and a copyable sanitized error code in diagnostics.
 
 ## P3 — Improve the available bounties
 
