@@ -802,6 +802,23 @@ const domChecks = `(()=>{
   assert.equal(noteFieldsEl.classList.contains('hide'),false,'switching back to climb keeps the note field visible');
   noteInput.value='';
 
+  // Entry 53: the person card gets a weekly-points chart, matching what the You card shows for the
+  // same climber, and falls back to the hint used elsewhere in the card when there is nothing to
+  // chart.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-10),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  logs=[{id:'pt3',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt4',name:'Alex',type:'climb',date:shift(-9),createdAt:'2'}];
+  render();
+  openPersonCard('Alex');
+  const personTrendEl=document.querySelector('#personTrend');
+  assert.equal(personTrendEl.innerHTML,youTrendEl.innerHTML,'the card charts the same weeks the You card shows for that same climber');
+  assert.ok(personTrendEl.innerHTML.indexOf('trend-col')>=0,'and draws at least one week column');
+  logs=[];
+  render();
+  openPersonCard('Bo');
+  assert.ok(document.querySelector('#personTrend').innerHTML.indexOf('class="hint"')>=0,'a climber with nothing logged gets the hint fallback instead of an empty chart');
+  closeModal('personModal');
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 
