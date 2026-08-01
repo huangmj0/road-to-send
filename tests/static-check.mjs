@@ -158,6 +158,13 @@ const hunterCard=html.match(/<article class="card hunter-card">[\s\S]*?<\/articl
 assert.match(hunterCard,/<h2>Titles<\/h2>/,'the Bounty Hunter card is headed Titles');
 assert.match(hunterCard,/<span class="hint">Last 7 days<\/span>/,'the Titles card names its rolling window');
 assert.match(hunterCard,/<div id="bountyHunter"/,'the Bounty Hunter row remains inside the Titles card');
+assert.match(hunterCard,/<div id="crewTitles"[^>]*aria-live="polite"/,'the title tile container is announced inside the Titles card');
+assert.match(html,/\.title-grid\{display:grid;grid-template-columns:repeat\(auto-fit,minmax\(150px,1fr\)\)/,'title tiles use an auto-fit grid that wraps at narrow widths');
+assert.match(html,/\.title-tile\{/,'title tile styles are present');
+assert.match(script,/function categoryDays\(/,'credited category-day counting is a pure helper');
+assert.match(script,/function crewTitles\(/,'the title rows are derived by a pure helper');
+const titlesConstant=script.match(/const TITLE_CATEGORIES=\[.*?\];/)?.[0]||'';
+assert.doesNotMatch(titlesConstant,/🧗|💪|🧘/,'title glyphs do not reuse the activity icons');
 assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
 assert.match(html,/data-panel="crew"[\s\S]*id="goalPace"[\s\S]*?id="goalProjection"[^>]*role="status"[^>]*aria-live="polite"/,'the goal projection line follows the pace line in the crew panel and is announced');
 assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring config');

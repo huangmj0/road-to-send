@@ -119,6 +119,31 @@ const checks = `(()=>{
   const emptyRecent=totalsModel();
   assert.equal(emptyRecent.huntCount,0,'nobody holds the title without a rolling claim');
   assert.deepEqual(emptyRecent.hunters,[],'the empty rolling title has no holders');
+  logs=[
+    {id:'c1',name:'Alex',type:'climb',date:'2026-07-07',createdAt:'1'},
+    {id:'c2',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'2'},
+    {id:'c3',name:'Alex',type:'climb',date:'2026-07-11',createdAt:'3'},
+    {id:'c4',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'4'},
+    {id:'c5',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'5'},
+    {id:'c6',name:'Bob',type:'climb',date:'2026-07-12',createdAt:'1'},
+    {id:'c7',name:'Alex',type:'climb',date:'2026-07-06',createdAt:'1'},
+    {id:'m1',name:'Cara',type:'mobility',date:'2026-07-13',createdAt:'1'},
+  ];
+  assert.equal(categoryDays('alex','climb','2026-07-13'),4,'credited days include the first window day and ignore a duplicate same-day log');
+  assert.equal(categoryDays('bob','climb','2026-07-13'),1,'another person is excluded from a climber title count');
+  assert.equal(categoryDays('nobody','climb','2026-07-13'),0,'unknown names have no credited category days');
+  const titleRows=crewTitles('2026-07-13'),rock=titleRows.find(row=>row.id==='rock-hound'),yogi=titleRows.find(row=>row.id==='yogi');
+  assert.deepEqual(rock.holders,['Alex'],'the top category-day holder alone receives Rock Hound');
+  assert.equal(rock.detail,'4 of last 7 days','the title reports its qualifying figure');
+  assert.deepEqual(yogi.holders,['Cara'],'one credited mobility day wins Yogi without a minimum');
+  logs=[{id:'tie1',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'1'},{id:'tie2',name:'Bob',type:'exercise',date:'2026-07-13',createdAt:'1'}];
+  assert.deepEqual(crewTitles('2026-07-13').find(row=>row.id==='gym-rat').holders,['Alex','Bob'],'tied category leaders share a title');
+  logs=[];
+  assert.ok(crewTitles('2026-07-13').every(row=>row.holders.length===0),'an empty roster leaves every category title unheld');
+  const titlesConfig=config;
+  config=Object.assign({},config,{crew:[]});
+  assert.ok(crewTitles('2026-07-13').every(row=>row.holders.length===0),'an empty configured roster leaves every category title unheld');
+  config=titlesConfig;
   challengeToday=savedToday;
   logs=savedLogs;
 
