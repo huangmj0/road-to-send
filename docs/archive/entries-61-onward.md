@@ -233,3 +233,37 @@ Notes: Commit `Count Bounty Hunter over seven days`. Archived entry 67. index.ht
 Touch `bountyUsed`, `SCORING.weeklyBountyCap`, or anything in `computeCreditsRaw()`'s bounty branch that decides credit (rule 2 — `scoring.json` is the browser/backend contract, and changing it forces an API version bump and an organizer redeploy). **Do not repoint the existing `bounties` field**, and do not "tidy up" by pointing the leaderboard metric or the person card at `recentBounties` here — that is entry 72's job for the leaderboard, and never the person card's. Do not make `#bountyCapHint` or the claimed list say "last 7 days"; they report the cap, which is weekly. Do not rename `#bountyHunter`, and do not change `weekReviewModel()`.
 
 ---
+
+## 70. On Fire and Beast
+
+Status: Done — 2026-08-01
+Notes: Commit `Add On Fire and Beast titles`. Archived entry 69. index.html 157,644 → 156,839 bytes
+(-805, 92.3% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+`#leaderChampions` (built inside `render()`, `src/app.js:105`) already computes both of the standings this crew cares about — `lead('week')` and `lead('total')` — and renders them as an unnamed "🏆 Points · This week · Overall" line above the leaderboard. The figures are right; they just have no names, and they sit in a panel that duplicates what the leaderboard's own ordering already shows. Naming them turns two anonymous numbers into titles and lets the panel retire, which is how this pass adds six titles while leaving the Crew tab simpler than it found it.
+
+### Requirements
+- **Sequencing:** entry 69 lands the tile grid. This entry adds two tiles to it and removes a panel.
+- `src/app.js` — **`totalsModel()` gains a `recent` field on each `sorted` row**: that person's points over `[windowStart(challengeToday()), challengeToday()]`, summed from `dayTotal`. This field has to exist before On Fire can be computed the way the rest of this card is — `sorted` rows currently carry only `name`, `total`, `week`, `bounties` and `bountiesTotal`, none of which is a rolling points figure. Entry 72 consumes the same field rather than deriving it a second time.
+- `src/app.js` — `crewTitles()` gains two standing titles, each read off `totalsModel().sorted` exactly as `lead()` does today (highest value, ties shared, nobody holds it when the top value is `0`) — the same rule entry 69 applies to the category titles, so one rule now governs all six tiles:
+
+  | Title | Glyph | Field | Scope label |
+  |---|---|---|---|
+  | On Fire | 🔥 | `recent` | `LAST 7 DAYS` |
+  | Beast | 👑 | `total` | `ALL CHALLENGE` |
+
+  Each tile's detail line carries the value (`214 pts`), so retiring the panel loses no information.
+- The two scope labels are why entry 69 put the window into the tile design: this card now holds titles on two different windows, and the reader has to be able to tell at a glance.
+- **Retire `#leaderChampions`.** Remove the markup from `src/index.template.html`, the block that builds it in `render()`, and the `.champions`/`.champ-line`/`.champ-who`/`.champ-val` rules from `src/styles.css`. **Keep `.champ-scope`** — entry 69 reuses it for the tile window labels. Its 🎯 Bounties line goes with it: that information is Bounty Hunter, already a tile since entry 68.
+- **Rule 3 carve-out, sanctioned by the maintainer.** This entry deliberately removes a feature, so it retires that feature's assertions: the `#leaderChampions` presence and source-order assertions in `tests/static-check.mjs`, the `.champions`/`.champ-line` CSS assertions, and the champions-content assertions in `tests/client-state.dom.test.js`. Name each one in the commit message. Every other assertion in those files keeps passing untouched, and no assertion for a feature that still exists may be weakened.
+
+### Tests
+- `tests/client-state.state.test.js`: On Fire holders are whoever has most points in the window, ties shared, empty when everyone is at `0`; a bounty claimed in the window counts toward On Fire — the case `dayMeter` would have missed and `dayTotal` exists to catch. Beast matches the top of `totalsModel().sorted`. Someone leading all challenge but quiet for eight days holds Beast and not On Fire; that separation is the point of having both.
+- `tests/client-state.dom.test.js`: both tiles render with holder and value; `#leaderChampions` is gone from the document; the leaderboard's own rows and ordering are unchanged.
+- `tests/static-check.mjs`: `.champ-scope` is still styled and `.champions{`/`.champ-line{` are not; `#leaderChampions` does not appear in the template.
+
+### Do not
+Sum `dayTotal` inside `crewTitles()` — the rolling figure belongs on `totalsModel().sorted` as `recent`, where entry 72 also reads it, and a second derivation is the fork rule 6 forbids. Do not keep a trimmed champions panel "just for the values"; the values live on the tiles now, and leaving both is the duplication this entry exists to remove. Do not remove the leaderboard, its rank column, or its scope toggle — entry 72 handles the toggle. Do not report anyone's distance from a leader.
+
+---

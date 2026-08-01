@@ -685,6 +685,32 @@ const domChecks = `(()=>{
   assert.ok(leaderRows.innerHTML.indexOf('data-person="Alex"')>=0&&leaderRows.innerHTML.indexOf('data-person="Bo"')>=0,'the leaderboard rows remain intact beside the new titles');
   render();
   assert.equal(titleGrid.innerHTML,titleMarkup,'repainting the title grid is idempotent');
+
+  // Entry 71: the rank column and Bounty Hunter mark carry the leaderboard without podium medals.
+  leaderMetric='points';leaderScope='week';
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
+  logs=[
+    {id:'m1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
+    {id:'m2',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'2'},
+    {id:'m3',name:'Bo',type:'exercise',date:'2026-07-13',createdAt:'3'},
+    {id:'m4',name:'Cy',type:'mobility',date:'2026-07-13',createdAt:'4'},
+  ];
+  render();
+  const weeklyMedalFree=leaderRows.innerHTML;
+  assert.equal(weeklyMedalFree.indexOf('🥇'),-1,'the weekly rows contain no gold medal');
+  assert.equal(weeklyMedalFree.indexOf('🥈'),-1,'the weekly rows contain no silver medal');
+  assert.equal(weeklyMedalFree.indexOf('🥉'),-1,'the weekly rows contain no bronze medal');
+  assert.equal(weeklyMedalFree.indexOf('class="medal"'),-1,'the weekly rows emit no medal span');
+  assert.ok(weeklyMedalFree.indexOf('>#1</td>')<weeklyMedalFree.indexOf('>#2</td>')&&weeklyMedalFree.indexOf('>#2</td>')<weeklyMedalFree.indexOf('>#3</td>'),'the weekly rank column remains in order');
+  assert.ok(weeklyMedalFree.indexOf('class="me"')>=0,'the signed-in climber remains highlighted');
+  assert.ok(weeklyMedalFree.indexOf('class="hunter"')>=0,'the Bounty Hunter glyph remains beside its holder');
+  leaderScope='overall';render();
+  const overallMedalFree=leaderRows.innerHTML;
+  assert.equal(overallMedalFree.indexOf('🥇'),-1,'the overall rows contain no gold medal');
+  assert.equal(overallMedalFree.indexOf('🥈'),-1,'the overall rows contain no silver medal');
+  assert.equal(overallMedalFree.indexOf('🥉'),-1,'the overall rows contain no bronze medal');
+  assert.equal(overallMedalFree.indexOf('class="medal"'),-1,'the overall rows emit no medal span');
+  assert.ok(overallMedalFree.indexOf('>#1</td>')<overallMedalFree.indexOf('>#2</td>')&&overallMedalFree.indexOf('>#2</td>')<overallMedalFree.indexOf('>#3</td>'),'the overall rank column remains in order');
   challengeToday=savedChallengeToday;leaderMetric='points';leaderScope='week';
 
   // Entry 48: the Crew feed names a person on every row, and those names open the same card the

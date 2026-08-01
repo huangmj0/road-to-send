@@ -221,6 +221,8 @@ assert.match(html,/id="leaderPointsBtn"[^>]*type="button"[^>]*aria-pressed=/,'th
 assert.match(html,/id="leaderBountyBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Bounties toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderMetricToggle"[^>]*aria-label=/,'the points/bounties metric toggle is a labelled group');
 assert.match(html,/id="leaderScopeToggle"[^>]*aria-label=/,'the weekly/overall scope toggle is a labelled group');
+assert.equal(script.indexOf('podiumMedals'),-1,'the leaderboard no longer builds podium medals');
+assert.equal(html.indexOf('.medal{'),-1,'podium medals no longer have CSS');
 assert.match(html,/data-panel="you"[\s\S]*id="youEmptyState"[\s\S]*id="personalActivity"[\s\S]*data-panel="record"/,'the You onboarding empty state sits in the recent-activity area of the You panel');
 assert.match(html,/id="youEmptyState"[\s\S]*data-tab="record"/,'the empty state offers a button that jumps to the Record tab');
 assert.match(html,/data-panel="crew"[\s\S]*id="crewLocalHint"/,'the crew local-mode hint lives in the Crew panel');
