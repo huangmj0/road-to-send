@@ -718,6 +718,21 @@ const domChecks = `(()=>{
   const recentRows=leaderRows.innerHTML;
   assert.ok(recentRows.indexOf('data-person="Bo"')<recentRows.indexOf('data-person="Alex"'),'the recent scope ranks points inside the last seven days above points eight days old');
 
+  // Entry 87: the leader order answers the selected recent question, while person cards and the
+  // You stat explicitly label their separately-derived all-time position.
+  logs=[
+    {id:'rank-old-1',name:'Bo',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'rank-old-2',name:'Bo',type:'climb',date:'2026-07-03',createdAt:'2'},
+    {id:'rank-recent',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'3'},
+  ];
+  me='Alex';recordingFor='Alex';leaderMetric='points';leaderScope='week';render();
+  assert.ok(leaderRows.innerHTML.indexOf('data-person="Alex"')<leaderRows.innerHTML.indexOf('data-person="Bo"'),'the selected recent metric numbers Alex first');
+  openPersonCard('Alex');
+  assert.ok(personSummaryEl.innerHTML.indexOf('<span>All-time rank</span>')>=0,'the person card labels its all-time rank');
+  assert.ok(personSummaryEl.innerHTML.indexOf('#2 of 2')>=0,'the person card keeps the all-time position');
+  assert.equal(document.querySelector('#youRank').textContent,'#2 of 2','the You stat keeps the all-time position');
+  closeModal('personModal');
+
   // Entry 73: both trend consumers name the same adjacent seven-day comparison, and neither
   // renders an arrow while the earlier window still falls before the challenge.
   challengeToday=()=> '2026-07-15';
