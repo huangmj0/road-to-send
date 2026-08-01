@@ -34,6 +34,7 @@ test('background sync respects the open date picker and refreshes stale caches',
     fireDocumentEvent: type => {const handler = listeners.get(type); if (handler) handler({})},
     countGets: () => gets,
     setPayloadVersion: v => {payload.version = v},
+    setNumericActivity: activity => {payload.activities = [activity]},
     fetch: async (url, options = {}) => {if (!options.method) gets++; return {ok: true, json: async () => JSON.parse(JSON.stringify(payload))}},
     localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
     setTimeout() {}, clearTimeout() {},
@@ -79,6 +80,9 @@ test('background sync respects the open date picker and refreshes stale caches',
     assert.ok(mismatchDetail.indexOf('This build expects v'+expectedVersion)>=0,'the expected version is still named after an unsupported payload');
     assert.equal(document.querySelector('#diagnosticCode').textContent,'RTS-REFRESH-VERSION','the version-mismatch code is still reported');
     setPayloadVersion(11);
+    setNumericActivity({id:'numeric-name',name:7,type:'climb',date:'${dayShift(-1)}',createdAt:'1'});
+    await loadRemote();
+    assert.equal(syncState,'live','a reachable payload with a numeric activity name remains a live sync');
     endpoint='';renderSync();
     const localDetail=document.querySelector('#diagnosticDetail').textContent;
     assert.equal(localDetail.indexOf('Challenge day'),-1,'local mode says nothing about a challenge day');

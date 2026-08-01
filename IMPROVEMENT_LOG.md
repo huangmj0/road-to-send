@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 87 — Make "rank" mean one thing — Done — 2026-08-01
-- 88 — One name key, so one odd Sheet row cannot empty or crash the You tab — Todo
+- 88 — One name key, so one odd Sheet row cannot empty or crash the You tab — Done — 2026-08-01
 - 89 — Collapse the superseded 44px one-offs and the declarations the cascade already discards — Todo
 - 90 — Delete three class attributes that style nothing — Todo
 - 91 — Guard the five live regions entry 83 left unguarded — Todo
@@ -54,38 +53,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 87. Make "rank" mean one thing
-
-Status: Done — 2026-08-01
-Notes: Commit `Clarify all-time rank labels`. Archived entry 86. index.html 156,621 → 156,634 bytes (+13 bytes, 92.1% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-The app shows a person two different ranks, one tap apart, and both are labelled just "rank".
-
-`render()` paints the leaderboard from `rankLeaders(model.sorted,metric)` and numbers the rows `#${i+1}` (`src/app.js:114`) — a rank in the **currently selected metric and scope**, which defaults to Recent (`leaderScope='week'`, `src/app.js:36`). But `#youRank` on the You tab (same line) and `personSummary().rank` (`src/app.js:109`) both use `model.sorted.indexOf(...)`, and `model.sorted` is sorted `b.total-a.total||a.name.localeCompare(b.name)` (`src/app.js:44`) — **all-time points only**.
-
-With a crew of two where Bo has 48 older points and Alex 30 recent ones, the default Crew tab shows Alex at `#1`; tapping that very row opens a card reading `Rank #2 of 2`; the You tab's "Crew rank" stat also reads `#2 of 2`. Nothing on screen explains that these are two different questions. Any crew whose recent order differs from its all-time order hits this, which is most crews after week two.
-
-### Requirements
-- `src/index.template.html` and `src/app.js`, plus tests. Label the two all-time figures for what they already are rather than changing any ranking maths.
-- `src/index.template.html:34`: the `#youRank` stat's `<span>` label becomes "All-time rank".
-- `src/app.js:112`: `renderPersonCard()`'s `cell('Rank',…)` becomes `cell('All-time rank',…)`.
-- Leave the leaderboard alone. Its `<th>Rank</th>` sits inside a table whose runtime `aria-label` already names the active metric and range (`src/app.js:114`), and the `.seg-toggle` pair states the scope on screen.
-- Do not touch `rankLabel()` (`:45`), `rankLeaders()` (`:46`), `model.sorted`'s comparator (`:44`), or `personSummary()`'s rank derivation (`:109`). This entry changes two label strings and nothing else.
-- Keep the stat grid's alignment from entry 84 intact — "All-time rank" is longer than "Crew rank", so verify at 320px that the label does not push the figure out of line or wrap the cell.
-
-### Tests
-- `tests/static-check.mjs`: the `#youRank` stat's visible label reads "All-time rank"; the leaderboard's rank column header is unchanged.
-- `tests/client-state.dom.test.js`: with a crew whose recent order differs from its all-time order, the person card's rank cell is labelled "All-time rank" and still reports the all-time position; the leaderboard's row numbering still follows the selected metric. This pins the two ranks as deliberately different rather than as a bug someone later "fixes" by unifying them.
-
-### Do not
-Do not change how any rank is computed, and do not make the leaderboard and the You tab agree by re-sorting either one — they answer different questions and both answers are wanted. Do not introduce dense ranking for ties; positional ranks with an alphabetical tiebreak are the current behaviour and changing that is a separate entry. Tone rule: do not add a rank-change indicator, a "dropped N places" line, or anything reporting a decline.
-
----
-
 ## 88. One name key, so one odd Sheet row cannot empty or crash the You tab
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Handle irregular Sheet names`. Archived entry 87. index.html 156,634 → 156,624 bytes (-10 bytes, 92.1% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 Every name comparison in the app goes through `nameKey()` — `String(x&&x.name||'').trim().toLowerCase()` (`src/app.js:25`) — except one. `render()` filters the personal feed with `logs.filter(x=>x.name.toLowerCase()===meLower)` (`src/app.js:114`): no trim, no string coercion.

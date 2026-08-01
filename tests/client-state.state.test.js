@@ -27,6 +27,9 @@ const checks = `(()=>{
   assert.equal(activityPoints({type:'mobility'}),1);
   assert.equal(activityPoints({type:'bounty',bountyId:'send-it'}),3);
   assert.equal(activityPoints({type:'bounty',bountyId:'not-real'}),0,'unknown bounty scores zero');
+  const rawNames=sanitizeActivities([{name:' Alex',type:'climb'},{name:7,type:'exercise'}]);
+  assert.equal(rawNames[0].name,' Alex','activity sanitation preserves a leading space in the stored name');
+  assert.equal(rawNames[1].name,7,'activity sanitation preserves a numeric stored name');
 
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
 
