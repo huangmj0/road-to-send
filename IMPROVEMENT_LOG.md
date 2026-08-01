@@ -18,7 +18,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 - 67 — A rolling seven-day window — Todo
 - 68 — Bounty Hunter counts the last seven days — Todo
 - 69 — Three titles for the habits people keep — Todo
-- 70 — On Fire and Apex Beast — Todo
+- 70 — On Fire and Beast — Todo
 - 71 — Retire the podium medals — Todo
 - 72 — Recent, not Weekly — Todo
 - 73 — The trend arrow reads the last seven days — Todo
@@ -302,18 +302,19 @@ Status: Todo
 
 ### Requirements
 - **Sequencing:** entry 67 lands `windowStart()` first. This entry consumes it; if it is missing, implement 67 rather than inlining the date arithmetic.
-- `src/app.js` — `totalsModel()`'s `bounties` field counts that person's `type==='bounty'` logs whose date falls in `[windowStart(challengeToday()), challengeToday()]`, instead of reading `credits.bountyWeekCount` at the week key. Every claim counts, credited or capped, exactly as `bountyWeekCount` does today — this is a window change, not a counting change. `hunters`/`huntCount` and the `maxB>0` guard are untouched, so nobody holds the tag when every count is zero.
+- `src/app.js` — `totalsModel()` gains a **new** row field `recentBounties`: that person's `type==='bounty'` logs whose date falls in `[windowStart(challengeToday()), challengeToday()]`, counting every claim credited or capped, exactly as `bountyWeekCount` does today. `hunters`/`huntCount` are computed from `recentBounties` instead of `bounties`; the `maxB>0` guard is unchanged, so nobody holds the tag when every count is zero.
+- **Leave the existing `bounties` field on calendar weeks — do not repoint it.** It has two other consumers that are still weekly at this point in the pass, and repointing it would publish rolling counts under calendar-week labels the moment this entry merges: the leaderboard's `Bounties` metric, labelled `Weekly` until entry 72, and `personSummary()`, which the person card renders as "N this week". Entry 72 switches the leaderboard metric to `recentBounties` and relabels it in the same commit. The person card's figure **stays weekly on purpose** — the six-point cap it reflects is weekly, so "this week" is the true label there. Entries ship independently, so an intermediate state that lies is a defect, not a rounding error.
 - `src/index.template.html` — the card's `<h2>Bounty Hunter</h2>` becomes `<h2>Titles</h2>` and its `<span class="hint">This week</span>` becomes `Last 7 days`. **Keep `#bountyHunter`** as the first row inside the card; it is asserted in `tests/static-check.mjs`, and renaming ids is churn across the suites for no user-visible benefit. Entries 69 and 70 fill the rest of this card.
 - **The weekly bounty cap stays on calendar weeks.** `SCORING.weeklyBountyCap` lives in the frozen `src/scoring.json` and the cap is real scoring maths — making it rolling would retroactively rescore live crew points (rules 1 and 2). `#bountyCapHint` keeps its "this week" wording and `bountyWeekProgress()` keeps reading `weekKey`. The cap resetting on Monday while the tag rolls is deliberate; the two surfaces must never both say "week".
 - `weekReviewModel()` keeps its own calendar-week hunter (`src/app.js:50`) — it reviews a bounded week and needs a bounded figure.
 
 ### Tests
-- `tests/client-state.state.test.js`: with `challengeToday()` stubbed, a claim exactly seven days old counts toward `bounties` and one eight days old does not; a claim capped to `0` credit still counts, keeping the existing "every completion counts toward Bounty Hunter" guarantee at line 65 true under the new window; two people tied both appear in `hunters`; `huntCount` is `0` and `hunters` empty when nobody has claimed in the window. Every existing assertion in that block keeps passing.
-- `tests/client-state.dom.test.js`: `#bountyHunter` still renders the holder line after a rolling-window claim, and the You tab's `#bountyCapHint` still reports the **calendar-week** figure — assert both in the same test so the deliberate split is pinned, not merely documented.
+- `tests/client-state.state.test.js`: with `challengeToday()` stubbed at `2026-07-13`, a claim dated `2026-07-07` — **six** days old, the first day of the window — counts toward `recentBounties`, and one dated `2026-07-06` does not. Seven days *inclusive* means `today-6` is the earliest date in the window, which is what entry 67 pins; a test written to expect a seven-day-old claim to count would silently specify an **eight**-day window, and every downstream entry in this pass would inherit it. A claim capped to `0` credit still counts, keeping the existing "every completion counts toward Bounty Hunter" guarantee at line 65 true under the new window; two people tied both appear in `hunters`; `huntCount` is `0` and `hunters` empty when nobody has claimed in the window. Assert in the same test that `bounties` still reports the **calendar-week** count for that roster, so the deliberate split between the two fields is pinned rather than merely described. Every existing assertion in that block keeps passing.
+- `tests/client-state.dom.test.js`: `#bountyHunter` renders the holder line from the rolling count, while the You tab's `#bountyCapHint`, the leaderboard's `Bounties` metric and the person card's bounty figure all still report the **calendar-week** number — assert them together, because this entry's whole risk is one field quietly changing meaning for consumers it was not meant to touch.
 - `tests/static-check.mjs`: the card's heading reads `Titles`, its hint reads `Last 7 days`, and `#bountyHunter` still exists inside it.
 
 ### Do not
-Touch `bountyUsed`, `SCORING.weeklyBountyCap`, or anything in `computeCreditsRaw()`'s bounty branch that decides credit (rule 2 — `scoring.json` is the browser/backend contract, and changing it forces an API version bump and an organizer redeploy). Do not make `#bountyCapHint` or the claimed list say "last 7 days"; they report the cap, which is weekly. Do not rename `#bountyHunter`, and do not change `weekReviewModel()`.
+Touch `bountyUsed`, `SCORING.weeklyBountyCap`, or anything in `computeCreditsRaw()`'s bounty branch that decides credit (rule 2 — `scoring.json` is the browser/backend contract, and changing it forces an API version bump and an organizer redeploy). **Do not repoint the existing `bounties` field**, and do not "tidy up" by pointing the leaderboard metric or the person card at `recentBounties` here — that is entry 72's job for the leaderboard, and never the person card's. Do not make `#bountyCapHint` or the claimed list say "last 7 days"; they report the cap, which is weekly. Do not rename `#bountyHunter`, and do not change `weekReviewModel()`.
 
 ---
 
@@ -326,33 +327,31 @@ The app names exactly one thing a person can be: Bounty Hunter. Points reward sh
 
 ### Requirements
 - **Sequencing:** entries 67 and 68 land first — `windowStart()` and the Titles card. This entry adds tiles to that card.
-- **Threshold, not leader.** A title is held by anyone who clears a fixed bar in the window, and several people can hold the same one. A "most days" rule was considered and rejected: with three categories it would hand out three tags every week regardless of what anyone did, and in a quiet week a single mobility log would take a title. A fixed bar means holding one says something specific.
+- **Most days in the window, ties shared.** A title goes to whoever has the most credited days of that category in the last seven days, and everyone tied for the top holds it. Nobody holds it when every count is zero — the same `maxB>0` guard `totalsModel()` already applies to 🏹 (`src/app.js:42`). There is deliberately **no minimum, floor or qualifying bar**: in a quiet week the title still goes to whoever did the most, exactly as Bounty Hunter goes to someone with a single claim. One rule governs all six titles in this card rather than two.
 - `src/app.js` — pure helper `categoryDays(nameLower,type,today)`: count that person's logs of that `type` whose date is inside `[windowStart(today), today]` **and** whose `computeCredits(logs).info` credit is greater than zero. A credited entry *is* a distinct day, because the engine credits only the first log of each category per day (`daySeen`, `src/app.js:28`) — so this counts days without needing a second day-set. It is the same derive-from-`info` pattern `bountyWeekProgress()` uses at `src/app.js:55`.
-- `src/app.js` — pure helper `crewTitles(today)` returning one row per title: `{id,glyph,title,scope,holders,detail}`. The three category titles and their bars live in a module-level constant in `app.js` — **not** `scoring.json` (rule 2); keeping them here is what lets a later entry retune them without an organizer redeploy:
+- `src/app.js` — pure helper `crewTitles(today)` returning one row per title: `{id,glyph,title,scope,holders,detail}`. The three category titles live in a module-level constant in `app.js` — **not** `scoring.json` (rule 2); keeping them here is what lets a later entry adjust them without an organizer redeploy:
 
-  | Title | Glyph | Category | Bar |
-  |---|---|---|---|
-  | Rock Hound | 🪨 | `climb` | 4 of the last 7 days |
-  | Gym Rat | ⚙️ | `exercise` | 4 of the last 7 days |
-  | Yogi | 🌿 | `mobility` | 5 of the last 7 days |
-
-  Mobility's bar is higher deliberately: it is the cheapest thing in the app to log — one point, one tap — so a three-day bar would be close to automatic.
+  | Title | Glyph | Category |
+  |---|---|---|
+  | Rock Hound | 🪨 | `climb` |
+  | Gym Rat | ⚙️ | `exercise` |
+  | Yogi | 🌿 | `mobility` |
 - Glyphs are **not** `CAT_ICONS` (🧗 💪 🧘). Those already mean "logged a climb" throughout the log and bounty cards, and reusing them would read as an activity rather than a title.
 - `src/index.template.html` / `src/styles.css` — the Titles card holds a tile grid: `grid-template-columns:repeat(auto-fit,minmax(150px,1fr))`, which wraps to one column at 320px and needs no media query. Each tile carries the glyph, the title name, the holders (or `—`), and the qualifying figure (`4 of last 7 days`) so the title explains itself. The window label reuses the existing `.champ-scope` treatment — 10px, weight 800, uppercase, `.06em` tracking, `--muted` — because the window is the genuinely confusing part of this feature, and encoding it in the design beats a paragraph of copy. Held tiles take the `--orange-tint`/`--orange-ring` fill already used by `.me-row`; unheld tiles stay flat. Match the stylesheet's compact single-line formatting.
 - Names and figures use `--ink`/`--muted`. The glyph and the tile fill carry identity — never colour the text by standing.
 - The container carries `aria-live="polite"`; decorative glyphs are `aria-hidden="true"` with the title name in text (rule 7).
 
 ### Tests
-- `tests/client-state.state.test.js`: `categoryDays` counts a climb logged on each of four days in the window as `4`; a second climb the same day does not raise the count (it is credited `0`); a log eight days old is excluded; another person's logs are excluded; an unknown name is `0`. `crewTitles()` gives Rock Hound holders at exactly four climb days and none at three; Yogi needs five mobility days and not four; two people over the bar both appear as holders; every title reports empty holders on an empty roster.
+- `tests/client-state.state.test.js`: `categoryDays` counts a climb logged on each of four days in the window as `4`; a second climb the same day does not raise the count (it is credited `0`); another person's logs are excluded; an unknown name is `0`. Take the window boundary from entry 67 rather than re-deriving it: with `today` at `2026-07-13` a log dated `2026-07-07` is the oldest one inside the window and `2026-07-06` is outside — assert both. `crewTitles()` gives Rock Hound to whoever has the most climb days in the window and not to the runner-up; two people tied at the top both hold it; every title reports empty holders on an empty roster and when nobody logged that category in the window. **Assert the no-minimum case explicitly**: one person with a single mobility day and nobody else logging mobility holds Yogi — that is the intended rule, and pinning it stops a later reader from filing it as a bug.
 - `tests/client-state.dom.test.js`: with a crafted roster, the Titles card renders a tile per title, a held tile names its holder and its count, an unheld tile renders `—`, and a repaint is idempotent (`render()` runs often — rule 6). The `#bountyHunter` assertions from entry 68 keep passing.
 - `tests/static-check.mjs`: the tile container exists inside the Titles card with `aria-live="polite"`; the grid rule and the tile classes are styled in CSS; `function categoryDays(` and `function crewTitles(` are present; and none of 🧗 💪 🧘 appears in the titles constant.
 
 ### Do not
-Put the thresholds in `src/scoring.json` (rule 2), award a title to whoever has the most rather than to everyone over the bar, or rank the holders of one title against each other. Do not write copy about a title nobody holds, how far anyone is from a bar, or how many days someone has left — the tone rule forbids the absence framing and aggregating it does not launder it; an unheld tile shows `—` and says nothing. Do not add a localStorage key (rule 4), a media query where `auto-fit` does the work, or a fourth category.
+Add a minimum, a floor or a qualifying bar to any title — a quiet week's holder is the intended behaviour, not a defect, and it is the behaviour 🏹 has always had. Put the titles constant in `src/scoring.json` (rule 2), rank the holders of one title against each other, or break a tie. Do not write copy about a title nobody holds, how far anyone is from the leader, or how many days someone has left — the tone rule forbids the absence framing and aggregating it does not launder it; an unheld tile shows `—` and says nothing. Do not add a localStorage key (rule 4), a media query where `auto-fit` does the work, or a fourth category.
 
 ---
 
-## 70. On Fire and Apex Beast
+## 70. On Fire and Beast
 
 Status: Todo
 
@@ -361,12 +360,13 @@ Status: Todo
 
 ### Requirements
 - **Sequencing:** entry 69 lands the tile grid. This entry adds two tiles to it and removes a panel.
-- `src/app.js` — `crewTitles()` gains two standing titles, computed from `totalsModel().sorted` exactly as `lead()` does today (highest value, ties shared, nobody holds it when the top value is `0`):
+- `src/app.js` — **`totalsModel()` gains a `recent` field on each `sorted` row**: that person's points over `[windowStart(challengeToday()), challengeToday()]`, summed from `dayTotal`. This field has to exist before On Fire can be computed the way the rest of this card is — `sorted` rows currently carry only `name`, `total`, `week`, `bounties` and `bountiesTotal`, none of which is a rolling points figure. Entry 72 consumes the same field rather than deriving it a second time.
+- `src/app.js` — `crewTitles()` gains two standing titles, each read off `totalsModel().sorted` exactly as `lead()` does today (highest value, ties shared, nobody holds it when the top value is `0`) — the same rule entry 69 applies to the category titles, so one rule now governs all six tiles:
 
-  | Title | Glyph | Metric | Scope label |
+  | Title | Glyph | Field | Scope label |
   |---|---|---|---|
-  | On Fire | 🔥 | most points in the last 7 days, summed from `dayTotal` | `LAST 7 DAYS` |
-  | Apex Beast | 👑 | most points all challenge (`totals`) | `ALL CHALLENGE` |
+  | On Fire | 🔥 | `recent` | `LAST 7 DAYS` |
+  | Beast | 👑 | `total` | `ALL CHALLENGE` |
 
   Each tile's detail line carries the value (`214 pts`), so retiring the panel loses no information.
 - The two scope labels are why entry 69 put the window into the tile design: this card now holds titles on two different windows, and the reader has to be able to tell at a glance.
@@ -374,12 +374,12 @@ Status: Todo
 - **Rule 3 carve-out, sanctioned by the maintainer.** This entry deliberately removes a feature, so it retires that feature's assertions: the `#leaderChampions` presence and source-order assertions in `tests/static-check.mjs`, the `.champions`/`.champ-line` CSS assertions, and the champions-content assertions in `tests/client-state.dom.test.js`. Name each one in the commit message. Every other assertion in those files keeps passing untouched, and no assertion for a feature that still exists may be weakened.
 
 ### Tests
-- `tests/client-state.state.test.js`: On Fire holders are whoever has most points in the window, ties shared, empty when everyone is at `0`; a bounty claimed in the window counts toward On Fire — the case `dayMeter` would have missed and `dayTotal` exists to catch. Apex Beast matches the top of `totalsModel().sorted`. Someone leading all challenge but quiet for eight days holds Apex Beast and not On Fire; that separation is the point of having both.
+- `tests/client-state.state.test.js`: On Fire holders are whoever has most points in the window, ties shared, empty when everyone is at `0`; a bounty claimed in the window counts toward On Fire — the case `dayMeter` would have missed and `dayTotal` exists to catch. Beast matches the top of `totalsModel().sorted`. Someone leading all challenge but quiet for eight days holds Beast and not On Fire; that separation is the point of having both.
 - `tests/client-state.dom.test.js`: both tiles render with holder and value; `#leaderChampions` is gone from the document; the leaderboard's own rows and ordering are unchanged.
 - `tests/static-check.mjs`: `.champ-scope` is still styled and `.champions{`/`.champ-line{` are not; `#leaderChampions` does not appear in the template.
 
 ### Do not
-Re-derive either standing — consume `totalsModel().sorted` (rule 6). Do not keep a trimmed champions panel "just for the values"; the values live on the tiles now, and leaving both is the duplication this entry exists to remove. Do not remove the leaderboard, its rank column, or its scope toggle — entry 72 handles the toggle. Do not report anyone's distance from a leader.
+Sum `dayTotal` inside `crewTitles()` — the rolling figure belongs on `totalsModel().sorted` as `recent`, where entry 72 also reads it, and a second derivation is the fork rule 6 forbids. Do not keep a trimmed champions panel "just for the values"; the values live on the tiles now, and leaving both is the duplication this entry exists to remove. Do not remove the leaderboard, its rank column, or its scope toggle — entry 72 handles the toggle. Do not report anyone's distance from a leader.
 
 ---
 
@@ -388,7 +388,7 @@ Re-derive either standing — consume `totalsModel().sorted` (rule 6). Do not ke
 Status: Todo
 
 ### Why
-`podiumMedals()` (`src/app.js:44`) puts 🥇🥈🥉 beside names in the leaderboard, dense-ranked on whichever metric the toggle is showing. That is a third encoding of an ordering the table already states twice — the rows are sorted, and each carries its numeric rank, which is the unambiguous version of the same fact and does not stop at three. With 👑 Apex Beast and 🔥 On Fire naming the top of both scopes as of entry 70, the medals are the redundant one, and a row that can carry 🥇 plus a title glyph plus the 🏹 span is exactly the clutter this pass set out to reduce.
+`podiumMedals()` (`src/app.js:44`) puts 🥇🥈🥉 beside names in the leaderboard, dense-ranked on whichever metric the toggle is showing. That is a third encoding of an ordering the table already states twice — the rows are sorted, and each carries its numeric rank, which is the unambiguous version of the same fact and does not stop at three. With 👑 Beast and 🔥 On Fire naming the top of both scopes as of entry 70, the medals are the redundant one, and a row that can carry 🥇 plus a title glyph plus the 🏹 span is exactly the clutter this pass set out to reduce.
 
 ### Requirements
 - **Sequencing:** entry 70 lands first. Removing the medals before the titles exist would briefly leave the top of the leaderboard unmarked.
@@ -414,8 +414,9 @@ Status: Todo
 The leaderboard's scope toggle reads `Weekly` / `Overall`, and after entry 68 the word is wrong: the card above it reports the last seven days while this button still scopes to a calendar week. Two controls on one screen using "week" for two different spans is worse than either span on its own.
 
 ### Requirements
-- **Sequencing:** entry 67 lands `windowStart()` and `dayTotal`.
-- `src/app.js` — the toggle's recent scope sums each person's `dayTotal` across `[windowStart(challengeToday()), challengeToday()]` instead of reading `weeks` at the current week key. Ordering, ties and the metric toggle (`Points`/`Bounties`) are unchanged.
+- **Sequencing:** entries 68 and 70 land first. They add the two rolling fields this entry consumes — `recentBounties` and `recent` — and this is the commit where the leaderboard starts reading them.
+- `src/app.js` — the toggle's recent scope reads `recent` for the `Points` metric and `recentBounties` for the `Bounties` metric, instead of `week` and `bounties`. Both fields already exist on `totalsModel().sorted`; derive neither a second time (rule 6). Ordering, ties and the metric toggle itself are unchanged.
+- This is the commit that makes the leaderboard's label and its data agree again. Entry 68 deliberately left `bounties` weekly so this pair would move together — relabelling without repointing, or repointing without relabelling, reintroduces exactly the mismatch entry 68 avoided.
 - `src/index.template.html` — the button label becomes `Recent`. `.leader-toggles` puts **four** buttons on one row at 320px, so "Last 7 days" does not fit; `Recent` is the same width as `Weekly` and opposes `Overall` cleanly. Where there is room — the card hint and the tile scope labels — the span is spelled out in full.
 - **`#leaderWeekBtn` keeps its id**, as do `#weeklyTrend` and `#weeklyTrendCard`. They are asserted in `tests/static-check.mjs`; renaming ids is churn across the suites for no user-visible benefit. Labels change, ids stay.
 - The toggle's `aria-label="Time range"` group stays; the button's `aria-pressed` behaviour is unchanged.
@@ -444,7 +445,8 @@ Status: Todo
 - Pure, no DOM, no `new Date()` (rule 6).
 
 ### Tests
-- `tests/client-state.state.test.js`: equal points in both windows is `'even'`; more recent is `'up'`; fewer is `'down'`; a day exactly 14 days old falls in the earlier window while 15 days old falls outside both; the guard returns `null` when the earlier window predates `config.startDate`. A bounty claimed in the recent window moves the arrow — the case `dayMeter` would have missed.
+- `tests/client-state.state.test.js`: equal points in both windows is `'even'`; more recent is `'up'`; fewer is `'down'`; the guard returns `null` when the earlier window predates `config.startDate`. A bounty claimed in the recent window moves the arrow — the case `dayMeter` would have missed.
+- **Boundary arithmetic, stated once so it is not re-derived wrongly.** `windowStart(today,14)` is `today-13`, so the two windows are `[today-6, today]` and `[today-13, today-7]` — seven days each, adjacent, non-overlapping. Assert that a day **13** days old falls in the earlier window and a day **14** days old falls outside both. A test that expects a 14-day-old day to count would force the earlier window to eight days and break the symmetry the comparison depends on.
 - `tests/client-state.dom.test.js`: the existing person-card and You-panel trend assertions keep passing with the new wording.
 
 ### Do not
