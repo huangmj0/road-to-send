@@ -671,10 +671,17 @@ const domChecks = `(()=>{
   assert.ok(hunterLine.innerHTML.indexOf('Alex')>=0&&hunterLine.innerHTML.indexOf('4 bounties claimed')>=0,'the title line reads the rolling count');
   assert.ok(capHint.textContent.indexOf('3 / '+SCORING.weeklyBountyCap+' bounty points this week')>=0,'the cap hint keeps its calendar-week credit');
   const alexRow=rollingRows.innerHTML.slice(rollingRows.innerHTML.indexOf('data-person="Alex"'));
-  assert.ok(alexRow.indexOf('<strong>1</strong>')>=0,'the weekly Bounties leaderboard remains on its calendar-week field');
+  assert.ok(alexRow.indexOf('<strong>4</strong>')>=0,'the recent Bounties leaderboard reads its rolling field');
   openPersonCard('Alex');
   assert.ok(personSummaryEl.innerHTML.indexOf('1 this week')>=0,'the person card bounty figure remains weekly');
   closeModal('personModal');
+  logs=[
+    {id:'recent-old',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
+    {id:'recent-new',name:'Bo',type:'climb',date:'2026-07-13',createdAt:'2'},
+  ];
+  leaderMetric='points';leaderScope='week';render();
+  const recentRows=leaderRows.innerHTML;
+  assert.ok(recentRows.indexOf('data-person="Bo"')<recentRows.indexOf('data-person="Alex"'),'the recent scope ranks points inside the last seven days above points eight days old');
   logs=[{id:'title1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},{id:'title2',name:'Bo',type:'exercise',date:'2026-07-13',createdAt:'1'}];
   render();
   const titleGrid=document.querySelector('#crewTitles'),titleMarkup=titleGrid.innerHTML;

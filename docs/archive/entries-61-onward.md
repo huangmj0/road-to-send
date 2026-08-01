@@ -207,6 +207,31 @@ The three bounty rows on the You card are one-tap claim buttons and look identic
 Disable, hide, grey out or reorder a claimed row — the crew can claim a bounty twice and this entry does not change that. Do not add a "2 of 3 claimed" counter, a per-day cap figure, or anything naming a bounty the user has **not** claimed; the tone rule forbids the absence framing, and an aggregate of it is the same nudge. Do not touch `#bountyCapHint`, `claimedBounties()` or the weekly cap maths in `computeCreditsRaw()` (rule 6).
 
 ---
+## 71. Retire the podium medals
+
+Status: Done — 2026-08-01
+Notes: Commit `Retire podium medals`. Archived entry 70. index.html 156,839 → 156,196 bytes
+(-643, 91.9% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+`podiumMedals()` (`src/app.js:44`) puts 🥇🥈🥉 beside names in the leaderboard, dense-ranked on whichever metric the toggle is showing. That is a third encoding of an ordering the table already states twice — the rows are sorted, and each carries its numeric rank, which is the unambiguous version of the same fact and does not stop at three. With 👑 Beast and 🔥 On Fire naming the top of both scopes as of entry 70, the medals are the redundant one, and a row that can carry 🥇 plus a title glyph plus the 🏹 span is exactly the clutter this pass set out to reduce.
+
+### Requirements
+- **Sequencing:** entry 70 lands first. Removing the medals before the titles exist would briefly leave the top of the leaderboard unmarked.
+- `src/app.js` — remove `podiumMedals()` and the `.medal` spans from the leaderboard row markup. The rows keep their sort order, their numeric rank column and the `.me-row` highlight.
+- `src/styles.css` — remove the `.medal` rule.
+- The 🏹 span beside names stays. It marks a title, not a rank, and it is the one per-row glyph that survives.
+- **Rule 3 carve-out, sanctioned by the maintainer.** This entry deliberately removes a feature and retires its assertions: the `podiumMedals()` unit assertions in `tests/client-state.state.test.js` (including the dense-ranking and tie cases), the medal-in-row assertions in `tests/client-state.dom.test.js`, and the `.medal{` CSS assertion in `tests/static-check.mjs`. Name each in the commit message. Assertions about row order, rank text, the 🏹 span and `.me-row` are **not** covered by this carve-out and must keep passing.
+
+### Tests
+- `tests/client-state.dom.test.js`: rendered leaderboard rows contain no 🥇, 🥈 or 🥉 and no `class="medal"`, on both toggle scopes; the rank column still reads `#1`, `#2`, `#3` in order; the 🏹 span still renders beside its holder; `.me-row` still marks the signed-in climber.
+- `tests/static-check.mjs`: `podiumMedals` does not appear in the built script and `.medal{` is not styled — the removal is asserted, not merely performed.
+
+### Do not
+Remove the rank column, the row ordering, the 🏹 span, `.me-row`, or the scope toggle. Do not replace the medals with a different per-row glyph — the point is fewer marks in the row, not different ones. Do not touch `totalsModel().sorted`, which the whole leaderboard reads (rule 6).
+
+---
+
 ## 68. Bounty Hunter counts the last seven days
 
 Status: Done — 2026-08-01
