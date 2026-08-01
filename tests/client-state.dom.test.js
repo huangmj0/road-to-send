@@ -366,6 +366,10 @@ const domChecks = `(()=>{
   assert.equal(youTrendCard.classList.contains('hide'),false,'logging something leaves the card open');
   const youCurve=youTrendEl.innerHTML;
   assert.ok(youCurve.indexOf('trend-line')>=0&&youCurve.indexOf('<title>')>=0,'the SVG keeps a line and per-point hover affordance');
+  const curveSvg=youCurve.slice(0,youCurve.indexOf('</svg>')+6);
+  assert.ok(youCurve.indexOf('<div class="trend-labels">')>curveSvg.length-1,'the value labels sit outside the stretched SVG');
+  assert.equal(curveSvg.indexOf('<text'),-1,'the SVG contains no distortable text marks');
+  assert.equal((curveSvg.match(/<title>/g)||[]).length,personalWeeklyTrend('alex',challengeToday()).length,'each curve day keeps one hover title');
   assert.ok(youTrendCap.textContent.indexOf('Peak ')===0,'and trendCaption writes the caption underneath it');
   render();
   assert.equal(youTrendEl.innerHTML,youCurve,'a repaint redraws the same curve instead of appending marks');
@@ -377,7 +381,6 @@ const domChecks = `(()=>{
   render();
   assert.equal(youTrendCard.classList.contains('hide'),false,'switching to a climber with nothing logged keeps the zero curve available');
   assert.ok(youTrendEl.innerHTML.indexOf('Current 0')>=0,'and the visible current label reads zero');
-
   // Entry 18: the today card carries the personal countdown and the person share of the crew pace.
   me='Alex';recordingFor='Alex';endpoint='';
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
