@@ -215,12 +215,14 @@ assert.equal((script.match(/Grade pyramid: /g)||[]).length,1,'the pyramid label 
 assert.match(html,/id="personPyramid"[^>]*><\/div><h3 class="person-head">Recent activity<\/h3><div id="personRecent" class="records"><\/div><\/div><\/div>/,'the person card recent-activity section is the last one in the dialog, right after the grade pyramid');
 const personCardSource=script.split('\n').find(line=>line.startsWith('function renderPersonCard('))||'';
 assert.equal(personCardSource.indexOf('activityMarkup('),-1,'renderPersonCard renders recent activity without reusing the dead-button activityMarkup() helper');
-assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Weekly toggle is a real button with aria-pressed');
+assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=[^>]*>Recent<\/button>/,'the Recent toggle keeps its id and is a real button with aria-pressed');
+assert.doesNotMatch(html,/>Weekly</,'the leaderboard template no longer labels its recent scope Weekly');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderPointsBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Points toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderBountyBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Bounties toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderMetricToggle"[^>]*aria-label=/,'the points/bounties metric toggle is a labelled group');
 assert.match(html,/id="leaderScopeToggle"[^>]*aria-label=/,'the weekly/overall scope toggle is a labelled group');
+assert.match(html,/\.leader-toggles\{display:flex;flex-wrap:nowrap/,'the four leaderboard buttons stay on one row');
 assert.equal(script.indexOf('podiumMedals'),-1,'the leaderboard no longer builds podium medals');
 assert.equal(html.indexOf('.medal{'),-1,'podium medals no longer have CSS');
 assert.match(html,/data-panel="you"[\s\S]*id="youEmptyState"[\s\S]*id="personalActivity"[\s\S]*data-panel="record"/,'the You onboarding empty state sits in the recent-activity area of the You panel');
