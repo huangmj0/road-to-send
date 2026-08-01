@@ -61,6 +61,7 @@ assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyr
 assert.ok((script.match(/Saving…/g)||[]).length>=3,'the preview reports an in-flight save, on top of the two button labels');
 assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption');
 assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
+assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.page-head h1\{overflow-wrap:anywhere\}/,'the page head wraps long names while keeping its actions reachable');
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
 const heatmapCard=html.match(/<article id="heatmapCard"[\s\S]*?<\/article>/)?.[0]||'';
 const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?.[0]||'';
