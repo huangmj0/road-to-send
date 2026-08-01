@@ -154,6 +154,10 @@ assert.match(script,/function claimBounty\(/,'a claim handler exists so bounty r
 assert.match(script,/<button class="bounty" type="button"[^>]*data-claim-bounty=[^>]*aria-label="Claim /,'bounty rows render as labelled one-tap claim buttons');
 assert.match(script,/function claimedTodayIds\(/,'a pure helper identifies bounties claimed today');
 assert.match(html,/id="bountyHunter"/,'the Bounty Hunter slot is present');
+const hunterCard=html.match(/<article class="card hunter-card">[\s\S]*?<\/article>/)?.[0]||'';
+assert.match(hunterCard,/<h2>Titles<\/h2>/,'the Bounty Hunter card is headed Titles');
+assert.match(hunterCard,/<span class="hint">Last 7 days<\/span>/,'the Titles card names its rolling window');
+assert.match(hunterCard,/<div id="bountyHunter"/,'the Bounty Hunter row remains inside the Titles card');
 assert.match(html,/id="goalPace"[^>]*role="status"[^>]*aria-live="polite"/,'the goal pace indicator is announced');
 assert.match(html,/data-panel="crew"[\s\S]*id="goalPace"[\s\S]*?id="goalProjection"[^>]*role="status"[^>]*aria-live="polite"/,'the goal projection line follows the pace line in the crew panel and is announced');
 assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring config');

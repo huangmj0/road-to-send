@@ -91,6 +91,37 @@ const checks = `(()=>{
   assert.equal(tmBob.bountiesTotal,1,'each climber gets their own all-time bounty count');
   logs=savedLogs;
 
+  // Entry 68: Bounty Hunter is a trailing seven-day title, while its existing consumers retain
+  // their calendar-week counts. Capped claims still compete for the title.
+  const savedToday=challengeToday;
+  challengeToday=()=> '2026-07-13';
+  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bob'},{name:'Cara'}]};
+  logs=[
+    {id:'r0',name:'Cara',type:'bounty',bountyId:'send-it',date:'2026-07-06',createdAt:'1'},
+    {id:'a1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'1'},
+    {id:'a2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-07',createdAt:'2'},
+    {id:'a3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-07',createdAt:'3'},
+    {id:'a4',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'4'},
+    {id:'b1',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'1'},
+    {id:'b2',name:'Bob',type:'bounty',bountyId:'outdoor-send',date:'2026-07-07',createdAt:'2'},
+    {id:'b3',name:'Bob',type:'bounty',bountyId:'century-club',date:'2026-07-07',createdAt:'3'},
+    {id:'b4',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'4'},
+  ];
+  const recentModel=totalsModel(),recentAlex=recentModel.sorted.find(r=>r.name==='Alex'),recentBob=recentModel.sorted.find(r=>r.name==='Bob'),recentCara=recentModel.sorted.find(r=>r.name==='Cara');
+  assert.equal(recentAlex.recentBounties,4,'the six-day-old first window day counts');
+  assert.equal(recentBob.recentBounties,4,'ties retain every holder');
+  assert.equal(recentCara.recentBounties,0,'the seven-day-old claim is outside the inclusive window');
+  assert.equal(computeCredits(logs).info.get('a3').credit,0,'a capped claim still enters the rolling title count');
+  assert.deepEqual(recentModel.hunters,['Alex','Bob'],'rolling leaders share Bounty Hunter');
+  assert.equal(recentModel.huntCount,4,'the title count is the rolling claim count');
+  assert.equal(recentAlex.bounties,1,'the existing bounty field remains a calendar-week count');
+  logs=[];
+  const emptyRecent=totalsModel();
+  assert.equal(emptyRecent.huntCount,0,'nobody holds the title without a rolling claim');
+  assert.deepEqual(emptyRecent.hunters,[],'the empty rolling title has no holders');
+  challengeToday=savedToday;
+  logs=savedLogs;
+
   assert.equal(computeCredits([{id:'before',name:'Alex',type:'climb',date:'2026-06-30'}]).info.get('before').reason,'outside challenge');
 
   // categoryBreakdown sums CREDITED points per type from computeCredits().info, with the balanced-day bonus as its own row.
