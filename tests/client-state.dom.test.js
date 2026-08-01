@@ -1034,6 +1034,28 @@ const domChecks = `(()=>{
   assert.ok(wideFeed.indexOf('class="pts"')>=0&&wideFeed.indexOf('class="del"')>=0,'a long unbroken note still renders points and delete controls');
   assert.ok(wideFeed.indexOf('class="pts"')<wideFeed.indexOf('class="del"'),'the points cell remains before the delete control in the same emitted row');
 
+  // Entry 83: changing only a note does not rewrite the unchanged point preview, and a repaint
+  // does not rewrite unchanged sync diagnostics inside their polite live region.
+  me='Alex';recordingFor='Alex';endpoint='';syncState='local';syncDetail='';syncErrorCode='';lastSyncedAt=0;challengeTimeZone='';logs=[];
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  typeRadio.value='climb';
+  dateBox.classList.add('hide');
+  updateRecordPreview();
+  let creditWrites=0,creditText=creditEl.textContent;
+  Object.defineProperty(creditEl,'textContent',{configurable:true,get(){return creditText},set(value){creditWrites++;creditText=value}});
+  document.querySelector('#activityNote').value='Different note, same points';
+  updateRecordPreview();
+  assert.equal(creditWrites,0,'changing only a note leaves the credit preview text node untouched');
+  endpoint='https://example.test/exec';syncState='error';syncDetail='Could not reach the Sheet';syncErrorCode='RTS-NETWORK';protocolVersion=11;
+  render();
+  const detailEl=document.querySelector('#diagnosticDetail'),codeEl=document.querySelector('#diagnosticCode');
+  let detailWrites=0,detailText=detailEl.textContent,codeWrites=0,codeText=codeEl.textContent;
+  Object.defineProperty(detailEl,'textContent',{configurable:true,get(){return detailText},set(value){detailWrites++;detailText=value}});
+  Object.defineProperty(codeEl,'textContent',{configurable:true,get(){return codeText},set(value){codeWrites++;codeText=value}});
+  render();
+  assert.equal(detailWrites,0,'an unchanged repaint leaves diagnostic detail text node untouched');
+  assert.equal(codeWrites,0,'an unchanged repaint leaves diagnostic code text node untouched');
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 

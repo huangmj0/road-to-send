@@ -268,4 +268,9 @@ assert.match(stylesheet,/\.activity>div\{min-width:0;overflow-wrap:anywhere\}/,'
 assert.match(stylesheet,/@media\(max-width:430px\)\{\.activity\{grid-template-columns:38px minmax\(0,1fr\) auto auto\}\}/,'phone feed rows retain the shrinkable note track');
 assert.match(stylesheet,/\.dialog h2\{min-width:0;overflow-wrap:anywhere\}/,'dialog headings can shrink and break long names');
 assert.match(stylesheet,/\.setup-copy pre\{overflow-wrap:anywhere\}/,'setup code breaks an unspaced run without losing its scroll container');
+// Entry 83: polite status regions keep their semantics but only receive changed text, and the
+// person-card wrapper does not duplicate the chart SVG's accessible name.
+assert.match(html,/class="preview"[^>]+role="status"[^>]+aria-live="polite"/,'record preview remains a polite live region');
+assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'sync diagnostics remain a polite live region');
+assert.doesNotMatch(personCardSource,/trendEl\.setAttribute\('aria-label'/,'the role-less person trend wrapper receives no dead aria-label');
 console.log('Road to Send static accessibility and UX checks passed.');

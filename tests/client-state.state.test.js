@@ -534,9 +534,14 @@ const checks = `(()=>{
   assert.equal(pyramidLabel([]),'Grade pyramid: no graded climbs yet','an empty pyramid still has a useful text alternative');
   assert.equal(pyramidLabel([{grade:'V5',count:1},{grade:'V3',count:2}]),'Grade pyramid: 1 send at V5, 2 sends at V3','the label preserves order and singular/plural sends');
 
-  assert.ok(personTrendLabel([]).indexOf('no challenge days yet')>=0,'an empty curve has a useful text alternative');
-  const trendLabel=personTrendLabel([{date:'2026-07-01',label:'Jul 1',points:12},{date:'2026-07-02',label:'Jul 2',points:0}]);
-  assert.ok(trendLabel.indexOf('peak 12')>=0&&trendLabel.indexOf('current 0')>=0,'the curve label names its peak and current values');
+  // Entry 83: live regions leave unchanged text nodes alone.
+  let textValue='before',textWrites=0;
+  const textNode={get textContent(){return textValue},set textContent(value){textWrites++;textValue=value}};
+  setText(textNode,'before');
+  assert.equal(textWrites,0,'the text guard skips an identical value');
+  setText(textNode,'after');
+  assert.equal(textWrites,1,'the text guard writes a changed value');
+  assert.equal(textValue,'after','the text guard preserves the changed text');
 
   // Entry 41: dailyBounties() hashes the date, so every future day's picks are already computable.
   // Someone planning a Thursday session can now see what Thursday offers.

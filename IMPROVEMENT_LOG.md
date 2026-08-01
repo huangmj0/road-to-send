@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 82 — Stop three remaining surfaces pushing past their card — Done — 2026-08-01
-- 83 — Stop announcing what did not change, and put the chart label where ARIA reads it — Todo
+- 83 — Stop announcing what did not change, and put the chart label where ARIA reads it — Done — 2026-08-01
 - 84 — Line up the numbers and close the double gap in the stat grid — Todo
 - 85 — Give the Bounty Hunter marker visible text and the small controls a 44px target — Todo
 
@@ -47,38 +46,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 82. Stop three remaining surfaces pushing past their card
-
-Status: Done — 2026-08-01
-Notes: Commit `Stop card overflow`. Archived entry 81. index.html 155,931 → 156,217 bytes (+286, 91.9% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Three more places let content run past the edge it is supposed to sit inside, each with a different cause and each measured.
-
-- **The You feed rows.** `.activity{display:grid;grid-template-columns:40px 1fr auto auto;…}` (`src/styles.css:3`, and `38px 1fr auto auto` at `:8`) — a `1fr` track keeps its min-content minimum, so a long note or grade string pushes the row wider than the card. At 320px the row is 288px inside 264px of card and the 44px delete button ends up **7px outside the card's own border**. The idiom that fixes it is already in this stylesheet: `.heatmap{grid-template-columns:repeat(7,minmax(0,1fr));…}` (`:15`).
-- **The Week in Review modal.** `#weekReviewTitle` has a min-content width of 266px inside a 242px `.dialog-head` at 320px. `openModal()` (`src/app.js:118`) focuses the close button, the browser scrolls it into view, and the dialog settles at **`scrollLeft = 45`** — so every line in the modal loses its first ~45px and it opens reading "lexandra / eatherstonehaugh's / eek in review". The threshold is roughly a 14-character name word; a short name opens at `scrollLeft 0`. This modal opens on first visit each week, so it is the first thing some of the crew see.
-- **The shared-setup script block.** `#scriptCode` has a `scrollWidth` of 2095px inside 242px. `.setup-copy pre{white-space:pre-wrap;…}` (`:3`) cannot break a 501-character run with no whitespace in it, so `pre-wrap` has nothing to break on.
-
-### Requirements
-- `src/styles.css` only. No template change, no JS change.
-- `.activity` (`:3` and the `:8` phone override): `1fr` → `minmax(0,1fr)` in both, matching `.heatmap` (`:15`). Verify the delete button lands inside the card border at 320px.
-- `.dialog h2` (`:3`, `font:800 32px 'Roboto Condensed';color:var(--green);margin:0`): add `min-width:0` so the flex item can shrink below its min-content, and `overflow-wrap:anywhere` so the long word actually breaks. Success criterion: `#weekReviewModal`'s dialog opens at `scrollLeft === 0` at 320px with the crew's longest name.
-- `.setup-copy pre` (`:3`): add `overflow-wrap:anywhere`. Keep `white-space:pre-wrap` and keep the `overflow:auto` scroll — the block is a code snippet an organizer copies, so it must stay selectable and complete.
-- **Sequencing:** entry 76 changes `.dialog h2`'s font stack to `var(--head)`. Both entries edit that declaration. If 76 has landed, edit around it and do not revert it; if it has not, leave the font component exactly as you find it.
-- Append at the end of `src/styles.css`; do not reformat existing lines.
-
-### Tests
-- `tests/static-check.mjs`: `.activity` uses `minmax(0,1fr)` in both the base rule and the `max-width:430px` override; `.dialog h2` carries `min-width:0`; `.setup-copy pre` carries `overflow-wrap:anywhere`. Assert the exact compact text.
-- `tests/client-state.dom.test.js`: a feed entry with a very long unbroken note still renders its `.del` button and its `.pts` cell in the same row.
-
-### Do not
-Do not truncate, ellipsise or clip the note text, the setup script or anybody's name — all three are content the user needs whole. Do not remove `overflow:auto` from `#scriptCode`; an organizer copies that block. Do not shrink the modal heading's font size to make it fit; breaking is the fix, not shrinking. Do not change what `openModal()` focuses — `tests/client-state.dom.test.js` covers entry 37's focus behaviour and it is correct. Tone rule: this entry changes layout only; the Week in Review modal is the one thing in the app that opens on its own and it is grandfathered — do not give anything else that behaviour, and do not add copy to any of these three surfaces.
-
----
-
 ## 83. Stop announcing what did not change, and put the chart label where ARIA reads it
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Guard repeated live announcements`. Archived entry 82. index.html 156,217 → 156,103 bytes (-114, 91.8% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 Two `aria-live` regions speak far more than they should, and one accessible name is set where ARIA discards it.
