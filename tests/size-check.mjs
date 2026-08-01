@@ -26,7 +26,14 @@ import { readFileSync } from 'node:fs';
 // nearest analogues in the archive cost between +13 and +1,515 bytes each, so
 // ~12,900 bytes of headroom covers the pass with room for the worst case. As before,
 // the next budget entry re-measures rather than assuming.
-const BUDGET = 165000;
+//
+// Re-baselined 165000 -> 170000 by log entry 66: measured 154670 bytes on main
+// after entries 58–65. Entries 67–74 add the rolling-window helper and credit map,
+// title tiles and their CSS, a comparison update, and an SVG trend; labels change
+// in entries 68 and 72, while entries 70 and 71 remove the champions panel and
+// podium markup, CSS and JS. The 5330 bytes of headroom covers that net pass shape;
+// the next budget entry re-measures rather than assuming.
+const BUDGET = 170000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
