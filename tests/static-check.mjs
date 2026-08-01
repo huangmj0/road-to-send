@@ -126,6 +126,8 @@ assert.match(html,/id="bountyWeek"[\s\S]*id="claimedToggle"[\s\S]*id="claimedLis
 assert.match(html,/#bountyWeekToggle,#claimedToggle\{min-height:44px\}/,'the claimed toggle reuses the 44px touch target');
 assert.match(script,/function claimedBounties\(/,'a pure helper lists the claims');
 assert.match(script,/function claimedCaption\(/,'a pure helper builds the claimed-list caption');
+assert.match(script,/function claimedRow\(/,'a pure helper owns claimed-bounty row markup');
+assert.equal((script.match(/class="bounty-peek"/g)||[]).length,2,'renderBountyWeek and claimedRow are the two owners of bounty-peek markup');
 assert.match(script,/function renderClaimed\(/,'a render function owns the claimed list');
 assert.match(script,/function shareProgress\(/,'the Share button goes through the system share sheet first');
 assert.match(script,/function writeStore\(/,'the shared storage helper exists');
@@ -179,6 +181,7 @@ assert.match(script,/function personalWeeklyTrend\(/,'a pure helper restricts th
 assert.match(script,/function trendColumns\(/,'both trend charts draw their bars from one markup helper');
 // Entry 53: the person card gets the same weekly trend chart, sitting between the personal
 // records and the grade pyramid.
+assert.match(html,/id="personBreakdown"[\s\S]*id="personClaimed"[\s\S]*id="personClaimedSummary"[\s\S]*id="personRecords"/,'the person card claimed-bounty section sits between the breakdown and records');
 assert.match(html,/id="personRecords"[\s\S]*id="personTrend"[\s\S]*id="personPyramid"/,'the person card weekly trend chart falls between personal records and the grade pyramid');
 assert.match(html,/id="personTrend"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the person card weekly trend chart is announced as a graphic with a non-empty label');
 assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="personTrend"/,'the person card trend chart sits inside the scrollable trend wrapper');

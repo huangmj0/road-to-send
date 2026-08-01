@@ -673,6 +673,35 @@ const domChecks = `(()=>{
   assert.ok(youPy.innerHTML.length>0,'the You pyramid has rows to compare');
   assert.equal(youPy.innerHTML,personPy.innerHTML,'the pyramid rows match too');
 
+  // Entry 59: a card lists only the bounty claims belonging to the climber the viewer opened.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;claimedOpen=false;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Maya'}]};
+  const alexBounty=dailyBounties(challengeToday())[0],boBounty=dailyBounties(challengeToday())[1];
+  logs=[{id:'b1',name:'Alex',type:'bounty',bountyId:alexBounty.id,bountyTitle:alexBounty.title,date:shift(-1),createdAt:'1'},{id:'b2',name:'Bo',type:'bounty',bountyId:boBounty.id,bountyTitle:boBounty.title,date:shift(-1),createdAt:'2'}];
+  render();
+  openPersonCard('Bo');
+  const personClaimed=document.querySelector('#personClaimed'),personClaimedCap=document.querySelector('#personClaimedSummary');
+  assert.ok(personClaimed.innerHTML.indexOf(boBounty.title)>=0,'the card lists that climber’s bounty title');
+  assert.equal(personClaimed.innerHTML.indexOf(alexBounty.title),-1,'another climber’s bounty title is absent');
+  assert.ok(personClaimedCap.textContent.indexOf('1 claim')>=0,'the card caption names the claim count');
+  assert.ok(personClaimed.innerHTML.indexOf('bounty-peek')>=0,'the card reuses the bounty row shape');
+  assert.equal(personClaimed.innerHTML.indexOf('data-claim-bounty'),-1,'the card rows cannot claim bounties');
+  assert.equal(personClaimed.innerHTML.indexOf('data-del'),-1,'the card rows cannot delete claims');
+  openPersonCard('Maya');
+  assert.ok(personClaimed.innerHTML.indexOf('No bounty claims yet.')>=0,'a climber with no claims gets the plain empty state');
+  assert.equal(personClaimedCap.textContent,'','and the empty state has no caption');
+  openPersonCard('Alex');
+  claimedOpen=true;
+  renderClaimed();
+  assert.equal(document.querySelector('#claimedList').innerHTML,personClaimed.innerHTML,'the You panel and the person card share the same claimed row markup');
+  claimedOpen=false;
+  renderClaimed();
+  closeModal('personModal');
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  render();
+  openPersonCard('Alex');
+
   // Entry 51: the pyramid gets the same plain-text caption treatment as the heatmap and trend
   // charts, tracking the card so it clears when the card hides.
   const pyramidCard=document.querySelector('#gradePyramidCard'),pyramidCap=document.querySelector('#pyramidSummary');
