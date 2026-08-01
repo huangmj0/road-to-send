@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 74 — A daily momentum curve — Done — 2026-08-01
-- 75 — Keep the You page head on screen at 320px — Todo
+- 75 — Keep the You page head on screen at 320px — Done — 2026-08-01
 - 76 — Repair the seven dropped `font` shorthands and give the display font a fallback — Todo
 - 77 — Stop the momentum curve stretching its text and its points — Todo
 - 78 — Draw the curve on day one, and the smallest bars at all — Todo
@@ -54,42 +53,11 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 ---
 
 
-## 74. A daily momentum curve
-
-Status: Done — 2026-08-01
-Notes: Commit `Render daily momentum curve; retire trend-bar assertions`. Archived entry 73.
-Retired the sanctioned `trendColumns()`/`.trend-col`/`.trend-bar` assertions with the removed bar
-markup. index.html 156,778 → 157,247 bytes (+469, 92.5% of the 170,000-byte budget). `npm test`:
-5/5 suites. Deviations: None.
-
-### Why
-The three trend charts draw one div bar per calendar week (`trendColumns()`, `.trend-col`), which has two problems this pass makes acute. The rightmost bar is always a partial week, so every chart reads as a decline until Sunday. And each bar's point total exists only in a `title` attribute, which never appears on the phones this crew uses — the need behind withdrawn entry 63, carried here. A trailing-seven-day total plotted once per day answers both: it is the momentum this pass is about, and it has no partial-period artefact, because every point covers a full seven days.
-
-### Requirements
-- **Sequencing:** last in the pass. Entries 66 and 67 land first; entry 66's budget is what pays for this.
-- `src/app.js` — a pure helper returning one point per challenge day: `{date,label,points}`, where `points` is that person's `dayTotal` summed over the seven days ending on that date. Walk days the way `heatmapDays()` does (`src/app.js:86`), stopping at `challengeToday()` or `config.tripDate`, whichever is earlier.
-- **Form change: inline SVG, not div bars.** A 70-day challenge is ~70 points; at `.trend-col`'s `min-width:34px` that is a 2,380px horizontal scroll, which is not a chart. Render an SVG area with a 2px line, sized to the card with a `viewBox` so it scales — **no horizontal scroll**.
-- Single series, so **no legend**: the card heading names it. One axis only. Axes and any gridline are recessive; the baseline is the only required rule.
-- One hue: `var(--orange-ink)` for the line with a low-alpha fill beneath. Introduce no new colour token. `--orange-ink` is already re-stepped for dark mode (`#c0481f` → `#ff9166`) in the `prefers-color-scheme:dark` block, so the chart inherits a *selected* dark treatment rather than an automatic flip.
-- **Selective direct labels, never one per point** — this is withdrawn entry 63's requirement, carried: label the peak and the current value in `--ink`/`--muted` text so the figure is readable without a hover. Text wears text tokens, never the series colour.
-- `role="img"` on the `<svg>` with an `aria-label` naming the peak and the current value; inner marks `aria-hidden="true"` (rule 7). Keep a hover affordance in the spirit of the existing `title=` tooltips.
-- Inline SVG markup is not a dependency — rule 8 is satisfied. No JS-driven animation; any transition is CSS so the `prefers-reduced-motion` kill-switch applies (rule 7).
-- All three charts — `#weeklyTrend`, `#youTrend`, `#personTrend` — draw through the one helper, as they do today. Do not special-case one. `trendColumns()`, `.trend-col`, `.trend-bar` and `.trend-label` go with the bars they served; `trendCaption()` is rewritten off "Best week … this week …".
-
-### Tests
-- `tests/client-state.state.test.js`: the series has one point per challenge day up to today and none beyond; each point equals the seven-day `dayTotal` sum ending that day; the challenge's first days sum a truncated window rather than reaching before `config.startDate`; a person with no logs yields an all-zero series, not an empty one. Build expected substrings with `+`, never a template literal — the state suite's TRAP forbids backticks and `${` inside the checks literal.
-- `tests/client-state.dom.test.js`: `#youTrend` contains an `<svg>` with `role="img"` and a non-empty `aria-label`; the peak value appears as visible text; the existing entry 53 assertion comparing `#personTrend` with `#youTrend` keeps passing; a repaint is idempotent.
-- `tests/static-check.mjs`: the chart carries `role="img"`; `.trend-col{` is no longer styled.
-- **Rule 3 carve-out, sanctioned by the maintainer:** the `trendColumns()`/`.trend-col`/`.trend-bar` assertions are retired along with the markup they describe. Name them in the commit message. Assertions about the charts' `aria-label`s, the `#personTrend`/`#youTrend` equality and `trendCaption()`'s existence are **not** covered and must keep passing against the new output.
-
-### Do not
-Add a second y-axis, a rainbow or per-series palette (there is one series), a number on every point, or a JS-driven animation. Do not let the chart scroll horizontally — fitting the card is the reason for the form change. Do not reach past `challengeToday()` or `config.tripDate`, and do not plot a day that has not happened. Do not add a charting dependency (rule 8) or a second `<script>` block (rule 5).
-
----
-
 ## 75. Keep the You page head on screen at 320px
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Keep You page head in view`. Archived entry 74. index.html 155,267 → 155,362
+bytes (+95, 91.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 On the You tab the greeting and the Share / Change me buttons sit in one `.page-head` row that is wider than the phone. Measured in Chromium at `origin/main`, `#you .page-head` has a `scrollWidth` of **506px** at every phone width — **+186px at 320px, +116px at 390px, +76px at 430px** — and it is the **only** document-level horizontal overflow in the app (Crew and Record never overflow at any viewport). At 320px both "Share" and "Change me" are pushed **entirely off-screen**: a climber on a small phone cannot reach their own share button or switch profile without sideways-scrolling the whole page. This is not a contrived name. `.page-head h1` is `800 44px` on phones and the crew's real first names measure 159–235px against an h1 budget of 146px at 320px, 216px at 390px and 256px at 430px; a short name shows no overflow at all, which is why this has stayed invisible to whoever tested it.
