@@ -7,6 +7,43 @@ Entries are the originals from `IMPROVEMENT_LOG.md`, moved here verbatim under r
 is renumbered, reworded, or re-run. This is closed history and never a queue — see
 `IMPROVEMENT_LOG.md` for live work.
 
+## 85. Give the Bounty Hunter marker visible text and the small controls a 44px target
+
+Status: Done — 2026-08-01
+Notes: Commit `Label Bounty Hunter controls`. Archived entry 84. index.html 156,367 → 156,621 bytes (+254, 92.1% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+The leaderboard marks the last seven days' Bounty Hunter with `<span class="hunter" title="Bounty Hunter of the last 7 days">🏹</span>` (`src/app.js:115`). The only explanation of that emoji is a `title` attribute, and `IMPROVEMENT_LOG.md:13` is the maintainer's own record that **a `title` never appears on the phones this crew uses** — that is precisely why entry 63 was withdrawn and why entry 74 carried its requirement forward. So on a phone the marker is an unexplained bow-and-arrow, and to a screen reader it is an unlabelled emoji. The three other crew titles — Crusher, Gym Rat, Yogi — already render as visible text through `titleMap` and `.title-tag` (`src/styles.css:16`) in the same cell. The Bounty Hunter is the odd one out.
+
+Separately, rule 7 sets a 44px minimum touch target and several controls miss it, all because the **base class** was never fixed even though individual instances were:
+
+- `.text-btn{…padding:8px}` (`:3`) renders **31px** tall today, and 34px once entry 76 restores its `font:800 14px`. That is `#personalShowMore`, `#crewShowMore`, `#dateToggle`, `#addParticipant`, the "Someone else" button, and all three `.setup-actions` buttons — including the destructive "Use local mode".
+- `.sync{…max-width:190px}` (`:3`) — `#syncStatus` measures **80.9 × 17px** and is the **only** refresh control in shared mode.
+- `.brand` (`:3`) — `a.brand` measures **260 × 29px**.
+
+`.head-actions .text-btn{display:inline-flex;align-items:center;min-height:44px}` (`:21`), `.del{min-width:44px;min-height:44px;border-radius:10px}` (`:9`) and `#bountyWeekToggle,#claimedToggle{min-height:44px}` (`:24`) are three separate one-off patches of the same defect. The gap is the base class, not the intent.
+
+### Requirements
+- `src/app.js` and `src/styles.css`.
+- **Bounty Hunter:** add it to the `titleMap` that `render()` builds (`src/app.js:115`: `const titleMap=new Map()` populated from `crewTitles(today)`), sourced from `model.hunters`, so it renders through the existing `.title-tag` path alongside the other three titles. Drop the `title=` attribute from the glyph span.
+  - **Keep `class="hunter"` on the glyph span** — `tests/client-state.dom.test.js:737` asserts `class="hunter"` remains beside its holder and that assertion stays. Mark the glyph `aria-hidden="true"`, since the title text now names it.
+  - Do **not** add the Bounty Hunter to the `TITLE_CATEGORIES` constant (`src/app.js:6`): `tests/static-check.mjs:160` asserts that constant carries no glyph, and the hunter is derived from bounty claims rather than from a category's active days. Merge it into the runtime `titleMap` only.
+  - Reuse `model.hunters` from `totalsModel()`. Do not re-derive who the hunter is (rule 6).
+- **Touch targets:** give the base classes the minimum rather than patching more instances — `.text-btn` (`:3`), `.sync` (`:3`) and `.brand` (`:3`) each reach **44px** of height. `.head-actions .text-btn` (`:21`) is the working precedent for the technique: `display:inline-flex;align-items:center;min-height:44px`.
+  - `.text-btn` is used inline inside prose in places; verify none of them gain an unwanted line break or a visible box, and that `#undoDelete` inside `.undo-bar` (`:22`) still fits its pill.
+  - Do not change the visible text size, colour, underline or padding-left of any of these — only the hit area.
+- **Sequencing:** entry 76 repairs `.text-btn`'s and `.sync`'s `font` shorthands and must land first, because the repaired sizes are what these heights have to accommodate. Do not revert 76's `var(--font)`.
+- Append new CSS at the end of `src/styles.css`; edit `src/app.js` in the existing compact single-line style.
+
+### Tests
+- `tests/client-state.dom.test.js`: the current Bounty Hunter's leaderboard row contains a `.title-tag` naming the title as visible text; the `class="hunter"` glyph is still present and is `aria-hidden="true"`; the glyph span carries no `title` attribute; a climber holding both a category title and the hunter title shows both.
+- `tests/static-check.mjs`: `.text-btn`, `.sync` and `.brand` each declare `min-height:44px`; no `title="Bounty Hunter` string remains in the built script. Assert the exact compact text.
+
+### Do not
+Do not reintroduce a `title` tooltip as the only carrier of any label — it does not render on this crew's phones, and that is settled history. Do not add a fourth entry to `TITLE_CATEGORIES` or change how titles are computed. Do not enlarge the visible text or padding of `.text-btn`, `.sync` or `.brand` — grow the hit area, not the type. Do not add a new title, badge or award of any kind. Tone rule: a title marks something a person **did**; do not add a marker for what anyone did not do, a "no hunter this week" line, or any count of how many people claimed nothing.
+
+---
+
 ## 83. Stop announcing what did not change, and put the chart label where ARIA reads it
 
 Status: Done — 2026-08-01
