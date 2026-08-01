@@ -631,24 +631,28 @@ const checks = `(()=>{
   assert.equal(prevWeekKey('2026-07-20'),'2026-07-13','crossing the Monday boundary advances the previous week too');
   assert.equal(prevWeekKey('garbage'),'','an unparseable today yields no previous week');
 
-  // weekTrend classifies this week vs the previous week from computeCredits().weeks → up/down/even, null in the first week.
+  // weekTrend compares adjacent seven-day dayTotal windows, including bounty credit, and stays quiet
+  // until the earlier window reaches the challenge.
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  const trendBounty=SCORING.bounties[0];
   logs=[
-    {id:'a1',name:'Alex',type:'climb',date:'2026-07-08',createdAt:'1'}, // prev week: 3
-    {id:'a2',name:'Alex',type:'climb',date:'2026-07-14',createdAt:'2'}, // this week: 3
-    {id:'a3',name:'Alex',type:'exercise',date:'2026-07-15',createdAt:'3'}, // this week: +2 => 5
-    {id:'d1',name:'Dana',type:'climb',date:'2026-07-08',createdAt:'4'}, // prev week: 3, this week: 0
-    {id:'e1',name:'Even',type:'climb',date:'2026-07-08',createdAt:'5'}, // prev week: 3
-    {id:'e2',name:'Even',type:'climb',date:'2026-07-15',createdAt:'6'}, // this week: 3
-    {id:'n1',name:'Newbie',type:'climb',date:'2026-07-14',createdAt:'7'}, // this week only: 3
+    {id:'a1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
+    {id:'a2',name:'Alex',type:'climb',date:'2026-07-15',createdAt:'2'},
+    {id:'u1',name:'Up',type:'climb',date:'2026-07-02',createdAt:'3'},
+    {id:'u2',name:'Up',type:'climb',date:'2026-07-15',createdAt:'4'},
+    {id:'u3',name:'Up',type:'exercise',date:'2026-07-15',createdAt:'5'},
+    {id:'d1',name:'Down',type:'climb',date:'2026-07-02',createdAt:'6'},
+    {id:'d2',name:'Down',type:'exercise',date:'2026-07-02',createdAt:'7'},
+    {id:'d3',name:'Down',type:'climb',date:'2026-07-15',createdAt:'8'},
+    {id:'b1',name:'Bounty',type:'bounty',bountyId:trendBounty.id,date:'2026-07-15',createdAt:'9'},
+    {id:'o1',name:'Outside',type:'climb',date:'2026-07-01',createdAt:'10'},
   ];
-  assert.equal(weekTrend('alex','2026-07-15'),'up','more points this week than last is up');
-  assert.equal(weekTrend('dana','2026-07-15'),'down','fewer points this week than last is down');
-  assert.equal(weekTrend('even','2026-07-15'),'even','matching the previous week is even');
-  assert.equal(weekTrend('newbie','2026-07-15'),'up','zero previous week with points this week is up');
-  assert.equal(weekTrend('ghost','2026-07-15'),'even','both weeks at zero is even');
-  assert.equal(weekTrend('alex','2026-07-03'),null,'the first challenge week is suppressed — no previous week to compare');
-  assert.equal(weekTrend('alex','2026-07-13'),'up','the second week compares against the first');
+  assert.equal(weekTrend('alex','2026-07-15'),'even','a day 13 days old falls in the earlier window, making equal totals even');
+  assert.equal(weekTrend('up','2026-07-15'),'up','more points in the recent window is up');
+  assert.equal(weekTrend('down','2026-07-15'),'down','fewer points in the recent window is down');
+  assert.equal(weekTrend('bounty','2026-07-15'),'up','a recent bounty moves the arrow through dayTotal');
+  assert.equal(weekTrend('outside','2026-07-15'),'even','a day 14 days old falls outside both windows');
+  assert.equal(weekTrend('alex','2026-07-07'),null,'the first challenge week is suppressed while the earlier window is before the start');
 
   // weeksUntilDone counts inclusive days from today through tripDate, rounded up to whole weeks; today is an ARGUMENT.
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
