@@ -1024,6 +1024,16 @@ const domChecks = `(()=>{
   assert.ok(document.querySelector('#personRecent').innerHTML.indexOf('class="hint"')>=0,'a climber with no entries gets the hint fallback instead of an empty list');
   closeModal('personModal');
 
+  // Entry 82: an unbroken note keeps the points and delete controls in its feed row.
+  me='Alex';recordingFor='Alex';endpoint='';feedType='all';personalFeedLimit=5;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'wide-note',name:'Alex',type:'climb',hardestGrade:'V5',note:'UnbrokenNote'.repeat(80),date:shift(-1),createdAt:'1'}];
+  render();
+  const wideFeed=document.querySelector('#personalActivity').innerHTML;
+  assert.ok(wideFeed.indexOf('UnbrokenNote'.repeat(80))>=0,'the full long note remains present for wrapping instead of being truncated');
+  assert.ok(wideFeed.indexOf('class="pts"')>=0&&wideFeed.indexOf('class="del"')>=0,'a long unbroken note still renders points and delete controls');
+  assert.ok(wideFeed.indexOf('class="pts"')<wideFeed.indexOf('class="del"'),'the points cell remains before the delete control in the same emitted row');
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 

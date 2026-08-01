@@ -565,3 +565,37 @@ Three tokens — `--sky`, `--orange` and the heatmap's orange mix — were never
 Do not add a colour token, a gradient, a pattern or a texture. Do not change the number of heatmap levels or the thresholds in `heatLevel()`. Do not restyle `--accent-solid`, `.btn.primary` or the brand colours. Do not turn contrast into meaning — a darker bar must not come to signal anything the current bar does not already signal. Tone rule: this entry changes colour only and adds no copy; do not let a re-step introduce a "behind" or "not logged" visual state that the app does not have today.
 
 ---
+
+## 81. One focus ring, at a contrast you can see
+
+Status: Done — 2026-08-01
+Notes: Commit `Unify focus ring contrast`. Archived entry 80. index.html 156,050 → 155,931 bytes (-119, 91.7% of the 170,000-byte budget). Green ring ratios against bg/card/input/wash/orange-tint: light 8.77/9.73/9.91/8.18/8.42, dark 7.52/6.83/6.26/6.61/6.73. `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+Someone navigating by keyboard cannot reliably see where they are. The global ring `:focus-visible{outline:3px solid var(--sky);outline-offset:2px}` (`src/styles.css:3`) measures **1.96:1** against the page background, well under the 3:1 a non-text indicator needs, and `--sky` is one of the three tokens the dark block never re-steps, so it is the same weak blue in both schemes. Three different rings then coexist and disagree with each other:
+
+- `:focus-visible{outline:3px solid var(--sky);outline-offset:2px}` (`:3`) — global, 1.96:1
+- `button.climber:focus-visible{outline:3px solid var(--sky);outline-offset:2px;border-radius:8px}` (`:7`) — the same weak ring, restated to add a radius
+- `.activity-picker input:focus-visible+span{outline:3px solid var(--sky);outline-offset:2px}` (`:9`) — the same again
+- `button.bounty:focus-visible{outline:2px solid var(--orange);outline-offset:-2px;border-radius:10px}` (`:3`) — 2px, orange at 2.25:1, inset
+- `.cat-chip:focus-visible{outline:2px solid var(--green);outline-offset:2px}` (`:23`) — 2px, green, and the only one of the five with real contrast
+
+Rule 7 requires visible focus, and the app currently has four thicknesses-and-colours of it, three of which are too faint to serve.
+
+### Requirements
+- `src/styles.css` only. Settle on **one** ring: `var(--green)` at 3px with `outline-offset:2px`. `--green` is re-stepped for dark (`#174a3a` → `#5fb896` at `:27`), and `.cat-chip:focus-visible` (`:23`) is the existing precedent for green focus in this codebase.
+- Apply it in the global `:focus-visible` rule and delete the restatements that then say nothing new: `button.climber:focus-visible` keeps **only** its `border-radius:8px`, `.cat-chip:focus-visible` keeps only what differs from the global. Fewer rules, not more.
+- **`.activity-picker input:focus-visible+span` (`:9`) is the one restatement that must stay — recolour it, do not delete it.** The radio it belongs to is `.activity-picker input{position:absolute;opacity:0}` (`:9`), so the global rule would draw the ring on a fully transparent, absolutely-positioned element and keyboard focus would be **invisible on all four activity choices**. The adjacent-sibling selector exists precisely to move the ring onto the visible `<span>`. Change its colour and width to match the shared ring and leave the selector alone.
+- `button.bounty:focus-visible` (`:3`) keeps `outline-offset:-2px` and `border-radius:10px` — the bounty row is full-bleed inside its card, so an outset ring would be clipped. Only its colour and width change to match.
+- Measure the ring against **every background it lands on** — `--bg`, `--card`, `--input-bg` and the `--wash`/`--orange-tint` states — in both the light `:root` (`:2`) and the dark block (`:27`), and confirm at least 3:1 everywhere. Record the ratios in your `Notes:`.
+- `--sky` stays in `:root`: it is still used by `--notice-bg`, `--avatar-bg` and the point meter. This entry retires its use **as a focus colour only**.
+- Rule 7 also requires the ring stay on `:focus-visible`, not `:focus` — do not widen it to mouse clicks.
+- Edit in place; do not reformat the surrounding compact CSS, and append anything new at the end of the file.
+
+### Tests
+- `tests/static-check.mjs`: exactly one `outline:3px solid var(--green)` focus declaration in the global `:focus-visible` rule; no `:focus-visible` rule anywhere in the built stylesheet still uses `var(--sky)`; `button.bounty:focus-visible` keeps `outline-offset:-2px`. Assert the exact compact text.
+
+### Do not
+Do not remove focus from anything, do not use `outline:none` anywhere, and do not replace the outline with a `box-shadow` — an outline is what respects forced-colors mode. **Do not delete `.activity-picker input:focus-visible+span`** — see the requirement above; deleting it hides focus on the whole activity picker, which is the opposite of what this entry is for. Do not add a fourth ring style for a new special case. Do not attach the ring to `:focus` instead of `:focus-visible`. Do not change the tab order or add a skip link in this entry. Tone rule: this entry changes colour and thickness only; it adds no copy, no prompt and no new surface.
+
+---
