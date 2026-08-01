@@ -8,6 +8,37 @@ is renumbered, reworded, or re-run. This is closed history and never a queue —
 `IMPROVEMENT_LOG.md` for live work.
 
 ---
+## 75. Keep the You page head on screen at 320px
+
+Status: Done — 2026-08-01
+Notes: Commit `Keep You page head in view`. Archived entry 74. index.html 155,267 → 155,362
+bytes (+95, 91.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+On the You tab the greeting and the Share / Change me buttons sit in one `.page-head` row that is wider than the phone. Measured in Chromium at `origin/main`, `#you .page-head` has a `scrollWidth` of **506px** at every phone width — **+186px at 320px, +116px at 390px, +76px at 430px** — and it is the **only** document-level horizontal overflow in the app (Crew and Record never overflow at any viewport). At 320px both "Share" and "Change me" are pushed **entirely off-screen**: a climber on a small phone cannot reach their own share button or switch profile without sideways-scrolling the whole page. This is not a contrived name. `.page-head h1` is `800 44px` on phones and the crew's real first names measure 159–235px against an h1 budget of 146px at 320px, 216px at 390px and 256px at 430px; a short name shows no overflow at all, which is why this has stayed invisible to whoever tested it.
+
+### Requirements
+- **Sequencing: this entry lands first in the pass.** Entry 76 widens `.head-actions` from 140.5px to 151px ("Share" +3.4, "Change me" +7.1), which pushes this same overflow from 186px to **197px at 320px**. Entry 76 does not cause the defect but makes it measurably worse, so this fix goes in ahead of it.
+- `src/styles.css` only. The three declarations that produce it, quoted from the current file:
+  - `:3` — `.page-head,.card-head,.recording-for,.roster-head,.inline{display:flex;align-items:center;justify-content:space-between;gap:14px}` (flex items default to `min-width:auto`, so the h1 cannot shrink below its min-content 342px)
+  - `:3` — `.page-head h1{font:800 clamp(42px,10vw,62px)/.95 'Roboto Condensed';color:var(--green);margin:5px 0 0}`
+  - `:8` — `@media(max-width:430px){….page-head h1{font-size:44px}…}`
+  - `:21` — `.head-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto}`
+- Let the heading shrink and break: `min-width:0` on the `.page-head` text block **and** `overflow-wrap:anywhere` on `.page-head h1`. `overflow-wrap:anywhere` is the correct value here and `break-word` is not — only `anywhere` lowers the element's **min-content** width, which is what the flex layout reads. Precedent for the idiom is `.person-cell strong{…overflow-wrap:anywhere}` at `src/styles.css:7`.
+- `.head-actions` must be reachable at 320px. Either drop its `flex:0 0 auto` so it can shrink, or let `.page-head` wrap. Whichever you pick, both buttons must be fully inside the viewport at 320px and keep the 44px minimum height `.head-actions .text-btn{display:inline-flex;align-items:center;min-height:44px}` (`:21`) already gives them.
+- **Append new declarations at the end of `src/styles.css`; do not reformat or reorder the existing lines.** `tests/static-check.mjs` matches exact compact CSS text in several places and its own TRAP header says so.
+- The Record and Crew page heads use the same `.page-head` rule. Whatever you change must leave those two non-overflowing — they are clean today and must stay clean.
+- Budget: this pass (entries 75–85) is estimated at roughly **+1,400 bytes** in total against **14,733 bytes of headroom** (`index.html` is 155,267 bytes, `BUDGET` is 170,000 in `tests/size-check.mjs`). **No re-baseline is needed or authorised in this pass.** Record the real figure in your `Notes:` so later entries can check the running total.
+
+### Tests
+- `tests/static-check.mjs`: `.page-head h1` carries `overflow-wrap:anywhere`; `.head-actions` no longer pins itself with `flex:0 0 auto`, or the wrap rule that replaces it is present. Assert the exact compact text you added.
+- No client-state assertions — this is layout only, and the element stub in `tests/harness.js` cannot measure geometry.
+
+### Do not
+Do not shorten, truncate, ellipsise or abbreviate anybody's name to make it fit — the heading is the one place the app says who you are. Do not hide `#shareBtn` or `#changeMeBtn` at small widths; making them reachable is the point. Do not move `#shareBtn` out of the You page head — `tests/static-check.mjs` pins it to `data-panel="you"` above the today card. Tone rule: this entry changes layout only and adds no copy; do not add a prompt, a reminder or a participation figure to the page head while you are in it.
+
+---
+
 ## 74. A daily momentum curve
 
 Status: Done — 2026-08-01

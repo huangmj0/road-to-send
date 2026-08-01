@@ -62,6 +62,12 @@ assert.ok((script.match(/Saving…/g)||[]).length>=3,'the preview reports an in-
 assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption');
 assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
 assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.page-head h1\{overflow-wrap:anywhere\}/,'the page head wraps long names while keeping its actions reachable');
+const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
+assert.match(stylesheet,/:root\{--font:'DM Sans',system-ui,sans-serif;--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
+for(const declaration of ['\\.icon-btn\\{[^}]*font:700 25px\\/1 var\\(--font\\)','\\.btn\\{[^}]*font:800 15px var\\(--font\\)','\\.text-btn\\{[^}]*font:800 14px var\\(--font\\)','\\.sync\\{[^}]*font:800 12px var\\(--font\\)','\\.bottom-nav button\\{[^}]*font:800 12px var\\(--font\\)','\\.seg-btn\\{[^}]*font:800 13px var\\(--font\\)','\\.review-section h3,\\.person-head\\{font:800 14px var\\(--font\\)'])assert.match(stylesheet,new RegExp(declaration),'each repaired control shorthand keeps its intended body stack');
+assert.doesNotMatch(stylesheet,/font:[^;}]*\s+inherit(?=[;}])/,'no multi-component font shorthand ends in invalid inherit');
+const displayUses=stylesheet.replace(/@import[^;]+;/,'').replace(/--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif/,'');
+assert.doesNotMatch(displayUses,/'Roboto Condensed'/,'display font uses share the fallback token');
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
 const heatmapCard=html.match(/<article id="heatmapCard"[\s\S]*?<\/article>/)?.[0]||'';
 const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?.[0]||'';
