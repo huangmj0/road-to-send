@@ -8,6 +8,31 @@ is renumbered, reworded, or re-run. This is closed history and never a queue —
 `IMPROVEMENT_LOG.md` for live work.
 
 ---
+## 73. The trend arrow reads the last seven days
+
+Status: Done — 2026-08-01
+Notes: Commit `Compare trend over seven days`. Archived entry 72. index.html 156,302 → 156,778
+bytes (+476, 92.2% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+`weekTrend()` (`src/app.js:46`) compares this calendar week's points to last week's and shows up, down or even. Early in a week it compares a partial week against a whole one, so on a Monday it is holding one day up against seven and reads `down` for almost everyone almost every Monday. It is the app's only momentum signal and it is wrong by construction half the time.
+
+### Requirements
+- **Sequencing:** entry 67 lands `windowStart()` and `dayTotal`.
+- `src/app.js` — `weekTrend(nameLower,today)` compares the sum of `dayTotal` over `[windowStart(today), today]` against the sum over the seven days immediately before it — `[windowStart(today,14), the day before windowStart(today)]`. The two windows must not overlap. Return `'up'`, `'down'` or `'even'` as it does today.
+- Keep a guard that returns `null` before there is anything to compare against. Today it is `wk===weekKey(config.startDate)`; it becomes "the earlier window falls entirely before `config.startDate`", so the arrow stays absent during the challenge's first week rather than reporting a fall from zero.
+- The helper keeps the name `weekTrend` — it is referenced from `personSummary()` and the person card, and renaming it is churn. Its label copy changes from week wording to "last 7 days".
+- Pure, no DOM, no `new Date()` (rule 6).
+
+### Tests
+- `tests/client-state.state.test.js`: equal points in both windows is `'even'`; more recent is `'up'`; fewer is `'down'`; the guard returns `null` when the earlier window predates `config.startDate`. A bounty claimed in the recent window moves the arrow — the case `dayMeter` would have missed.
+- **Boundary arithmetic, stated once so it is not re-derived wrongly.** `windowStart(today,14)` is `today-13`, so the two windows are `[today-6, today]` and `[today-13, today-7]` — seven days each, adjacent, non-overlapping. Assert that a day **13** days old falls in the earlier window and a day **14** days old falls outside both. A test that expects a 14-day-old day to count would force the earlier window to eight days and break the symmetry the comparison depends on.
+- `tests/client-state.dom.test.js`: the existing person-card and You-panel trend assertions keep passing with the new wording.
+
+### Do not
+Compare overlapping windows, read the clock, or fork the scoring maths — sum `dayTotal` (rule 6). Do not show an arrow during the first week, and do not add copy about a decline; the glyph is the whole message, and "you did less" copy is the absence framing the tone rule rules out.
+
+---
 
 ## 72. Recent, not Weekly
 

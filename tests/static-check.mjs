@@ -67,7 +67,7 @@ const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?
 assert.match(heatmapLegend,/role="img"[^>]*aria-label="[^"]+"/,'the heatmap shade key has one text alternative');
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapLegend"[\s\S]*id="heatmapSummary"/,'the heatmap shade key sits between the graphic and caption');
 for(const shade of [0,1,2,3,4])assert.match(heatmapLegend,new RegExp(`class="heat-cell heat${shade}" aria-hidden="true"`),`the heatmap shade key includes heat${shade}`);
-assert.match(html,/class="trend-scroll"[\s\S]*id="trendSummary"/,'the trend caption follows the scroll wrapper');
+assert.match(html,/id="weeklyTrend"[\s\S]*id="trendSummary"/,'the trend caption follows the crew curve');
 assert.match(script,/function heatmapCaption\(/,'a pure helper builds the heatmap caption');
 assert.match(script,/function trendCaption\(/,'a pure helper builds the trend caption');
 assert.match(script,/Challenge day: /,'the diagnostics say which day the app is scoring against');
@@ -192,22 +192,21 @@ assert.match(html,/data-panel="you"[\s\S]*id="gradePyramidCard"[\s\S]*id="heatma
 assert.match(html,/data-panel="you"[\s\S]*id="gradePyramidCard"[\s\S]*id="recordsCard"[\s\S]*id="heatmapCard"/,'the personal records card sits between the grade pyramid and the heatmap on the You panel');
 assert.match(html,/id="youHeatmap"[^>]*role="img"[^>]*aria-label=/,'the daily activity heatmap is announced as a graphic');
 assert.match(html,/data-panel="crew"[\s\S]*class="card group-card"[\s\S]*id="weeklyTrendCard"[\s\S]*class="card hunter-card"/,'the weekly trend card sits between the group goal card and the Bounty Hunter card on the crew panel');
-assert.match(html,/id="weeklyTrend"[^>]*role="img"[^>]*aria-label=/,'the weekly trend chart is announced as a graphic');
-assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="weeklyTrend"/,'the weekly trend chart sits inside a horizontally scrollable wrapper');
-assert.match(html,/\.trend-scroll\{overflow-x:auto\}/,'the trend wrapper scrolls horizontally instead of squeezing');
+assert.match(script,/<svg class="trend-svg"[^>]*role="img"[^>]*aria-label=/,'the daily momentum curve is announced as one graphic');
+assert.doesNotMatch(html,/trend-scroll/,'the curve has no horizontal scroll wrapper');
+assert.doesNotMatch(html,/\.trend-col\{/,'the removed bar columns are not styled');
 // Entry 45: the same chart, restricted to the signed-in climber, on the You panel after the heatmap.
 assert.match(html,/data-panel="you"[\s\S]*id="heatmapCard"[\s\S]*id="youTrendCard"/,'the personal weekly trend card sits after the daily activity heatmap on the You panel');
-assert.match(html,/id="youTrend"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the personal weekly trend chart is announced as a graphic with a non-empty label');
-assert.match(html,/id="youTrendCard"[\s\S]*class="trend-scroll"[^>]*>\s*<div id="youTrend"/,'the personal trend chart reuses the horizontally scrollable trend wrapper');
+assert.match(html,/id="youTrendCard"[\s\S]*id="youTrend" class="trend"/,'the personal daily curve has its own card container');
 assert.match(html,/id="youTrend"[\s\S]*id="youTrendSummary"/,'the personal trend caption follows its chart');
 assert.match(script,/function personalWeeklyTrend\(/,'a pure helper restricts the weekly rows to one climber');
-assert.match(script,/function trendColumns\(/,'both trend charts draw their bars from one markup helper');
+assert.match(script,/function momentumCurve\(/,'one helper produces every chart series');
+assert.match(script,/function trendSvg\(/,'one helper renders every chart SVG');
 // Entry 53: the person card gets the same weekly trend chart, sitting between the personal
 // records and the grade pyramid.
 assert.match(html,/id="personBreakdown"[\s\S]*id="personClaimed"[\s\S]*id="personClaimedSummary"[\s\S]*id="personRecords"/,'the person card claimed-bounty section sits between the breakdown and records');
 assert.match(html,/id="personRecords"[\s\S]*id="personTrend"[\s\S]*id="personPyramid"/,'the person card weekly trend chart falls between personal records and the grade pyramid');
-assert.match(html,/id="personTrend"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the person card weekly trend chart is announced as a graphic with a non-empty label');
-assert.match(html,/class="trend-scroll"[^>]*>\s*<div id="personTrend"/,'the person card trend chart sits inside the scrollable trend wrapper');
+assert.match(html,/id="personTrend" class="trend"/,'the person card has the daily curve container');
 assert.match(html,/id="personPyramid"[^>]*role="img"[^>]*aria-label="[^"]+"/,'the person card grade pyramid is announced as a graphic with a non-empty label');
 assert.match(script,/function pyramidLabel\(/,'a pure helper owns the pyramid text alternative');
 assert.equal((script.match(/Grade pyramid: /g)||[]).length,1,'the pyramid label text has one owner');

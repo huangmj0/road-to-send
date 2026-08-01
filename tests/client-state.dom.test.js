@@ -345,40 +345,38 @@ const domChecks = `(()=>{
   assert.ok(heatCap.textContent.indexOf('active day')>=0,'and reports the active-day count');
   const trendCard=document.querySelector('#weeklyTrendCard'),trendCap=document.querySelector('#trendSummary');
   assert.equal(trendCard.classList.contains('hide'),false,'the trend card is showing');
-  assert.ok(trendCap.textContent.indexOf('Best week')===0,'so its caption names the best week');
+  assert.ok(trendCap.textContent.indexOf('Peak ')===0,'so its caption names the curve peak');
   logs=[];
   render();
   assert.equal(heatCap.textContent,'','a hidden heatmap card carries no caption');
   assert.equal(trendCap.textContent,'','and neither does a hidden trend card');
 
-  // Entry 45: the You panel charts the signed-in climber own weeks. The card is hidden until they
-  // have logged, and a repaint redraws the bars rather than appending a second set of them.
+  // Entry 74: each trend card renders the same accessible daily momentum SVG.
   me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
   logs=[];
   render();
   const youTrendCard=document.querySelector('#youTrendCard'),youTrendEl=document.querySelector('#youTrend'),youTrendCap=document.querySelector('#youTrendSummary');
-  assert.equal(youTrendCard.classList.contains('hide'),true,'a climber with nothing logged gets no personal trend card');
-  assert.equal(youTrendEl.innerHTML,'','and no bars left behind it');
-  assert.equal(youTrendCap.textContent,'','and no caption');
+  assert.equal(youTrendCard.classList.contains('hide'),false,'a climber with nothing logged still gets the all-zero curve');
+  assert.ok(youTrendEl.innerHTML.indexOf('<svg')>=0,'the personal chart is an inline SVG');
+  assert.ok(youTrendEl.innerHTML.indexOf('role="img"')>=0&&youTrendEl.innerHTML.indexOf('aria-label=')>=0,'the SVG has one accessible name');
+  assert.ok(youTrendEl.innerHTML.indexOf('Peak 0')>=0&&youTrendEl.innerHTML.indexOf('Current 0')>=0,'the peak and current values are visible without a hover');
   logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt2',name:'Maya',type:'climb',date:shift(-1),createdAt:'2'}];
   render();
-  assert.equal(youTrendCard.classList.contains('hide'),false,'logging something opens the card');
-  const youBars=youTrendEl.innerHTML.split('trend-col').length-1;
-  assert.ok(youBars>0,'and it draws a column per challenge week');
-  assert.ok(youTrendEl.innerHTML.indexOf('trend-bar')>=0,'reusing the crew chart bar markup rather than a second visual language');
-  assert.ok(youTrendCap.textContent.indexOf('Best week')===0,'and trendCaption writes the caption underneath it');
+  assert.equal(youTrendCard.classList.contains('hide'),false,'logging something leaves the card open');
+  const youCurve=youTrendEl.innerHTML;
+  assert.ok(youCurve.indexOf('trend-line')>=0&&youCurve.indexOf('<title>')>=0,'the SVG keeps a line and per-point hover affordance');
+  assert.ok(youTrendCap.textContent.indexOf('Peak ')===0,'and trendCaption writes the caption underneath it');
   render();
-  assert.equal(youTrendEl.innerHTML.split('trend-col').length-1,youBars,'a repaint redraws the same bars instead of appending a second set');
+  assert.equal(youTrendEl.innerHTML,youCurve,'a repaint redraws the same curve instead of appending marks');
   assert.equal(youTrendCard.classList.contains('hide'),false,'and leaves the card open');
-  assert.equal(personalWeeklyTrend('alex',challengeToday()).reduce((s,r)=>s+r.points,0),3,'the personal chart counts only this climber points');
-  assert.equal(weeklyTrend(challengeToday()).reduce((s,r)=>s+r.points,0),6,'while the crew chart still counts both climbers, unchanged');
+  assert.equal(personalWeeklyTrend('alex',challengeToday()).slice(-1)[0].points,3,'the personal curve counts only this climber points in its current window');
+  assert.equal(weeklyTrend(challengeToday()).slice(-1)[0].points,6,'while the crew curve includes both climbers in its current window');
   me='Maya';recordingFor='Maya';
   logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
-  assert.equal(youTrendCard.classList.contains('hide'),true,'switching to a climber with nothing logged closes the card again');
-  assert.equal(youTrendEl.innerHTML,'','and empties the bars');
-  assert.equal(youTrendCap.textContent,'','and clears the caption');
+  assert.equal(youTrendCard.classList.contains('hide'),false,'switching to a climber with nothing logged keeps the zero curve available');
+  assert.ok(youTrendEl.innerHTML.indexOf('Current 0')>=0,'and the visible current label reads zero');
 
   // Entry 18: the today card carries the personal countdown and the person share of the crew pace.
   me='Alex';recordingFor='Alex';endpoint='';
@@ -945,21 +943,19 @@ const domChecks = `(()=>{
   assert.equal(noteFieldsEl.classList.contains('hide'),false,'switching back to climb keeps the note field visible');
   noteInput.value='';
 
-  // Entry 53: the person card gets a weekly-points chart, matching what the You card shows for the
-  // same climber, and falls back to the hint used elsewhere in the card when there is nothing to
-  // chart.
+  // Entry 74: the person card uses exactly the same curve markup as the You card.
   me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
   config={startDate:shift(-10),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
   logs=[{id:'pt3',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt4',name:'Alex',type:'climb',date:shift(-9),createdAt:'2'}];
   render();
   openPersonCard('Alex');
   const personTrendEl=document.querySelector('#personTrend');
-  assert.equal(personTrendEl.innerHTML,youTrendEl.innerHTML,'the card charts the same weeks the You card shows for that same climber');
-  assert.ok(personTrendEl.innerHTML.indexOf('trend-col')>=0,'and draws at least one week column');
+  assert.equal(personTrendEl.innerHTML,youTrendEl.innerHTML,'the card charts the same daily curve the You card shows for that same climber');
+  assert.ok(personTrendEl.innerHTML.indexOf('<svg')>=0,'and draws the inline SVG curve');
   logs=[];
   render();
   openPersonCard('Bo');
-  assert.ok(document.querySelector('#personTrend').innerHTML.indexOf('class="hint"')>=0,'a climber with nothing logged gets the hint fallback instead of an empty chart');
+  assert.ok(document.querySelector('#personTrend').innerHTML.indexOf('Current 0')>=0,'a climber with nothing logged gets an all-zero curve');
   closeModal('personModal');
 
   // Entry 54: the person card lists that climber's most recent entries as its final section, and
