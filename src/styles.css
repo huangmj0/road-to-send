@@ -33,3 +33,4 @@
     .stat strong,.pts,#leaderTable td:nth-child(3),#leaderTable td:nth-child(4){font-variant-numeric:tabular-nums}.stat-grid .card{margin-bottom:0}.group-percent{color:var(--green);font:800 31px var(--head);font-variant-numeric:tabular-nums}
     .text-btn{display:inline-flex;align-items:center;min-height:44px}.sync{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px}.brand{min-height:44px}
     .bounty-peek{grid-template-columns:auto minmax(0,1fr) auto}.bounty-peek>span:nth-child(2){min-width:0;overflow-wrap:anywhere}
+    .heatmap-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;max-width:400px;color:var(--muted);font-size:11px;font-weight:800;text-align:center;line-height:1;margin:0 0 5px}.heatmap-weekdays span{min-width:0;white-space:nowrap}

@@ -332,3 +332,27 @@ The same region has a second, larger source of churn. `setMeter('#recordMeter',�
 Do not remove, rename or relocate any live region, and do not add one. Do not change any of the copy in these regions. Do not switch a region from `polite` to `assertive`. Do not make the meter stop updating when its value genuinely changes — the guard is on redundant writes only. Tone rule: this entry adds no new announcement of any kind; announcing less is the entire point.
 
 ---
+## 93. Break a long note inside the claimed-bounty row
+
+Status: Done — 2026-08-01
+Notes: Commit `Wrap long claimed-bounty notes`. Archived entry 92. index.html 156,912 → 157,042 bytes (+130 bytes, 92.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+Entry 82 fixed the overflowing rows it found, changing `1fr` to `minmax(0,1fr)` on `.activity` and adding `.activity>div{min-width:0;overflow-wrap:anywhere}` (`src/styles.css:32`). It did not reach `.bounty-peek{display:grid;grid-template-columns:auto 1fr auto;…}` (`src/styles.css:24`), whose middle track is a bare `1fr` — a min-content floor — holding a `<span>` with neither `min-width:0` nor `overflow-wrap`.
+
+`claimedRow()` (`src/app.js:71`) interpolates the user's own note straight into that cell: `<small>${esc(r.date)}${r.note?' · '+esc(r.note):''}…</small>`, and `noteValue()` (`src/app.js:134`) allows 120 characters. A pasted URL, or any long unbroken run, gives the middle track a min-content width of several hundred pixels inside roughly 264px of card, and the `+N` points column is pushed off the card entirely. Two surfaces show it: `#claimedList` on the You tab (`renderClaimed()`, `src/app.js:73`) and `#personClaimed` in the person dialog (`renderPersonCard()`, `src/app.js:112`) — and the dialog is `overflow:auto` (`src/styles.css:3`), so it reproduces entry 82's sideways-scroll symptom at roughly 242px of content width.
+
+### Requirements
+- `src/styles.css` only, plus tests. Append the new rule at the end of the file.
+- Give `.bounty-peek` the same treatment entry 82 applied to `.activity`: a `minmax(0,1fr)` middle track, and `min-width:0;overflow-wrap:anywhere` on the cell that carries the note. Reuse the existing idiom — `.heatmap` (`:15`), `.activity>div` (`:32`) and `.person-cell strong` (`:7`) already use it.
+- The fix must hold in both surfaces, `#claimedList` and `#personClaimed`, and at 320px.
+- **Leave `button.bounty`/`.bounty` (`src/styles.css:3`) alone.** Those render catalog copy only, whose longest token is `Shoulder-focused` (16 characters, hyphen-breakable), so they are not at risk and are out of scope here.
+
+### Tests
+- `tests/static-check.mjs`: `.bounty-peek` declares a `minmax(0,1fr)` track and its note cell declares `min-width:0` and `overflow-wrap:anywhere`. Assert the exact compact text.
+- `tests/client-state.dom.test.js`: a claimed bounty whose note is a long unbroken string still renders its points cell in both `#claimedList` and `#personClaimed`, and the note text is present in full.
+
+### Do not
+Do not truncate, ellipsise, clip or cap the note — entry 82's prohibition applies here: break the text, never hide it. Do not change `noteValue()`'s 120-character limit or anything in `claimedRow()`. Do not restyle `button.bounty`. Do not introduce a horizontal scroll wrapper; `tests/static-check.mjs:219` asserts the curve has none and the same principle holds here.
+
+---

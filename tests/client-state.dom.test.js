@@ -351,9 +351,11 @@ const domChecks = `(()=>{
   me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   logs=[{id:'h1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'h2',name:'Alex',type:'exercise',date:shift(-3),createdAt:'2'}];
+  const heatmapEl=document.querySelector('#youHeatmap');let heatmapLabel='';heatmapEl.setAttribute=(name,value)=>{if(name==='aria-label')heatmapLabel=value};
   render();
   const heatCard=document.querySelector('#heatmapCard'),heatCap=document.querySelector('#heatmapSummary');
   assert.equal(heatCard.classList.contains('hide'),false,'the heatmap card is showing');
+  assert.equal(heatmapLabel,'Active 2 of 6 days, 5 points','the weekday axis leaves the heatmap graphic label unchanged');
   assert.ok(heatCap.textContent.length>0,'so its caption says something');
   assert.ok(heatCap.textContent.indexOf('active day')>=0,'and reports the active-day count');
   logs=[{id:'bounty-heat',name:'Alex',type:'bounty',bountyId:'send-it',date:shift(-1),createdAt:'1'}];

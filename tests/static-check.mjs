@@ -94,6 +94,10 @@ assert.doesNotMatch(displayUses,/'Roboto Condensed'/,'display font uses share th
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
 const heatmapCard=html.match(/<article id="heatmapCard"[\s\S]*?<\/article>/)?.[0]||'';
 const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?.[0]||'';
+const heatmapWeekdays=heatmapCard.match(/<div class="heatmap-weekdays"[\s\S]*?<\/div>/)?.[0]||'';
+assert.match(heatmapCard,/<div class="heatmap-weekdays" aria-hidden="true"><span>M<\/span><span>T<\/span><span>W<\/span><span>T<\/span><span>F<\/span><span>S<\/span><span>S<\/span><\/div><div id="youHeatmap"/,'the weekday axis sits immediately before the heatmap and stays out of its accessible name');
+assert.equal((heatmapWeekdays.match(/<span>/g)||[]).length,7,'the weekday axis has exactly seven cells');
+assert.match(stylesheet,/\.heatmap-weekdays\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:5px;max-width:400px;/,'the weekday axis shares the heatmap grid geometry');
 assert.match(heatmapLegend,/role="img"[^>]*aria-label="[^"]+"/,'the heatmap shade key has one text alternative');
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapLegend"[\s\S]*id="heatmapSummary"/,'the heatmap shade key sits between the graphic and caption');
 for(const shade of [0,1,2,3,4])assert.match(heatmapLegend,new RegExp(`class="heat-cell heat${shade}" aria-hidden="true"`),`the heatmap shade key includes heat${shade}`);
