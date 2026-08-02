@@ -513,6 +513,19 @@ const checks = `(()=>{
   assert.deepEqual(momentumCurve('alex','garbage'),[],'an invalid date yields no curve');
   assert.equal(weeklyTrend('2026-07-05')[4].points,11,'the crew chart uses the same helper and includes every person');
   assert.equal(personalWeeklyTrend('alex','2026-07-05')[4].points,8,'the personal wrapper stays scoped to that climber');
+  // Entry 96: a one-pass bucket and sliding window preserve the former per-day map scan exactly,
+  // including the partial first week, a day-one crew point, and a person with only one logged day.
+  logs=[
+    {id:'full-a1',name:'Alex',type:'climb',date:'2026-07-01',createdAt:'1'},
+    {id:'full-a2',name:'Alex',type:'exercise',date:'2026-07-03',createdAt:'2'},
+    {id:'full-a3',name:'Alex',type:'mobility',date:'2026-07-08',createdAt:'3'},
+    {id:'full-a4',name:'Alex',type:'bounty',bountyId:curveBounty.id,date:'2026-07-15',createdAt:'4'},
+    {id:'full-a5',name:'Alex',type:'climb',date:'2026-07-31',createdAt:'5'},
+    {id:'full-m1',name:'Maya',type:'climb',date:'2026-07-01',createdAt:'6'},
+  ];
+  const previousCurve=(name,today)=>{const key=String(name||'').toLowerCase(),model=computeCredits(logs),last=today<config.tripDate?today:config.tripDate,rows=[];let day=config.startDate;while(day<=last){let points=0,start=windowStart(day);model.dayTotal.forEach((value,dayKey)=>{const cut=dayKey.lastIndexOf('|'),rowName=dayKey.slice(0,cut),date=dayKey.slice(cut+1);if(date>=start&&date<=day&&(!key||rowName===key))points+=value});rows.push({date:day,label:fmtDay(day),points});const next=parseDateOnly(day);next.setDate(next.getDate()+1);day=localDate(next)}return rows};
+  assert.deepEqual(momentumCurve('alex','2026-07-31'),previousCurve('alex','2026-07-31'),'the full personal challenge curve matches the former map scan');
+  assert.deepEqual(momentumCurve('','2026-07-31'),previousCurve('','2026-07-31'),'the full crew curve keeps the day-one and single-log crew points');
   logs=[{id:'pipe1',name:'Alex|Jr',type:'climb',date:'2026-07-01',createdAt:'1'}];
   assert.equal(weeklyTrend('2026-07-01')[0].points,3,'a crew name containing a pipe still aggregates into its curve');
   assert.equal(personalWeeklyTrend('alex|jr','2026-07-01')[0].points,3,'a personal curve keeps credited points for a name containing a pipe');
@@ -757,6 +770,15 @@ const checks = `(()=>{
   ];
   assert.equal(earnedThrough('2026-07-10'),3,'a future-dated entry is excluded from the through-today total');
   assert.equal(earnedThrough('2026-07-25'),5,'once its date has arrived the entry counts toward the rate');
+  logs=[
+    {id:'cap1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-06',createdAt:'1'},
+    {id:'cap2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-07',createdAt:'2'},
+    {id:'cap3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-08',createdAt:'3'},
+    {id:'dup1',name:'Maya',type:'climb',date:'2026-07-09',createdAt:'4'},
+    {id:'dup2',name:'Maya',type:'climb',date:'2026-07-09',createdAt:'5'},
+  ];
+  const cappedModel=totalsModel(),sumThrough=cut=>{let sum=0;cappedModel.dayTotal.forEach((value,key)=>{if(key.slice(key.lastIndexOf('|')+1)<=cut)sum+=value});return sum};
+  ['2026-07-06','2026-07-08','2026-07-09','2026-07-31'].forEach(cut=>assert.equal(earnedThrough(cut,cappedModel),sumThrough(cut),'earnedThrough reads the credited day map through '+cut));
 
   // Entry 25: computeCredits memoizes the live (logs, config) pair only. Every way that pair can
   // change is checked here with a case whose stale answer would be a DIFFERENT number, so a

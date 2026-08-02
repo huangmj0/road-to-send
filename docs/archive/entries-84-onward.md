@@ -7,6 +7,33 @@ Entries are the originals from `IMPROVEMENT_LOG.md`, moved here verbatim under r
 is renumbered, reworded, or re-run. This is closed history and never a queue — see
 `IMPROVEMENT_LOG.md` for live work.
 
+## 95. Mark the bounties you already claimed inside the Record tab's select
+
+Status: Done — 2026-08-01
+Notes: Commit `Mark claimed bounties in Record picker`. Archived entry 94. index.html 157,452 → 157,566 bytes (+114 bytes, 92.7% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+The You tab's bounty card marks each of today's bounties you have already claimed with "· claimed today" (`renderBounties()`, `src/app.js:75`, shipped as entry 61). The Record tab's select, which lists the same three bounties, does not: `populateBountySelect()` builds each option as `icon title · +points` with no marker (`src/app.js:136`). So the parity breaks at exactly the moment of choosing — you can see what you have claimed everywhere except in the control where you pick one.
+
+Worth stating plainly, because it shapes the scope: a duplicate claim still scores against the weekly cap (`computeCreditsRaw`, `src/app.js:30`), and the existing submit guard (`src/app.js:149`) does not treat it as an error. This entry is informational parity, not a new restriction.
+
+### Requirements
+- `src/app.js` only, plus tests.
+- In `populateBountySelect()` (`src/app.js:136`), append the same marker the You tab uses to any option already claimed. Reuse `claimedTodayIds(nameLower,today)` (`src/app.js:68`) — despite its name it takes any date, so pass the currently selected `recordDate()` (`src/app.js:133`) rather than assuming today. The select's own label already distinguishes today from a back-dated day.
+- Use `currentTarget()` (`src/app.js:43`) for whose claims to check, so recording on someone else's behalf marks that person's claims and not your own.
+- An `<option>` carries no styling hook, so the marker is plain text inside the option label. **Use the date-neutral word "claimed", not the You tab's "claimed today".** The select is date-aware: its label already reads "Bounties for Jul 30" when a past day is chosen (`src/app.js:136`), so a "claimed today" marker inside it would misstate when the claim happened. The You tab's card is always today-scoped and keeps its existing wording unchanged.
+- Leave `#bountyHint`'s description behaviour (`src/app.js:140`) and the submit guard (`src/app.js:149`) exactly as they are.
+- Preserve the existing selection-restoring behaviour: `populateBountySelect()` re-selects the previous value when it is still in the list, and that must keep working with the marker appended.
+
+### Tests
+- `tests/client-state.dom.test.js`: with one of today's three bounties already claimed by the current user, that option's text carries the marker and the other two do not; changing the record date to a day with no claims removes the marker; recording on behalf of another person marks that person's claims. Assert the previous selection still survives a repopulate.
+- `tests/static-check.mjs`: no new `title` attribute is introduced by this entry.
+
+### Do not
+Do not disable, hide, reorder or remove a claimed option — a repeat claim is still allowed and still counts toward the Bounty Hunter tag. Do not change the submit guard or the scoring. Do not add a `title` tooltip. Do not reword the You tab's existing marker. Tone rule: mark only what someone **did** claim; add no "not yet claimed" marker, no count of unclaimed bounties, and no prompt to claim one.
+
+---
+
 ## 94. Key the heatmap's columns with weekday letters
 
 Status: Done — 2026-08-01

@@ -121,18 +121,18 @@ const domChecks = `(()=>{
   // Entry 25: one render() runs the raw scorer a FIXED number of times. Before the memo it was
   // about one scan per helper plus one per leaderboard row; now every computeCredits(logs) call
   // inside a render collapses onto a single scan. The remainder is the callers that deliberately
-  // pass a DERIVED array and so bypass the memo by design: earnedThrough() passes a date-filtered
-  // copy and updateRecordPreview() passes [...logs,draft]. If this delta moves, a new derived-array
-  // caller appeared inside render() — find it rather than editing the number.
+  // pass a DERIVED array and so bypass the memo by design: updateRecordPreview() passes
+  // [...logs,draft]. If this delta rises, a new derived-array caller appeared inside render() —
+  // find it rather than editing the number.
   endpoint='';me='Alex';recordingFor='Alex';
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
   const runsBefore=creditRuns;
   render();
-  assert.equal(creditRuns-runsBefore,2,'one render scores the live log exactly twice');
+  assert.equal(creditRuns-runsBefore,1,'one render scores the live log exactly once');
   const liveMemo=computeCredits(logs);
-  assert.equal(creditRuns-runsBefore,2,'reading the live pair again after a render costs no scan at all');
+  assert.equal(creditRuns-runsBefore,1,'reading the live pair again after a render costs no scan at all');
   // The point of the memo is that this number is now a constant. Before it, weekTrend() ran inside
   // leaders.map(), so the count grew with the crew; here a six-person crew costs exactly what a
   // one-person crew costs.
@@ -141,7 +141,7 @@ const domChecks = `(()=>{
   render();
   const runsCrewBefore=creditRuns;
   render();
-  assert.equal(creditRuns-runsCrewBefore,2,'a six-person crew costs the same two scans as a one-person crew');
+  assert.equal(creditRuns-runsCrewBefore,1,'a six-person crew costs the same one scan as a one-person crew');
   // updateRecordPreview() is the one render-path caller that passes a DERIVED array ([...logs,draft]),
   // so it always pays its own scan and must never disturb the live memo.
   const runsAfterRender=creditRuns;
@@ -385,6 +385,9 @@ const domChecks = `(()=>{
   assert.equal(youTrendCard.classList.contains('hide'),false,'logging something leaves the card open');
   const youCurve=youTrendEl.innerHTML;
   assert.ok(youCurve.indexOf('trend-line')>=0&&youCurve.indexOf('<title>')>=0,'the SVG keeps a line and per-point hover affordance');
+  const titlePoints=html=>html.split('<title>').slice(1).map(title=>Number(title.split(' · ')[1].split(' ')[0]));
+  assert.deepEqual(titlePoints(document.querySelector('#weeklyTrend').innerHTML),weeklyTrend(challengeToday()).map(row=>row.points),'the crew chart renders its unchanged curve points');
+  assert.deepEqual(titlePoints(youCurve),personalWeeklyTrend('alex',challengeToday()).map(row=>row.points),'the personal chart renders its unchanged curve points');
   const curveSvg=youCurve.slice(0,youCurve.indexOf('</svg>')+6);
   assert.ok(youCurve.indexOf('<div class="trend-labels">')>curveSvg.length-1,'the value labels sit outside the stretched SVG');
   assert.equal(curveSvg.indexOf('<text'),-1,'the SVG contains no distortable text marks');
