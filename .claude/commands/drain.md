@@ -1,127 +1,103 @@
 ---
-description: One loop tick — check the queue and delegate the work to a fresh subagent.
+description: One autonomous loop tick — implement or recover one entry PR, review it, and guarded-fast-forward it.
 model: sonnet
 effort: medium
 ---
 
-You are the loop's orchestrator. **Stay small.**
-
-Do not read `src/`, do not open a test file, do not edit anything, do not run `npm run build` or
-`npm test`, do not write a commit or a pull request body. Every one of those happens inside a
-subagent whose context dies when it finishes — that is the entire point of this command.
-
-The reason is arithmetic. `/loop` fires into the *same* session, so whatever you read stays with
-you for every later iteration. An entry worked inline costs tens of thousands of tokens — `app.js`
-alone is 78 KB — and ten of those end the window. Worked through a subagent it costs you seven lines.
-Your job is to check state, delegate, keep those seven lines, and pick the next wake-up.
+You are the loop orchestrator. Stay small. Do not read `src/`, tests, or diffs; do not edit files,
+run build/test, implement, or review inline. Fresh subagents own those contexts. Never enable
+auto-merge. Your only push to `main` is the exact non-force reviewed fast-forward in step 4.
 
 ## 1. Check state
 
-Run `npm run queue`. That is the only repository state you read. Branch on its exit code:
+Run `npm run queue`, the only repository state read before branching:
 
-- **0** — a `Todo` entry is next, named on the `next:` line. Go to step 2.
-- **3** — queue empty. Go to step 3.
-- **4** — the previous entry is not merged yet. Say nothing, idle (step 5). This is the ordinary
-  resting state of a healthy loop, not a problem to report.
-- **5** — an entry is stuck `In progress` from a run that died. Tell the user which one and **end
-  the loop**. Resetting a half-finished entry is a human's call, not yours.
+- **0** — continue with the `next:` entry.
+- **3** — report `queue complete — no Todo entries` and end. `/refill` is a separate deliberate
+  design run; do not make a finite drain endless.
+- **4** — parse the JSON object on `hold:` and recover that entry in step 2. Stop if it is absent,
+  malformed, or lacks its recorded subject.
+- **5** — report the stuck `In progress` entry and end. Resetting it is a human decision.
 
-Do not switch branches, reset, or clean the tree before running it. `npm run queue` works out what
-is in flight on its own, including from branches this session never touched.
+Do not switch branches, reset, clean, or inspect source before this check.
 
-## 2. Work one entry, in a subagent
+## 2. Obtain one ready PR
 
-Spawn exactly one, and wait for it (`run_in_background: false`). **Never run two at once** —
-entries overlap in the files they touch, which is why the queue serialises on merge at all.
+Before implementing on exit 0, list open PRs for head refs matching the controlled
+`codex/entry-<N>-*` or `claude/entry-<N>-*` prefix for `next:`. This is mandatory after a clean
+reset, because `origin/main` may still say `Todo` while a ready PR already carries `Done`. On exit 4,
+use the entry, ref, and subject from machine-readable `hold:`, never `archive-due:` or title text.
+Strip the single leading `origin/` from `hold.ref` before comparing it with GitHub's `headRefName`.
+If `ref` is non-null require that exact normalized PR head; otherwise use the controlled entry
+prefix. Require the commit subject to match `hold:`.
 
-Use the `queue-entry` agent, not `general-purpose`. It pins the model and effort this step is meant
-to run at; spawning `general-purpose` instead silently inherits yours and undoes the routing.
+Zero candidates on exit 0 permits implementation. Exactly one open candidate is recovered and
+skips implementation, whether ready or draft; review may repair red work and promote a green draft.
+Stop on multiple candidates, a mismatched entry number, or ambiguity; never create a duplicate PR.
+
+When no candidate exists on exit 0, spawn exactly one `queue-entry` agent and wait. Never run entry
+agents in parallel. Tell it to invoke the `entry` skill and return only:
 
 ```
 Agent(
   subagent_type: "queue-entry",
   run_in_background: false,
   description: "Work one queue entry",
-  prompt: """
-Invoke the `entry` skill and follow it exactly, start to finish.
-
-Then reply with ONLY these seven lines, and nothing else:
-  ENTRY: <number> — <title>
-  PR: <url, or "none">
-  CI: <green|red|pending>
-  REVIEW: <ready|draft — reason>
-  BYTES: <before> -> <after>
-  DEVIATIONS: <one line, or "none">
-  STATUS: <shipped|blocked|stopped>
-
-Do not paste diffs, file contents, test output, or the PR body into your reply. Your report is the
-only thing that survives you, and it is read by an orchestrator whose context has to last dozens of
-iterations. If you stopped without shipping, say why on the DEVIATIONS line.
-"""
+  prompt: "Invoke the `entry` skill and return its seven fixed report lines only."
 )
 ```
 
-Keep those seven lines. Nothing else from that run enters your context.
+- `ENTRY: <number> — <title>`
+- `PR: <url or none>`
+- `CI: <green|red|pending>`
+- `REVIEW: <ready|draft — reason>`
+- `BYTES: <before> -> <after>`
+- `DEVIATIONS: <one line or none>`
+- `STATUS: <shipped|blocked|stopped>`
 
-`REVIEW: ready` means the entry's PR passed its own checks and is now waiting on the user to merge —
-which is the one thing the loop never does for itself.
+Continue for shipped, a valid PR URL, and no deviations. A draft, red, or pending PR still goes to
+review for recovery. Stop on blocked, stopped, no PR, or a deviation. A recovered PR goes directly
+to review.
 
-## 3. Refill, in a subagent, at most once
+## 3. Independently review
 
-Exit 3 means the queue is drained. A refill opens a proposal PR that a human has to merge before
-any entry can run, so **check first that one is not already waiting** — proposing twice creates two
-conflicting queues that cannot both be merged.
-
-List the repository's open pull requests. If one is already a queue proposal, say nothing and idle
-(step 5). Otherwise spawn one subagent and wait for it — the `queue-refill` agent, not
-`general-purpose`, for the same reason as step 2:
+Spawn one `queue-review` agent at a time with only the entry number and PR URL. Tell it to invoke
+the `review` skill and return only its nine fixed lines.
 
 ```
 Agent(
-  subagent_type: "queue-refill",
+  subagent_type: "queue-review",
   run_in_background: false,
-  description: "Refill the queue",
-  prompt: """
-Invoke the `refill` skill and follow it exactly, start to finish.
-
-Then reply with ONLY these five lines, and nothing else:
-  QUEUE: <first>-<last>
-  PR: <url, or "none">
-  COUNT: <n> entries
-  REVIEW: <ready|draft — reason>
-  STATUS: <proposed|stopped>
-
-Do not paste entry bodies or the PR description into your reply.
-"""
+  description: "Review one queue entry PR",
+  prompt: "Invoke the `review` skill. ENTRY: <replace with actual entry number and title>. PR: <replace with actual PR URL>. Return its nine fixed report lines only."
 )
 ```
 
-Then tell the user the queue PR is waiting on them, and idle. **Do not refill again** — the next
-exit 3 will find the open proposal and idle silently until it merges.
+On `VERDICT: fixed`, discard every prior head and base SHA and send the updated PR to a fresh `queue-review`
+agent. Allow at most three review passes per tick. Stop on blocked, red/pending CI, a malformed
+report, or a third consecutive fix. Continue only for `VERDICT: approved`, `CI: green`,
+40-character `HEAD` and `BASE` SHAs, and a non-empty exact `SUBJECT` from the entry's `Notes:`.
 
-## 4. What to say
+## 4. Guard and merge
 
-The PR is the record, so stay silent on a clean iteration that opened a green one and marked it
-ready. Speak up only when the user has something to do or something is wrong:
+Immediately re-read PR metadata and require it to be open, non-draft, based on `main`, cleanly
+mergeable, still at the approved `HEAD` and `BASE`, and green on every check. Require exactly one
+entry commit whose parent is `BASE`, the entry number and subject to match, and no unsatisfied
+approval requirement. Any change invalidates review.
 
-- exit 5, or a subagent reported `STATUS: blocked` or `stopped`
-- a subagent reported `CI: red`, or `REVIEW: draft` — the PR could not hand itself over, so say
-  which check stopped it
-- a refill PR was opened — the loop cannot continue until it is merged
-- the same entry number comes back twice running, or `BYTES` crossed 95% of the budget
+Run `node scripts/queue-git-guard.mjs release <PR> <ENTRY> <BASE> <HEAD> <SUBJECT>` with safely
+quoted values. The deterministic guard re-reads GitHub state and validates green checks, entry
+branch, subject, one-commit parentage, base, and head before its exact non-force fast-forward. If
+`main` advances, Git rejects it atomically. Never bypass the guard or fall back to `gh pr merge`.
 
-That last pair means something is wrong with the loop itself rather than with one entry. Stop and
-say so rather than iterating into it.
+Fetch `origin/main`, require it to equal `HEAD`, verify the PR is merged, and rerun `npm run queue`.
+Success is exit 0 for the next entry or exit 3 for a complete queue. Never start a second entry.
 
-## 5. Pacing
+## 5. Report and pace
 
-Under `/loop` dynamic pacing, choose the next delay from what you are actually waiting for. In
-every ordinary case that is a human merging a pull request, which is not a thing that happens in
-sixty seconds:
+Stay silent after a clean reviewed merge. Report only blocked/stopped work, draft or red checks,
+three non-converging review passes, a merge-guard failure, exit 5, a repeated entry, a bundle above
+95% of budget, or queue completion.
 
-- shipped an entry, or exit 4 — **1800s**
-- opened a refill PR, or found one already open — **1800s**
-- exit 5, a repeated entry number, or `STATUS: stopped` — do not reschedule; end the loop
-
-Never poll faster. A short interval just wakes into "still not merged" and spends context to learn
-nothing, which is the failure this whole command exists to avoid.
+Under `/loop`, reschedule a clean merge after 120–300 seconds. End on completion, exit 5, stopped
+work, repeated entries, or a merge-guard failure. Never poll in the foreground.

@@ -27,4 +27,4 @@ whose context has to last dozens of iterations, so it is a fixed short report an
 never diffs, file contents, test output, or the pull request body.
 
 **Never merge the pull request**, enable auto-merge, approve it, or push to `main`. Marking it ready
-for review is the entire handoff.
+for independent review is the entire handoff.

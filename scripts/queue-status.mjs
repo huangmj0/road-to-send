@@ -7,16 +7,14 @@
 //   4  the previous entry is not on origin/main yet — stop, do not stack a second entry
 //   5  an entry is stuck In progress — a previous iteration died mid-entry; needs a human
 //
-// Exit 4 replaces the branch-prefix guard that docs/loop-prompt.md used to carry. That guard
-// looked for an open PR from a branch named `claude/entry-<N>-<slug>`; no branch in this
-// repository's history has ever used that prefix, so it matched nothing and the loop was free
-// to stack entries on unmerged work — which it did. Asking git whether the previous entry's
-// commit is on origin/main cannot drift, because it depends on no naming convention at all.
+// Exit 4 asks git whether the previous subject is on origin/main and scans remote queue content
+// for a Todo entry already marked Done elsewhere. The `hold:` JSON line gives the orchestrator
+// the exact entry/ref/subject needed to recover that PR without parsing human prose.
 
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseEntries } from './log-model.mjs';
+import {formatHold,parseEntries} from './log-model.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const args = process.argv.slice(2);
@@ -31,8 +29,8 @@ const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' })
 // A stale local view of origin/main is how the guard gets the wrong answer, so refresh it
 // before asking. `--no-fetch` is for offline runs and for the tests.
 if (!noFetch) {
-  const fetched = git('fetch', 'origin', 'main');
-  if (fetched.status !== 0) console.log('note:  git fetch origin main failed — reporting against the local ref');
+  const fetched = git('fetch', '--prune', 'origin');
+  if (fetched.status !== 0) console.log('note:  git fetch origin failed — reporting against the local refs');
 }
 
 const log = readFileSync(logPath, 'utf8');
@@ -61,16 +59,21 @@ for (const entry of inProgress) console.log(`stale: ${entry.n} — ${entry.title
 // The newest Done entry is the one whose commit should already be on origin/main.
 const previous = done.length ? done.reduce((a, b) => (b.n > a.n ? b : a)) : null;
 let unmerged = null;
+let hold = null;
+let holds = null;
 
 if (previous) {
   if (!previous.commitSubject) {
     unmerged = `entry ${previous.n} records no commit subject in Notes: — cannot verify it landed`;
+    hold = previous;
   } else {
     const subjects = git('log', 'origin/main', '--format=%s', '-500');
     if (subjects.status !== 0) {
       unmerged = 'origin/main is unavailable — cannot verify the previous entry landed';
+      hold = previous;
     } else if (!subjects.stdout.split('\n').includes(previous.commitSubject)) {
       unmerged = `entry ${previous.n} ("${previous.commitSubject}") is not on origin/main yet`;
+      hold = previous;
     }
   }
 }
@@ -85,13 +88,22 @@ if (previous) {
 // like the check above, so it depends on no branch-naming convention.
 if (!unmerged) {
   const held = heldOnRemote(new Set(todo.map(entry => entry.n)));
-  if (held) unmerged = `entry ${held.n} ("${held.title}") is already Done on ${held.ref}, which is not merged into origin/main`;
+  if (held.length===1) {
+    hold = held[0];
+    unmerged = hold.commitSubject
+      ? `entry ${hold.n} ("${hold.commitSubject}") is already Done on ${hold.ref}, which is not merged into origin/main`
+      : `entry ${hold.n} on ${hold.ref} records no commit subject in Notes: — cannot verify it`;
+  } else if(held.length>1){
+    holds=held;
+    unmerged=`multiple remote branches hold Todo entries Done (${held.map(item=>`${item.n} on ${item.ref}`).join(', ')}) — cannot choose one safely`;
+  }
 }
 
 function heldOnRemote(todoNumbers) {
-  if (!todoNumbers.size) return null;
+  if (!todoNumbers.size) return [];
   const refs = git('for-each-ref', '--format=%(refname)', 'refs/remotes/origin');
-  if (refs.status !== 0) return null;
+  if (refs.status !== 0) return [];
+  const matches=[];
   for (const ref of refs.stdout.split('\n').map(line => line.trim()).filter(Boolean)) {
     if (ref === 'refs/remotes/origin/HEAD' || ref === 'refs/remotes/origin/main') continue;
     // Already merged: whatever it holds is on main, so it is nobody's in-flight work.
@@ -100,13 +112,15 @@ function heldOnRemote(todoNumbers) {
     const log = git('show', `${ref}:IMPROVEMENT_LOG.md`);
     if (log.status !== 0) continue;
     for (const entry of parseEntries(log.stdout)) {
-      if (entry.state === 'Done' && todoNumbers.has(entry.n)) return {n: entry.n, title: entry.title, ref: ref.replace('refs/remotes/', '')};
+      if (entry.state === 'Done' && todoNumbers.has(entry.n)) matches.push({...entry,ref:ref.replace('refs/remotes/', '')});
     }
   }
-  return null;
+  return matches.sort((a,b)=>a.ref.localeCompare(b.ref));
 }
 
 if (unmerged) {
+  if (hold) console.log(formatHold(hold,hold.ref||null));
+  if (holds) console.log(`holds: ${JSON.stringify(holds.map(item=>({entry:item.n,ref:item.ref,subject:item.commitSubject})))}`);
   console.log(`head:  ${unmerged}`);
   console.log('\nSTOP — wait for the previous entry to merge. Do not start a second entry on top of it.');
   process.exit(4);

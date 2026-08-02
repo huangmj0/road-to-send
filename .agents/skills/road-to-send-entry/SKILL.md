@@ -13,7 +13,7 @@ This step executes a spec a human already read and merged, and `npm test` catche
 before anyone else sees it — so it does not need the model the refill step needs. Keep the reasoning
 effort high anyway: the failures that actually happen here are the `TRAP` header notes, reusing the
 helpers the entry names, and reading the whole `=== summary ===` block instead of the first failure.
-`docs/loop-prompt.md` explains the split across all three workflows.
+`docs/loop-prompt.md` explains the split across all four workflows.
 
 ## 1. Orient
 
@@ -69,12 +69,15 @@ Run `npm run build`, then `npm test`. Read the complete `=== summary ===` block.
   `npm run queue` reads the subject to determine whether the entry merged.
 - Inspect `git diff` and `git status`. Stage only this entry's files, including regenerated
   `index.html`. Put the implementation, status, notes, and archive/index maintenance in one commit.
-- Push with `git push -u origin codex/entry-<N>-<slug>`.
+- Record the full `HEAD`, then publish the new entry branch with
+  `node scripts/queue-git-guard.mjs publish <N> <HEAD> <SUBJECT>`, passing safely quoted values.
+  Never publish an entry through a raw `git push`; the guard requires a new controlled branch and
+  exactly one commit directly atop the current `origin/main`.
 - Open a draft pull request using the repository template. Prefer the connected GitHub tools when
   available; otherwise use `gh`.
 - Check CI without pretending pending checks are green.
 
-## 6. Hand the pull request to the reviewer
+## 6. Hand the pull request to independent review
 
 A draft means this run has not finished checking itself. When it has, mark the pull request **ready
 for review** — `update_pull_request` with `draft: false`, or `gh pr ready`. Promote it only when
@@ -93,7 +96,8 @@ pending then, or if any item above fails, leave the pull request a draft and rep
 stopped it. A draft that names its problem is more useful than a ready pull request that hides it.
 
 **Never merge it**, enable auto-merge, approve it, or push to `main`. Marking it ready is the entire
-handoff; merging is the human decision that gates what reaches a live app.
+handoff. A fresh `$road-to-send-review` agent must approve the exact base and head before the drain
+orchestrator may perform its guarded fast-forward.
 
 Report the entry number and title, pull-request URL, CI status, whether the pull request is ready for
 review or still a draft and why, byte count before and after, and any deviations. Then stop.
