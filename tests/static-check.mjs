@@ -188,6 +188,9 @@ assert.match(html,/data-panel="you"[\s\S]*id="todayBounties"[\s\S]*id="personalA
 assert.match(script,/function claimBounty\(/,'a claim handler exists so bounty rows are actionable');
 assert.match(script,/<button class="bounty" type="button"[^>]*data-claim-bounty=[^>]*aria-label="Claim /,'bounty rows render as labelled one-tap claim buttons');
 assert.match(script,/function claimedTodayIds\(/,'a pure helper identifies bounties claimed today');
+const populateBountySelectSource=script.split('\n').find(line=>line.startsWith('function populateBountySelect('))||'';
+assert.ok(populateBountySelectSource,'the Record bounty picker has its own named population helper');
+assert.doesNotMatch(populateBountySelectSource,/title=/,'claimed bounty markers use option text, not a title tooltip');
 assert.doesNotMatch(html,/id="bountyHunter"|id="crewTitles"|class="card hunter-card"/,'the retired Titles card has no remaining slot in the template');
 assert.doesNotMatch(html,/\.title-grid\{|\.title-tile\{/,'the retired title tile styles are gone');
 assert.match(script,/function categoryDays\(/,'credited category-day counting is a pure helper');

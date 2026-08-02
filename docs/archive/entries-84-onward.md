@@ -7,6 +7,34 @@ Entries are the originals from `IMPROVEMENT_LOG.md`, moved here verbatim under r
 is renumbered, reworded, or re-run. This is closed history and never a queue — see
 `IMPROVEMENT_LOG.md` for live work.
 
+## 94. Key the heatmap's columns with weekday letters
+
+Status: Done — 2026-08-01
+Notes: Commit `Label heatmap columns by weekday`. Archived entry 93. index.html 157,042 → 157,452 bytes (+410 bytes, 92.6% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+`renderHeatmap()` pads the grid so column one is Monday (`src/app.js:98`), but nothing on screen says so. The only per-cell identification is `title="Jul 12 · 3 pts"` on each `<i>` (`src/app.js:98`) — and `IMPROVEMENT_LOG.md:13` is the maintainer's own record that **a `title` never renders on the phones this crew uses**, which is why entry 63 was withdrawn and why entry 85 stripped the Bounty Hunter's tooltip. So on a phone the heatmap is thirty-odd anonymous squares: you can see how much, never when.
+
+The card already carries a shade key (entry 62) and a caption (entry 36). The column axis is the last unlabelled dimension of the chart.
+
+### Requirements
+- `src/index.template.html` and `src/styles.css`, plus tests. No JavaScript is needed — the letters are static markup, because the grid's first column is always Monday.
+- Add a seven-cell header row immediately above `#youHeatmap` inside `#heatmapCard` (`src/index.template.html:38`), reading Monday through Sunday.
+- The row must line up with the grid exactly: mirror the three declarations from `.heatmap{grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;max-width:400px}` (`src/styles.css:15`). Append the new rule at the end of `src/styles.css`.
+- Mark the row `aria-hidden="true"`. `#youHeatmap` already owns the graphic's text alternative through its `role="img"` and `aria-label` (`src/app.js:98`), and a screen reader must not read seven stray letters before it.
+- Keep the letters small and muted enough not to compete with the cells; do not introduce a new colour token — reuse the existing muted token.
+- Verify at 320px that seven letters fit their columns without wrapping or widening the card.
+- `tests/static-check.mjs:85,89,214,215` use permissive `[\s\S]*` around this region and keep passing; the new assertion below is what pins the row's position.
+
+### Tests
+- `tests/static-check.mjs`: the weekday row sits immediately before `#youHeatmap` inside `#heatmapCard`, carries `aria-hidden="true"`, and holds exactly seven cells starting with Monday; its CSS rule declares the same seven-column template, gap and max-width as `.heatmap`.
+- `tests/client-state.dom.test.js`: the heatmap's `aria-label` is unchanged by this entry — the row adds no text to the accessible name.
+
+### Do not
+Do not make the heatmap cells tappable or focusable. At 320px the cells compute to roughly 34px, under rule 7's 44px minimum, with no way to reach 44px across seven columns at that width — a tap-to-read heatmap cannot be built inside the accessibility rule, and this entry must not smuggle one in. Do not add a `title` tooltip anywhere, and do not treat the existing ones as the fix. Do not change the shade key, the caption, `heatLevel()`, or the Monday-based padding. Tone rule: label the axis only — do not annotate empty cells or count them.
+
+---
+
 ## 90. Delete three class attributes that style nothing
 
 Status: Done — 2026-08-01

@@ -961,6 +961,31 @@ const domChecks = `(()=>{
   bountyEl.value='';
   updateRecordPreview();
   assert.equal(hintEl.textContent,'','clearing the choice empties the hint');
+
+  // Entry 95: the date-aware picker marks claims for the person being recorded, without
+  // changing its options or losing the caller's current selection on a repaint.
+  const pickerBounties=dailyBounties(challengeToday()),claimedBounty=pickerBounties[0],otherBounty=pickerBounties[1];
+  logs=[{id:'select-alex',name:'Alex',type:'bounty',bountyId:claimedBounty.id,date:challengeToday(),createdAt:'1'}];
+  recordingFor='Alex';
+  dateField.value=challengeToday();
+  bountyEl.value=claimedBounty.id;
+  populateBountySelect();
+  assert.ok(bountyEl.innerHTML.indexOf(claimedBounty.title+' · +'+claimedBounty.points+' · claimed')>=0,'the current user’s claimed bounty is marked in the picker');
+  assert.equal(bountyEl.innerHTML.split(' · claimed</option>').length-1,1,'the other two current bounties have no claimed marker');
+  assert.equal(bountyEl.value,claimedBounty.id,'a marked option still restores the previous selection');
+  dateField.value=shift(-1);
+  populateBountySelect();
+  assert.equal(bountyEl.innerHTML.indexOf(' · claimed</option>'),-1,'moving to an unclaimed day removes the marker');
+  logs.push({id:'select-bo',name:'Bo',type:'bounty',bountyId:otherBounty.id,date:challengeToday(),createdAt:'2'});
+  config.crew.push({name:'Bo'});
+  recordingFor='Bo';
+  dateField.value=challengeToday();
+  bountyEl.value=otherBounty.id;
+  populateBountySelect();
+  assert.ok(bountyEl.innerHTML.indexOf(otherBounty.title+' · +'+otherBounty.points+' · claimed')>=0,'recording for another climber marks that climber’s claim');
+  assert.equal(bountyEl.innerHTML.indexOf(claimedBounty.title+' · +'+claimedBounty.points+' · claimed'),-1,'the picker does not mark the current user’s claim for another climber');
+  logs=[];
+  recordingFor='Alex';
   typeRadio.value='climb';
 
   // Entry 22: Share only offers itself once a profile is chosen.
