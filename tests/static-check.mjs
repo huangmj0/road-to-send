@@ -238,6 +238,7 @@ assert.match(script,/function personalWeeklyTrend\(/,'a pure helper restricts th
 assert.match(script,/function momentumCurve\(/,'one helper produces every chart series');
 assert.match(script,/function trendSvg\(/,'one helper renders every chart SVG');
 assert.doesNotMatch(stylesheet,/\.trend-value\{|\.trend-point\{/,'the stretched SVG text and point styles are retired');
+assert.match(stylesheet,/\.bounty-peek\{grid-template-columns:auto minmax\(0,1fr\) auto\}\.bounty-peek>span:nth-child\(2\)\{min-width:0;overflow-wrap:anywhere\}/,'claimed bounty rows can break a long note without pushing out their points');
 assert.match(stylesheet,/\.trend-labels\{display:flex;justify-content:space-between;gap:12px;padding:8px 2px 0;font-size:12px;font-weight:800\}\.trend-label\.peak\{color:var\(--ink\)\}\.trend-label\.current\{color:var\(--muted\)\}/,'the curve value labels use HTML text styling');
 assert.match(stylesheet,/\.trend-baseline\{stroke:var\(--line-strong\);vector-effect:non-scaling-stroke\}/,'the curve baseline stays crisp and separates from the fill');
 assert.equal((stylesheet.match(/\.del\{[^}]*min-width:44px;min-height:44px;border-radius:10px\}/g)||[]).length,1,'the delete control has one 44px rule');

@@ -213,8 +213,9 @@ const domChecks = `(()=>{
   me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
   config={startDate:shift(-5),tripDate:shift(20),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
   const claimedId=dailyBounties(challengeToday())[0].id,claimedTitle=bountyById(claimedId).title;
+  const unbrokenClaimNote='https://example.test/thisisareallylongunbrokennotethatmustwrapwithoutmovingthepointscolumn';
   logs=[
-    {id:'k1',name:'Alex',type:'bounty',bountyId:claimedId,bountyTitle:claimedTitle,note:'felt good',date:shift(-1),createdAt:'1'},
+    {id:'k1',name:'Alex',type:'bounty',bountyId:claimedId,bountyTitle:claimedTitle,note:unbrokenClaimNote,date:shift(-1),createdAt:'1'},
     {id:'k2',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'2'},
     {id:'k3',name:'Maya',type:'bounty',bountyId:claimedId,bountyTitle:'Maya only',date:shift(-1),createdAt:'3'},
   ];
@@ -229,7 +230,8 @@ const domChecks = `(()=>{
   assert.equal(claimedOpen,true,'tapping the toggle opens it');
   assert.equal(claimedBox.classList.contains('hide'),false,'and reveals the container');
   assert.ok(claimedBox.innerHTML.indexOf(claimedTitle)>=0,'which now names the bounty that was claimed');
-  assert.ok(claimedBox.innerHTML.indexOf('felt good')>=0,'and the note written on the claim');
+  assert.ok(claimedBox.innerHTML.indexOf(unbrokenClaimNote)>=0,'and a long unbroken note remains present in full');
+  assert.ok(claimedBox.innerHTML.indexOf('<span class="bounty-pts">+')>=0,'and its points cell stays in the claimed-list row');
   assert.ok(claimedBox.innerHTML.indexOf('bounty-peek')>=0,'reusing the existing bounty row markup');
   assert.equal(claimedBox.innerHTML.indexOf('Maya only'),-1,'another person’s claims never appear here');
   assert.equal(claimedBox.innerHTML.indexOf('data-claim-bounty'),-1,'claimed rows are plain rows, never claim buttons');
@@ -881,11 +883,14 @@ const domChecks = `(()=>{
   me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;claimedOpen=false;
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Maya'}]};
   const alexBounty=dailyBounties(challengeToday())[0],boBounty=dailyBounties(challengeToday())[1];
-  logs=[{id:'b1',name:'Alex',type:'bounty',bountyId:alexBounty.id,bountyTitle:alexBounty.title,date:shift(-1),createdAt:'1'},{id:'b2',name:'Bo',type:'bounty',bountyId:boBounty.id,bountyTitle:boBounty.title,date:shift(-1),createdAt:'2'}];
+  const personClaimNote='https://example.test/anotherlongunbrokennotethatmustwrapwithoutmovingthepointscolumn';
+  logs=[{id:'b1',name:'Alex',type:'bounty',bountyId:alexBounty.id,bountyTitle:alexBounty.title,date:shift(-1),createdAt:'1'},{id:'b2',name:'Bo',type:'bounty',bountyId:boBounty.id,bountyTitle:boBounty.title,note:personClaimNote,date:shift(-1),createdAt:'2'}];
   render();
   openPersonCard('Bo');
   const personClaimed=document.querySelector('#personClaimed'),personClaimedCap=document.querySelector('#personClaimedSummary');
   assert.ok(personClaimed.innerHTML.indexOf(boBounty.title)>=0,'the card lists that climber’s bounty title');
+  assert.ok(personClaimed.innerHTML.indexOf(personClaimNote)>=0,'the person card keeps a long unbroken note in full');
+  assert.ok(personClaimed.innerHTML.indexOf('<span class="bounty-pts">+')>=0,'the person card keeps its points cell beside the wrapped note');
   assert.equal(personClaimed.innerHTML.indexOf(alexBounty.title),-1,'another climber’s bounty title is absent');
   assert.ok(personClaimedCap.textContent.indexOf('1 claim')>=0,'the card caption names the claim count');
   assert.ok(personClaimed.innerHTML.indexOf('bounty-peek')>=0,'the card reuses the bounty row shape');

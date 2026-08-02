@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 92 — Hide the bottom-nav glyphs from the screen reader, and keep focus on the chip you tapped — Done — 2026-08-01
-- 93 — Break a long note inside the claimed-bounty row — Todo
+- 93 — Break a long note inside the claimed-bounty row — Done — 2026-08-01
 - 94 — Key the heatmap's columns with weekday letters — Todo
 - 95 — Mark the bounties you already claimed inside the Record tab's select — Todo
 - 96 — Cut render()'s avoidable rescoring — Todo
@@ -49,39 +48,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 92. Hide the bottom-nav glyphs from the screen reader, and keep focus on the chip you tapped
-
-Status: Done — 2026-08-01
-Notes: Commit `Hide nav glyphs and restore chip focus`. Archived entry 91. index.html 156,480 → 156,912 bytes (+432 bytes, 92.3% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Two rule 7 defects, both in controls a keyboard or screen-reader user touches constantly.
-
-**The nav glyphs are read aloud.** `src/index.template.html:66` ships `<button id="navYou" …><span>●</span>You</button>`, `<span>＋</span>Record` and `<span>♟</span>Crew`. None of the three spans is `aria-hidden="true"`, so the primary navigation announces as "black circle You", "plus sign Record" and "black chess pawn Crew". Worse, all three `<section>`s use `aria-labelledby` pointing at those buttons (`src/index.template.html:20`, `:42`, `:57`), so the three landmark regions inherit the glyph names too. Rule 7 names this case explicitly, and `.brand` (`src/index.template.html:18`) and the category chips (`src/app.js:80`) already do it correctly — the bottom nav is the outlier.
-
-**Tapping a filter chip throws focus to the top of the document.** `renderFeedChips()` (`src/app.js:161`) rebuilds its container's `innerHTML` wholesale, `render()` calls it for both rows (`src/app.js:114`), and `setFeedType()` (`src/app.js:162`) ends in `render()`. So activating a chip destroys the very button that was activated: `document.activeElement` falls back to `<body>`, a keyboard user must tab from the top of the page to reach the next chip, and the `aria-pressed` change is never announced because the node carrying it no longer exists. Both `#feedFilter` (You) and `#crewFeedFilter` (Crew) are affected.
-
-### Requirements
-- `src/index.template.html`, `src/app.js` and `src/styles.css` if needed, plus tests.
-- Add `aria-hidden="true"` to the three glyph `<span>`s in the bottom nav (`src/index.template.html:66`). Do not change the glyphs, the visible labels, or the `aria-current` handling.
-- After `renderFeedChips()` re-renders a row, restore focus to the chip carrying the newly selected `data-feed-type` in that same row, but **only when focus was inside that row before the re-render** — `render()` runs for many reasons, and a sync or a save must never steal focus from wherever the user actually is.
-- `restoreFeedFocus()` (`src/app.js:155`) is the working precedent for re-finding an element after a re-render and focusing it; follow its shape rather than inventing a second mechanism. `data-feed-type` (`src/app.js:161`) gives the selector.
-- The stub harness cannot observe focus (`tests/harness.js:7-12`), so put the decision — which chip should receive focus, or none — in a small pure helper that the state suite can call directly, exactly as `nextFocusIndex()` (`src/app.js:154`) is tested at `tests/client-state.state.test.js:911-914`.
-- `tests/static-check.mjs:106-108` and `:118-119` pin the chip markup and both `renderFeedChips(...)` call sites as exact text. Extend those assertions rather than reshaping the call signature (rule 5).
-
-### Tests
-- `tests/static-check.mjs`: each of the three bottom-nav glyph spans carries `aria-hidden="true"`; the visible labels "You", "Record" and "Crew" are unchanged; the three sections still use `aria-labelledby`.
-- `tests/client-state.state.test.js`: the new pure helper returns the selected chip's type when focus was in that row and returns nothing when it was not.
-- `tests/client-state.dom.test.js`: after `setFeedType()`, the selected chip in the affected row carries `aria-pressed="true"`, and the other row is untouched.
-
-### Do not
-Do not move focus on any render that the user did not initiate from within that chip row — a background sync must not pull the caret. Do not convert the chips to links, change their order, or alter `data-feed-type` values. Do not remove the glyphs from the nav; hide them from assistive technology only. Do not add a new focus-management helper when `restoreFeedFocus()`'s pattern fits. Tone rule: this entry announces nothing new and adds no copy.
-
----
-
 ## 93. Break a long note inside the claimed-bounty row
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Wrap long claimed-bounty notes`. Archived entry 92. index.html 156,912 → 157,042 bytes (+130 bytes, 92.4% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 Entry 82 fixed the overflowing rows it found, changing `1fr` to `minmax(0,1fr)` on `.activity` and adding `.activity>div{min-width:0;overflow-wrap:anywhere}` (`src/styles.css:32`). It did not reach `.bounty-peek{display:grid;grid-template-columns:auto 1fr auto;…}` (`src/styles.css:24`), whose middle track is a bare `1fr` — a min-content floor — holding a `<span>` with neither `min-width:0` nor `overflow-wrap`.
