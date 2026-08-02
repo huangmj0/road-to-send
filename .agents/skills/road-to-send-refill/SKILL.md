@@ -14,7 +14,7 @@ This is the loop's design step. Every entry written here becomes a binding spec 
 vague `### Requirements` block, a named helper that does not exist, or two entries colliding in the
 same DOM region each cost a full implementation iteration and a human review. A refill runs once per
 drained queue, against six to twelve entries, so the cost amortises to almost nothing. `docs/loop-prompt.md`
-explains the split across all three workflows.
+explains the split across all four workflows.
 
 ## Hard boundary
 

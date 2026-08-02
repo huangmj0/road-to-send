@@ -61,8 +61,11 @@ just the first failure. `check:generated` is read-only: if it fails, run `npm ru
   `npm run queue` reads that subject back out to tell the next iteration whether you landed, so an
   entry without it reports as unverifiable and stalls the loop. Add any deviations after it.
 - All of that goes in the **same commit** as the implementation. One entry = one commit.
-- `git push -u origin claude/entry-<N>-<slug>`, then open a **draft** PR filling in the
-  repository's pull request template.
+- Record the full `HEAD`, then run
+  `node scripts/queue-git-guard.mjs publish <N> <HEAD> <SUBJECT>` with safely quoted values. Never
+  publish through a raw `git push`; the guard requires a new controlled branch and exactly one
+  commit directly atop current `origin/main`. Then open a **draft** PR filling in the repository's
+  pull request template.
 
 ## 6. Hand it to the reviewer
 
@@ -87,8 +90,8 @@ If any item above fails, **leave it a draft** and say which one. A draft that na
 worth more than a ready PR that buries it.
 
 **Never merge it.** Not by merging, not by enabling auto-merge, not by approving, not by pushing to
-`main`. Marking ready is the entire handoff; the merge is the human's, and it is the only gate
-between this loop and an app a real crew uses.
+`main`. Marking ready is the entire handoff. A fresh `review` run must approve the exact base and
+head before the drain orchestrator may perform its guarded fast-forward.
 
 - Report the entry number, the PR URL, CI status, and whether the PR is ready for review or still a
   draft and why. Then stop — do not start the next entry.

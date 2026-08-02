@@ -53,3 +53,9 @@ function commitSubjectFor(lines, headingIndex) {
 export function queueIndex(log) {
   return log.slice(log.indexOf('## Queue index'), log.indexOf('## Rules for implementers'));
 }
+
+// Exit-4 recovery is consumed by a context-light orchestrator, so keep the held entry's
+// machine-readable identity separate from the human `head:` explanation.
+export function formatHold(entry, ref = null) {
+  return `hold:  ${JSON.stringify({entry:entry.n,ref,subject:entry.commitSubject})}`;
+}

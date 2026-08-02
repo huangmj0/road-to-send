@@ -69,16 +69,17 @@ assert.match(readFileSync(entryCommand,'utf8'),/npm run queue/,'.claude/commands
 const refillCommand=at('.claude/commands/refill.md');
 assert.ok(existsSync(refillCommand),'refuelling the queue lives in .claude/commands/refill.md, separate from the run that implements entries');
 assert.match(readFileSync(refillCommand,'utf8'),/IMPROVEMENT_LOG\.md.*nothing else/,'.claude/commands/refill.md keeps a refill PR to IMPROVEMENT_LOG.md alone, so proposing work and shipping it stay separate runs');
-// The loop orchestrator delegates to the two commands by name rather than restating them, which is
+// The loop orchestrator delegates implementation and release judgment by name rather than
+// restating them, which is
 // the only reason the loop body still lives in one place. If it stopped naming them it would have
 // started carrying its own copy.
 const drainCommand=at('.claude/commands/drain.md');
 assert.ok(existsSync(drainCommand),'the loop tick lives in .claude/commands/drain.md');
 const drain=readFileSync(drainCommand,'utf8');
-for(const skill of ['entry','refill'])assert.match(drain,new RegExp('`'+skill+'` skill'),`.claude/commands/drain.md delegates to the ${skill} skill by name instead of restating it`);
+for(const skill of ['entry','review'])assert.match(drain,new RegExp('`'+skill+'` skill'),`.claude/commands/drain.md delegates to the ${skill} skill by name instead of restating it`);
 assert.match(drain,/npm run queue/,'.claude/commands/drain.md branches on npm run queue');
 
-// The three workflows are not equally hard, so each declares the model and reasoning effort it runs
+// The four workflows are not equally hard, so each declares the model and reasoning effort it runs
 // at: refill designs binding specs a later run executes literally, entry executes one a human
 // already merged and npm test checks, drain reads an exit code and delegates. Claude Code reads
 // that tier from a different file depending on how the workflow was entered — the agent definition
@@ -94,22 +95,26 @@ const frontmatter=path=>{
 // The tiers this repo routes between, cheapest first. Adding another means ranking it here too.
 const ranked=['haiku','sonnet','opus'];
 const efforts=['low','medium','high','xhigh','max'];
-const tier=Object.fromEntries(['drain','entry','refill'].map(name=>{
+const tier=Object.fromEntries(['drain','entry','review','refill'].map(name=>{
   const fm=frontmatter(`.claude/commands/${name}.md`);
   assert.ok(ranked.includes(fm.model),`.claude/commands/${name}.md pins the model it runs on, one of ${ranked.join('/')} — inherit or an unranked alias puts it back on whatever the session happened to be using (saw ${JSON.stringify(fm.model)})`);
   assert.ok(efforts.includes(fm.effort),`.claude/commands/${name}.md pins its reasoning effort, one of ${efforts.join('/')} (saw ${JSON.stringify(fm.effort)})`);
   return [name,fm];
 }));
-for(const [name,agent] of [['entry','queue-entry'],['refill','queue-refill']]){
+for(const [name,agent] of [['entry','queue-entry'],['review','queue-review']]){
   const fm=frontmatter(`.claude/agents/${agent}.md`);
   assert.equal(fm.name,agent,`.claude/agents/${agent}.md declares name: ${agent}, which is the subagent type /drain spawns`);
   assert.match(drain,new RegExp('subagent_type: "'+agent+'"'),`.claude/commands/drain.md spawns the ${agent} agent for the ${name} step rather than general-purpose, which would inherit the orchestrator's model instead of pinning its own`);
   for(const field of ['model','effort'])assert.equal(fm[field],tier[name][field],`.claude/agents/${agent}.md and .claude/commands/${name}.md declare the same ${field} — /drain enters the ${name} step through the first and a human running /${name} enters through the second, so both have to say ${JSON.stringify(tier[name][field])} (agent says ${JSON.stringify(fm[field])})`);
 }
+const refillAgent=frontmatter('.claude/agents/queue-refill.md');
+assert.equal(refillAgent.name,'queue-refill','.claude/agents/queue-refill.md keeps the explicit-only refill worker available');
+for(const field of ['model','effort'])assert.equal(refillAgent[field],tier.refill[field],`.claude/agents/queue-refill.md and .claude/commands/refill.md declare the same ${field}, even though finite drain no longer invokes refill automatically`);
 // Refill designs what entry implements, and it runs once per drained queue against six to twelve
 // entries where entry runs per commit. If it ever stops outranking entry, the reasoning in
 // docs/loop-prompt.md and in both agent files is no longer describing what the loop does.
 assert.ok(ranked.indexOf(tier.refill.model)>ranked.indexOf(tier.entry.model),`refill writes the binding specs entry executes literally, so it runs on a more capable model than entry — change this only together with the rationale in docs/loop-prompt.md, AGENTS.md and both .claude/agents files (saw refill on ${tier.refill.model}, entry on ${tier.entry.model})`);
+assert.ok(ranked.indexOf(tier.review.model)>=ranked.indexOf(tier.entry.model),`review is the independent release judgment, so it may not run below entry (saw review on ${tier.review.model}, entry on ${tier.entry.model})`);
 
 const codexSkill=name=>at(`.agents/skills/${name}/SKILL.md`);
 const codexMetadata=name=>readFileSync(at(`.agents/skills/${name}/agents/openai.yaml`),'utf8');
@@ -118,27 +123,71 @@ assert.match(codexEntry,/name: road-to-send-entry/,'the Codex entry skill has di
 assert.match(codexEntry,/npm run queue/,'the Codex entry skill orients on npm run queue before starting an entry');
 const codexRefill=readFileSync(codexSkill('road-to-send-refill'),'utf8');
 assert.match(codexRefill,/IMPROVEMENT_LOG\.md` and nothing else/,'the Codex refill skill keeps proposal and implementation in separate runs');
+const codexReview=readFileSync(codexSkill('road-to-send-review'),'utf8');
+assert.match(codexReview,/name: road-to-send-review/,'the Codex review skill has discoverable metadata');
+assert.match(codexReview,/Never merge/,'the independent Codex reviewer cannot release its own verdict');
 const codexDrain=readFileSync(codexSkill('road-to-send-drain'),'utf8');
-for(const skill of ['road-to-send-entry','road-to-send-refill'])assert.match(codexDrain,new RegExp('\\$'+skill),`the Codex drain skill delegates to $${skill} instead of restating it`);
+for(const skill of ['road-to-send-entry','road-to-send-review'])assert.match(codexDrain,new RegExp('\\$'+skill),`the Codex drain skill delegates to $${skill} instead of restating it`);
 assert.match(codexDrain,/Spawn exactly one/,'the Codex drain skill serializes write-heavy subagents');
 assert.match(codexDrain,/npm run queue/,'the Codex drain skill branches on npm run queue');
-for(const skill of ['road-to-send-entry','road-to-send-refill','road-to-send-drain']){
+for(const skill of ['road-to-send-entry','road-to-send-review','road-to-send-refill','road-to-send-drain']){
   assert.match(codexMetadata(skill),/allow_implicit_invocation: false/,`${skill} requires explicit invocation because it can create branches and pull requests`);
 }
 
-// A run that passed its own checks promotes its pull request out of draft, and stops there. Both
-// halves are load-bearing: the draft flag only means anything if a green run clears it, and the
-// merge is the human gate on what reaches a live app, so no workflow may take it.
+// Entry and refill stop at ready-for-review. Entry release authority belongs only to drain after a
+// fresh reviewer approves the exact head; neither implementation nor review may self-release.
 for(const workflow of ['.claude/commands/entry.md','.claude/commands/refill.md','.agents/skills/road-to-send-entry/SKILL.md','.agents/skills/road-to-send-refill/SKILL.md']){
   const text=readFileSync(at(workflow),'utf8');
   assert.match(text,/ready for review/i,`${workflow} marks its pull request ready for review once the checks pass, so a draft still means unfinished`);
-  assert.match(text,/[Nn]ever merge it/,`${workflow} stops at ready for review — merging is the human gate on what ships to a live app`);
+  assert.match(text,/[Nn]ever merge it/,`${workflow} stops at ready for review and cannot self-release`);
+}
+assert.match(readFileSync(at('.claude/commands/review.md'),'utf8'),/Never merge/,'.claude/commands/review.md cannot merge the head it judges');
+for(const review of [readFileSync(at('.claude/commands/review.md'),'utf8'),codexReview]){
+  assert.match(review,/BASE: <40-character SHA or none>/,`review binds its verdict to the base as well as the head`);
+  assert.match(review,/git add -- <paths>/,`review stages explicit permitted fix paths before amending`);
+  assert.ok(review.indexOf('git add -- <paths>')<review.indexOf('git commit --amend --no-edit'),`review stages its fix before amending the entry commit`);
+  assert.match(review,/draft is\s+recoverable|draft.*becomes fully green/is,`review can recover a transient draft instead of stalling forever`);
+  assert.match(review,/parent is that base|parent is `BASE`/i,`review approves only a one-commit integration on the reviewed base`);
+}
+for(const text of [drain,codexDrain]){
+  assert.match(text,/node scripts\/queue-git-guard\.mjs release <PR> <ENTRY> <BASE> <HEAD> <SUBJECT>/,`drain releases only through the deterministic base/head guard`);
+  assert.match(text,/sole (child|parent)|commit.*parent is `BASE`/s,`drain requires one entry commit directly atop the reviewed base`);
+  assert.doesNotMatch(text,/Run `gh pr merge/,`drain does not use a head-only merge API that can race an unreviewed base`);
+  assert.match(text,/queue complete — no Todo entries/,`drain stops when the finite queue is complete instead of refilling forever`);
+  assert.match(text,/codex\/entry-<N>-/i,`drain recovers an open Codex entry PR after a clean reset instead of duplicating it`);
+  assert.match(text,/claude\/entry-<N>-/i,`drain recovers an open Claude entry PR after a clean reset instead of duplicating it`);
+  assert.match(text,/never create a\s+duplicate PR/i,`drain treats ambiguous open entry PRs as a stop condition`);
+  assert.match(text,/machine-readable `hold:`|JSON object on `hold:`/i,`exit 4 consumes the queue command's structured hold record`);
+  assert.match(text,/Strip the single leading `origin\/`/i,`exit 4 normalizes the remote-tracking ref before comparing GitHub headRefName`);
+  assert.match(text,/never `archive-due:`|never `archive-due:` or title text/i,`exit 4 never mistakes the older archive-due entry for the held entry`);
+  assert.match(text,/whether ready or draft|draft.*proceeds to independent review/is,`drain sends a recovered draft to review instead of stalling permanently`);
+  assert.match(text,/discard every prior head and base SHA/i,`a reviewer fix invalidates both prior reviewed SHAs`);
+}
+assert.match(drain,/ENTRY: <replace with actual entry number and title>/,`Claude drain forwards the concrete entry target to its fresh reviewer`);
+assert.match(drain,/PR: <replace with actual PR URL>/,`Claude drain forwards the concrete PR target to its fresh reviewer`);
+const claudeSettings=readFileSync(at('.claude/settings.json'),'utf8');
+assert.ok(!claudeSettings.includes('gh pr merge:*'),'Claude does not grant every subagent unrestricted PR merge permission');
+assert.ok(!claudeSettings.includes('git push --force-with-lease:*'),'Claude does not grant every subagent unrestricted force-push permission');
+assert.ok(!claudeSettings.includes('git push -u origin:*'),'Claude does not grant every subagent unrestricted initial-push permission');
+assert.ok(claudeSettings.includes('node scripts/queue-git-guard.mjs:*'),'Claude permits only the deterministic guarded amend/release script for sensitive pushes');
+assert.ok(claudeSettings.includes('git rebase:*'),'Claude review may rebase a stale entry before sending its changed head to a fresh reviewer');
+assert.ok(claudeSettings.includes('gh pr create:*'),'Claude can open a new entry PR without human approval');
+for(const workflow of ['.claude/commands/entry.md','.agents/skills/road-to-send-entry/SKILL.md']){
+  const text=readFileSync(at(workflow),'utf8');
+  assert.match(text,/queue-git-guard\.mjs publish <N> <HEAD> <SUBJECT>/,`${workflow} publishes a new entry branch through the deterministic guard`);
+  assert.doesNotMatch(text,/`git push -u origin/,`${workflow} cannot bypass guarded initial publication`);
 }
 
 const loopDoc=readFileSync(at('docs/loop-prompt.md'),'utf8');
 assert.ok(!loopDoc.includes('```'),'docs/loop-prompt.md points at tool-specific workflows instead of carrying another fenced prompt');
 assert.match(loopDoc,/\.claude\/commands\/entry\.md/,'docs/loop-prompt.md names where the prompt actually lives');
+assert.match(loopDoc,/\.claude\/commands\/review\.md/,'docs/loop-prompt.md names the independent review workflow');
 assert.match(loopDoc,/\.agents\/skills\/road-to-send-entry\//,'docs/loop-prompt.md names where the Codex entry skill lives');
+assert.match(loopDoc,/road-to-send-review\//,'docs/loop-prompt.md names where the Codex review skill lives');
+assert.match(loopDoc,/fresh agent context/,'docs/loop-prompt.md states the actual independence boundary');
+assert.match(loopDoc,/same account/,'docs/loop-prompt.md does not overstate identity-level GitHub independence');
+assert.match(loopDoc,/stops on multiple matching remote branches/,'docs/loop-prompt.md makes duplicate recovery candidates fail closed');
+assert.match(loopDoc,/prunes deleted remote refs/,'docs/loop-prompt.md explains stale recovery refs are removed');
 
 // The live site is only published from a green tree, and only the app is published.
 const pages=readFileSync(at('.github/workflows/pages.yml'),'utf8');

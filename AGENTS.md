@@ -22,18 +22,29 @@ shared Google Sheet and from their browsers' localStorage. `index.html` is the d
 
 - Invoke `$road-to-send-entry` to implement, verify, commit, push, and open a draft PR for exactly
   one queue entry.
+- Invoke `$road-to-send-review` only as a fresh independent reviewer for a ready entry PR. It may
+  fix defects by amending the entry commit, but it never merges and never approves a head it changed.
 - Invoke `$road-to-send-refill` only when the queue is empty to propose new entries in a queue-only
   draft PR.
-- Both open their PR as a draft and mark it **ready for review** themselves once the local suites
-  and CI are green. Neither ever merges: the merge is the human gate on what reaches a live app.
-- Invoke `$road-to-send-drain` for a context-light loop tick. It reads only queue state and delegates
-  the entry or refill workflow to one fresh subagent, then stops. The outer automation or operator
-  owns the next tick.
-- The three workflows do not run on the same model. Refill is the design step — its entries are
+- Entry and refill open their PR as a draft and mark it **ready for review** once local suites and
+  CI are green. Neither may merge. Drain sends an entry PR to a fresh review agent and may perform
+  only an atomic non-force fast-forward when the approved head is the sole child of the approved
+  base. `scripts/queue-git-guard.mjs` enforces initial entry publication, reviewer lease updates,
+  and release. If `main` advances, Git rejects the release and a fresh review is required.
+- “Independent” means a fresh agent context that did not implement or modify the head. The current
+  setup uses one GitHub account, so GitHub cannot attest separate reviewer identity. Enforcing that
+  stronger boundary requires a separately credentialed GitHub App or bot; do not represent the
+  fresh-context boundary as a distinct GitHub approval.
+- Invoke `$road-to-send-drain` for one context-light loop tick. It reads queue state, delegates at
+  most one entry plus sequential independent review, performs the guarded merge, and stops. On an
+  empty queue it reports completion; refill remains a separate deliberate design run. The outer
+  automation or operator owns the next tick.
+- The four workflows do not run on the same model. Refill is the design step — its entries are
   binding specs a later run executes literally — so it gets the most capable model available at high
-  reasoning effort. Entry executes an already-merged spec that `npm test` checks, so a mid-tier model
-  at high effort is enough. Drain reads one exit code and delegates, so a mid-tier model at moderate
-  effort covers it. Each skill states its own tier at the top; `docs/loop-prompt.md` explains why.
+  reasoning effort. Review also gets the most capable model at high effort because it is the release
+  gate. Entry executes an already-merged spec that `npm test` checks, so a mid-tier model at high
+  effort is enough. Drain reads state, delegates, and guards one merge, so a mid-tier model at
+  moderate effort covers it. Each skill states its own tier; `docs/loop-prompt.md` explains why.
 - The Codex skills live under `.agents/skills/`; the Claude Code commands remain under
   `.claude/commands/`, with the subagent tiers pinned in `.claude/agents/`.
   `docs/loop-prompt.md` is the shared operator guide.
