@@ -1102,6 +1102,43 @@ const domChecks = `(()=>{
   assert.equal(detailWrites,0,'an unchanged repaint leaves diagnostic detail text node untouched');
   assert.equal(codeWrites,0,'an unchanged repaint leaves diagnostic code text node untouched');
 
+  // Entry 91: every other polite live-region write is equally quiet on an unchanged render, but
+  // each region still changes when the state it reports does.
+  endpoint='';syncState='local';syncDetail='';syncErrorCode='';lastDeleted=null;configErrors={};logs=[];
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  render();
+  const watchText=el=>{let text=el.textContent,writes=0;Object.defineProperty(el,'textContent',{configurable:true,get(){return text},set(value){writes++;text=value}});return{writes:()=>writes,text:()=>text}};
+  const remainingWatch=watchText(document.querySelector('#todayRemaining')),paceWatch=watchText(document.querySelector('#goalPace')),projectionWatch=watchText(document.querySelector('#goalProjection')),noticeWatch=watchText(document.querySelector('#configNotice')),undoWatch=watchText(document.querySelector('#undoText'));
+  render();
+  for(const region of [remainingWatch,paceWatch,projectionWatch,noticeWatch,undoWatch])assert.equal(region.writes(),0,'an unchanged render leaves every remaining polite region untouched');
+  logs=[{id:'live-change',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'}];
+  configErrors={groupGoal:'needs a whole number'};lastDeleted={label:'climb'};
+  render();
+  for(const region of [remainingWatch,paceWatch,projectionWatch,noticeWatch,undoWatch])assert.equal(region.writes(),1,'a genuine state change updates every remaining polite region');
+
+  // Both meter helpers also leave their live-region DOM alone when their value and label match.
+  const recordMeter=document.querySelector('#recordMeter'),youMeter=document.querySelector('#youMeter');
+  let recordMarkup=recordMeter.innerHTML,recordMarkupWrites=0,recordAriaWrites=0,youMarkup=youMeter.innerHTML,youMarkupWrites=0,youAriaWrites=0;
+  Object.defineProperty(recordMeter,'innerHTML',{configurable:true,get(){return recordMarkup},set(value){recordMarkupWrites++;recordMarkup=value}});
+  Object.defineProperty(youMeter,'innerHTML',{configurable:true,get(){return youMarkup},set(value){youMarkupWrites++;youMarkup=value}});
+  recordMeter.setAttribute=name=>{if(name==='aria-label')recordAriaWrites++};
+  youMeter.setAttribute=name=>{if(name==='aria-label')youAriaWrites++};
+  typeRadio.value='climb';
+  updateRecordPreview();
+  renderTodayStatus();
+  assert.equal(recordMarkupWrites,0,'an unchanged record draft leaves its meter markup untouched');
+  assert.equal(recordAriaWrites,0,'an unchanged record draft leaves its meter label untouched');
+  assert.equal(youMarkupWrites,0,'an unchanged day leaves its segmented meter markup untouched');
+  assert.equal(youAriaWrites,0,'an unchanged day leaves its segmented meter label untouched');
+  typeRadio.value='exercise';
+  updateRecordPreview();
+  logs=logs.concat([{id:'live-change-2',name:'Alex',type:'mobility',date:challengeToday(),createdAt:'2'}]);
+  renderTodayStatus();
+  assert.equal(recordMarkupWrites,1,'changing the activity type rebuilds the record meter');
+  assert.equal(recordAriaWrites,1,'changing the activity type updates the record meter label');
+  assert.equal(youMarkupWrites,1,'changing the day points rebuilds the segmented meter');
+  assert.equal(youAriaWrites,1,'changing the day points updates the segmented meter label');
+
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
 

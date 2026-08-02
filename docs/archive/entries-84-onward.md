@@ -7,6 +7,35 @@ Entries are the originals from `IMPROVEMENT_LOG.md`, moved here verbatim under r
 is renumbered, reworded, or re-run. This is closed history and never a queue — see
 `IMPROVEMENT_LOG.md` for live work.
 
+## 90. Delete three class attributes that style nothing
+
+Status: Done — 2026-08-01
+Notes: Commit `Delete unused class attributes`. Archived entry 89. index.html 156,324 → 156,244 bytes (-80 bytes, 91.9% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+Three class attributes ship in the page, match no CSS rule, are read by no JavaScript and are named by no test. Each reads like a styling hook that exists, and one of them makes `render()` do work with no effect.
+
+- **`active` on the two segmented toggles.** `src/index.template.html:61` ships `class="seg-btn active"` on `#leaderPointsBtn` and `#leaderWeekBtn`, and `syncSeg` in `render()` (`src/app.js:114`) keeps it in sync with `el.classList.toggle('active',on)`. There is **no `.seg-btn.active` rule** — the only `.active` selectors in `src/styles.css` are `.tab-panel.active` and `.bottom-nav button.active` (twice). The pressed appearance comes entirely from `.seg-btn[aria-pressed="true"]` (`:16`).
+- **`review-dialog`** — `src/index.template.html:72`. No CSS rule, no JS read, no test reference.
+- **`trend-hover`** — on the transparent `<rect>` inside the momentum curve (`src/app.js:105`). No CSS rule, no JS read, no test reference.
+
+### Requirements
+- `src/index.template.html`, `src/app.js` and tests. Nothing a user sees may change.
+- Remove the `active` token from the two `.seg-btn` elements in `src/index.template.html:61` and the corresponding `classList.toggle('active',on)` from `syncSeg` (`src/app.js:114`). Keep `syncSeg`'s `aria-pressed` handling exactly as it is — that is what styles the control and what a screen reader reads.
+- Remove `class="review-dialog"` from `src/index.template.html:72` and `class="trend-hover"` from the `<rect>` in `src/app.js:105`.
+- **Remove only the class attribute on the `<rect>` — the `<rect>` itself and its `<title>` stay.** `tests/client-state.dom.test.js:368` and `:372` assert one `<title>` per day and those assertions are not in scope here.
+- **Do not touch `.tab-panel.active` or the `active` class on the three `.bottom-nav` buttons** (`src/index.template.html:66`) — both are styled and live.
+- `tests/static-check.mjs:244`/`:247` match around the class with `[^>]*` and keep passing; confirm before editing.
+
+### Tests
+- `tests/static-check.mjs`: neither `#leaderPointsBtn` nor `#leaderWeekBtn` carries an `active` class, and both still carry `aria-pressed`; the strings `review-dialog` and `trend-hover` do not appear in the built page; the `.bottom-nav` buttons still carry `active`, so the live use is pinned against a future over-eager sweep.
+- `tests/client-state.dom.test.js`: toggling the leaderboard metric and scope still flips `aria-pressed` on the right buttons.
+
+### Do not
+Do not remove the `<rect>` or its `<title>` from the momentum curve — only the dead class attribute on it. Do not remove `aria-pressed` handling from `syncSeg`. Do not sweep the `active` class off the bottom nav or the tab panels. Do not delete any other attribute in the same commit; the three named above are the ones verified dead.
+
+---
+
 ## 89. Collapse the superseded 44px one-offs and the declarations the cascade already discards
 
 Status: Done — 2026-08-01
