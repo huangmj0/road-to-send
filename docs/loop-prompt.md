@@ -55,7 +55,7 @@ and require its approval through branch protection before release.
 
 `/loop` fires into the **same session**, so everything an iteration reads stays in context for
 every iteration after it. Worked inline, one entry costs tens of thousands of tokens — `src/app.js`
-alone is 78 KB — and a handful of them exhaust the window. That is the same rot the split test
+alone is tens of kilobytes — and a handful of them exhaust the window. That is the same rot the split test
 suites and the split archive were meant to stop, arriving by a different route.
 
 So the drain workflow reads almost nothing. It runs `npm run queue`, delegates implementation and

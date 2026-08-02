@@ -42,9 +42,15 @@ const archiveDir=at('docs/archive/');
 const archives=readdirSync(archiveDir).filter(name=>name.endsWith('.md')).sort();
 assert.ok(archives.length,'the shipped entries live in docs/archive/');
 for(const name of archives){
-  assert.ok(improvements.includes(`docs/archive/${name}`),`docs/archive/${name} has a section in the IMPROVEMENTS.md index`);
+  const marker=`## \`docs/archive/${name}\``;
+  const sectionStart=improvements.indexOf(marker);
+  assert.ok(sectionStart>=0,`docs/archive/${name} has a section in the IMPROVEMENTS.md index`);
+  const sectionEnd=improvements.indexOf('\n## ',sectionStart+marker.length);
+  const section=improvements.slice(sectionStart,sectionEnd<0?undefined:sectionEnd);
   const bytes=readFileSync(new URL(name,archiveDir)).length;
   assert.ok(bytes<=ARCHIVE_CAP,`docs/archive/${name} is ${bytes} bytes, over the ${ARCHIVE_CAP}-byte cap: start the next pass file and point the index at it — do not raise the cap`);
+  const titles=[...readFileSync(new URL(name,archiveDir),'utf8').matchAll(/^## (\d+\. .+)$/gm)].map(match=>match[1]);
+  for(const title of titles)assert.ok(section.includes(`- ${title}`),`${title} from docs/archive/${name} has a matching title bullet in its IMPROVEMENTS.md section`);
 }
 assert.ok(!/^## \d+\. /m.test(improvements),'IMPROVEMENTS.md is the index over docs/archive/, not a place entries are pasted back into');
 

@@ -6,10 +6,9 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 96 — Cut render()'s avoidable rescoring — Done — 2026-08-01
-- 97 — Re-index the archive and correct the stale figures in the loop docs — Todo
+- 97 — Re-index the archive and correct the stale figures in the loop docs — Done — 2026-08-01
 
-Entries 1–40 shipped and now live under `docs/archive/`, together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. `IMPROVEMENTS.md` indexes them by title. Entry numbers never restart.
+Entries 1–96 shipped and now live under `docs/archive/`, together with five backfilled stubs (B1–B5) for feature commits that shipped without an entry. `IMPROVEMENTS.md` indexes them by title. Entry numbers never restart.
 
 **63 was withdrawn, not shipped**, and like 39 its number is retired rather than reused. It put a visible point total on each weekly trend bar and forbade an SVG; entry 74 replaces those bars with an inline SVG curve, so shipping 63 first would have built markup for 74 to delete. The need behind it was real — a `title` tooltip never appears on the phones this crew uses — so 74 carries it as a requirement instead.
 
@@ -45,39 +44,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 96. Cut render()'s avoidable rescoring
-
-Status: Done — 2026-08-01
-Notes: Commit `Cut render rescoring`. Archived entry 95. index.html 157,566 → 157,730 bytes (+164 bytes, 92.8% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Rule 6 says `render()` runs often, so additions stay cheap. Three existing call sites are not, and two of them re-derive values `render()` is already holding. Measured on the stub DOM at 960 logs, 8 crew and 60 days (a phone pays more, since this excludes layout and HTML parsing): `render()` totals 23.2ms, of which `weeklyTrend()` is 5.1ms, `personalWeeklyTrend()` 4.6ms, `earnedThrough()` 2.8ms and `crewTitles()` 1.5ms.
-
-- `momentumCurve()` (`src/app.js:101`) walks the **entire** `dayTotal` map once per challenge day — 60 days × ~480 entries ≈ 29k iterations — and `render()` calls it twice (`renderTrend()` `:106`, `renderYouTrend()` `:107`), with a third call from `renderPersonCard()`. It computes a rolling seven-day sum, which a single bucketing pass plus a sliding window does in O(days + entries).
-- `earnedThrough()` (`src/app.js:100`) builds a filtered copy of the log and hands it to `computeCredits()`, which by design bypasses the memo when `entries!==logs` (`src/app.js:31`) — a **full re-score of every activity on every render**. It is exactly the sum of `model.dayTotal` entries whose date is on or before the cutoff, and `render()` already holds `model`.
-- `crewTitles()` (`src/app.js:59`) calls `totalsModel()` a second time, on the same line where `render()` already has `model`.
-
-### Requirements
-- `src/app.js` only, plus tests. No visible change: every number on screen must be identical before and after.
-- Rewrite `momentumCurve()` to bucket `dayTotal` by date once and slide a seven-day window across the challenge days. Keep it a pure helper with the same signature and the same return shape.
-- Compute `earnedThrough()` from the `dayTotal` map instead of re-scoring a filtered copy. This reads the map `computeCredits()` returns — it must not re-implement or fork any scoring maths (rule 6). The weekly bounty cap and the per-day category dedup are already baked into `dayTotal`, which is why the sum matches.
-- Pass the `model` `render()` already holds into `crewTitles()` rather than having it call `totalsModel()` again. Keep `crewTitles()` callable with its current behaviour from any other site that needs it.
-- **Rule 3, named deliberately:** `tests/client-state.dom.test.js:122` and `:133` assert `creditRuns-runsBefore===2` ("one render scores the live log exactly twice"). Removing `earnedThrough()`'s derived-array call moves that constant to **1**. The comment at `:110-115` explains that the number rising means a new derived-array caller appeared; this entry moves it in the intended direction, so update the expected value and the surrounding comment to match. This is a strengthening, not a weakening: the assertion still pins an exact scan count. `tests/client-state.dom.test.js:138` (the preview costs exactly one scan) is untouched and must stay.
-- Sequencing: this entry lands after entry 91, which adds guards inside `updateRecordPreview()` and the meter helpers. Do not revert those guards.
-
-### Tests
-- `tests/client-state.state.test.js`: `momentumCurve()` returns identical rows to the current implementation for a fixture spanning a full challenge, including the first six days where the window is partial, a day-one crew, and a crew with a single logged day.
-- `tests/client-state.state.test.js`: `earnedThrough()` equals the sum of `dayTotal` at a range of cutoffs, including one where the weekly bounty cap binds and one where a category is logged twice in a day.
-- `tests/client-state.dom.test.js`: the updated `creditRuns` assertion, plus a check that the crew and personal curves render the same points as before.
-
-### Do not
-Do not change any displayed value, curve shape, or caption. Do not fork, re-implement or inline any scoring maths — read the maps `computeCredits()` returns (rule 6). Do not add a new memo, cache or module-level map keyed by anything that grows with the log. Do not weaken the `creditRuns` assertions to "at most N" — keep them exact. Do not touch `computeCreditsRaw()`.
-
----
-
 ## 97. Re-index the archive and correct the stale figures in the loop docs
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Re-index archive loop docs`. Archived entry 96. index.html unchanged at 157,730 bytes. `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 `IMPROVEMENT_LOG.md:11` tells every implementer that `IMPROVEMENTS.md` "indexes them by title", and rule 10 tells them to look an entry up by reading "the one pass file that holds it". Both instructions currently fail for **41 of the 84 shipped entries**.
