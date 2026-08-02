@@ -107,6 +107,17 @@ const domChecks = `(()=>{
   render();
   assert.equal(crewHint.classList.contains('hide'),true,'the crew local hint hides when an endpoint is connected');
 
+  // Entry 88: activity rows keep their stored names, but the personal feed compares them through
+  // the same canonical key as totals so odd Sheet values neither disappear nor crash render().
+  endpoint='';
+  logs=[{id:'spaced-name',name:' Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  render();
+  assert.equal(document.querySelector('#youTotal').textContent,3,'the spaced row still contributes its existing points total');
+  assert.equal(youEmpty.classList.contains('hide'),true,'a leading-space name does not trigger the false personal empty state');
+  assert.ok(personalFeed.innerHTML.indexOf('spaced-name')>=0,'the leading-space row remains visible in the personal feed');
+  logs=[{id:'numeric-name',name:7,type:'climb',date:shift(-1),createdAt:'1'}];
+  assert.doesNotThrow(()=>render(),'a numeric activity name cannot crash the You tab');
+
   // Entry 25: one render() runs the raw scorer a FIXED number of times. Before the memo it was
   // about one scan per helper plus one per leaderboard row; now every computeCredits(logs) call
   // inside a render collapses onto a single scan. The remainder is the callers that deliberately
