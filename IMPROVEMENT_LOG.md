@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 91 — Guard the five live regions entry 83 left unguarded — Done — 2026-08-01
-- 92 — Hide the bottom-nav glyphs from the screen reader, and keep focus on the chip you tapped — Todo
+- 92 — Hide the bottom-nav glyphs from the screen reader, and keep focus on the chip you tapped — Done — 2026-08-01
 - 93 — Break a long note inside the claimed-bounty row — Todo
 - 94 — Key the heatmap's columns with weekday letters — Todo
 - 95 — Mark the bounties you already claimed inside the Record tab's select — Todo
@@ -50,43 +49,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 91. Guard the five live regions entry 83 left unguarded
-
-Status: Done — 2026-08-01
-Notes: Commit `Guard repeated live-region writes`. Archived entry 90. index.html 156,244 → 156,480 bytes (+236 bytes, 92.0% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Entry 83 added `setText()` (`src/app.js:138`) so a live region only announces when its text actually changed, and routed `#rawPreview`, `#creditPreview`, `#diagnosticTitle`, `#diagnosticDetail` and `#diagnosticCode` through it. Five more writes inside `aria-live="polite"` regions were left unguarded, and every one of them fires on **every** `render()`:
-
-- `#todayRemaining` — `role="status" aria-live="polite"` (`src/index.template.html:27`), written as `remainEl.textContent=copy` (`src/app.js:80`). The comment at `src/app.js:81` calls this the You card's only live region.
-- `#goalPace` and `#goalProjection` (`src/index.template.html:59`), both written at `src/app.js:114`.
-- `#configNotice` (`src/index.template.html:22`), `notice.textContent=…` at `src/app.js:114`.
-- `#undoText` inside `#undoBar` (`src/index.template.html:80`), written at `src/app.js:167`.
-
-`render()` runs on identity change, both leaderboard toggles, every filter chip, Show more, save, delete, undo, disconnect and every sync. So tapping "Bounties", then "Overall", then a filter chip re-reads "Behind pace by 12 pts · ~4 pts/day to hit the goal" and the whole remaining-today sentence three times each, verbatim — exactly the defect entry 83 exists to remove.
-
-The same region has a second, larger source of churn. `setMeter('#recordMeter',…)` (`src/app.js:53`, called from `:140`) unconditionally rewrites `style.gridTemplateColumns`, `innerHTML` (eight `<i>` nodes) and the `aria-label` on a `role="img"` element that sits **inside** `<div class="preview" role="status" aria-live="polite">` (`src/index.template.html:52`). `init()` binds `updateRecordPreview` to the note field's `input` event (`src/app.js:185`), so typing a 40-character note performs 40 rebuilds and 40 inline-style writes inside a live region.
-
-### Requirements
-- `src/app.js` only, plus tests. No markup changes and no visible change for a sighted user — this entry only stops redundant writes.
-- Route the five writes above through the existing `setText()` helper (`src/app.js:138`). Do not write a second helper.
-- Give `setMeter()` (`:53`) and `setSegmentedMeter()` (`:54`) the same early-return shape: when the points value **and** the label both match what the element was last given, leave the DOM untouched. Keep the guard cheap and local — compare against what is already in the DOM or a single cached value per element; do not add a new module-level cache keyed by anything that can grow.
-- The guards must be idempotent and safe on first render, when the element is empty (rule 6).
-- Entry 83's `### Do not` forbids removing live regions or adding new ones. This entry does neither: the regions and their markup stay exactly as they are. `tests/static-check.mjs:139,195,196,199` pin their existence — guard the writes, never the markup.
-
-### Tests
-- `tests/client-state.dom.test.js`: for each of the five regions, calling `render()` twice with unchanged data leaves the node untouched on the second pass (assert via a write counter or a mutation-detecting stub in the style the suite already uses for entry 83's regions), while a genuine change still updates the text.
-- `tests/client-state.dom.test.js`: `updateRecordPreview()` called twice with an unchanged draft does not rewrite `#recordMeter`'s `innerHTML` or its `aria-label`; changing the activity type or date still rebuilds it.
-- Read the `TRAP` header at the top of `tests/client-state.dom.test.js` before adding these — the harness's sharp edges around `render()` and the stub document are described there (rule 9).
-
-### Do not
-Do not remove, rename or relocate any live region, and do not add one. Do not change any of the copy in these regions. Do not switch a region from `polite` to `assertive`. Do not make the meter stop updating when its value genuinely changes — the guard is on redundant writes only. Tone rule: this entry adds no new announcement of any kind; announcing less is the entire point.
-
----
-
 ## 92. Hide the bottom-nav glyphs from the screen reader, and keep focus on the chip you tapped
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Hide nav glyphs and restore chip focus`. Archived entry 91. index.html 156,480 → 156,912 bytes (+432 bytes, 92.3% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 Two rule 7 defects, both in controls a keyboard or screen-reader user touches constantly.

@@ -24,7 +24,10 @@ for(const tab of ['you','record','crew']){
   assert.match(html,new RegExp(`data-tab="${tab}"`),`${tab} navigation exists`);
 }
 assert.match(html,/class="bottom-nav"[^>]+aria-label="Primary"/,'bottom navigation is named');
-assert.match(html,/id="navYou" class="active"[^>]*>\s*<span>●<\/span>You<\/button>/,'the You navigation button retains its live active class');
+assert.match(html,/id="navYou" class="active"[^>]*>\s*<span aria-hidden="true">●<\/span>You<\/button>/,'the You navigation button retains its live active class and hides its glyph');
+assert.match(html,/id="navRecord"[^>]*>\s*<span aria-hidden="true">＋<\/span>Record<\/button>/,'the Record navigation button keeps its visible label and hides its glyph');
+assert.match(html,/id="navCrew"[^>]*>\s*<span aria-hidden="true">♟<\/span>Crew<\/button>/,'the Crew navigation button keeps its visible label and hides its glyph');
+for(const tab of ['you','record','crew'])assert.match(html,new RegExp(`data-panel="${tab}"[^>]*aria-labelledby="nav${tab[0].toUpperCase()+tab.slice(1)}"`),`the ${tab} section remains labelled by its navigation button`);
 assert.doesNotMatch(html,/id="leaderPointsBtn"[^>]*class="[^"]*\bactive\b/,'the Points toggle carries no dead active class');
 assert.doesNotMatch(html,/id="leaderWeekBtn"[^>]*class="[^"]*\bactive\b/,'the Recent toggle carries no dead active class');
 assert.match(html,/id="leaderPointsBtn"[^>]*aria-pressed=/,'the Points toggle keeps its pressed state');

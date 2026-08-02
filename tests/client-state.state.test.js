@@ -934,6 +934,10 @@ const checks = `(()=>{
   assert.equal(nextFocusIndex(2,2),1,'a deleted last row hands focus to the new last row');
   assert.equal(nextFocusIndex(5,3),2,'a position past the end clamps to the last row');
 
+  // Entry 92: only a chip row that held focus asks renderFeedChips() to restore it.
+  assert.equal(feedFocusType(true,'climb'),'climb','a focused chip row restores the newly selected chip');
+  assert.equal(feedFocusType(false,'climb'),null,'an unfocused chip row leaves focus alone');
+
   // Entry 20: the per-person card composes the existing per-person helpers and adds no scoring math.
   const monday=weekKey(challengeToday()),onDay=n=>{const d=parseDateOnly(monday);d.setDate(d.getDate()+n);return localDate(d)};
   config={startDate:onDay(-14),tripDate:onDay(14),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};

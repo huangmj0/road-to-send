@@ -584,6 +584,7 @@ const domChecks = `(()=>{
   assert.equal(filterFeed.innerHTML.indexOf(CAT_LABELS.exercise)>=0,false,'and the other categories drop out');
   assert.equal(filterChips.innerHTML.indexOf('data-feed-type="climb" aria-pressed="true"')>=0,true,'the chosen chip is the pressed one');
   assert.equal(filterChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="false"')>=0,true,'and All un-presses');
+  assert.equal(document.querySelector('#crewFeedFilter').innerHTML.indexOf('data-feed-type="all" aria-pressed="true"')>=0,true,'changing the You row leaves the Crew row untouched');
   setFeedType('mobility');
   assert.equal(filterFeed.innerHTML.split('class="activity').length-1,1,'switching to another category shows that one');
   setFeedType('all');
