@@ -6,8 +6,7 @@ Status values: `Todo` · `In progress — YYYY-MM-DD` · `Done — YYYY-MM-DD` �
 
 ## Queue index
 
-- 89 — Collapse the superseded 44px one-offs and the declarations the cascade already discards — Done — 2026-08-01
-- 90 — Delete three class attributes that style nothing — Todo
+- 90 — Delete three class attributes that style nothing — Done — 2026-08-01
 - 91 — Guard the five live regions entry 83 left unguarded — Todo
 - 92 — Hide the bottom-nav glyphs from the screen reader, and keep focus on the chip you tapped — Todo
 - 93 — Break a long note inside the claimed-bounty row — Todo
@@ -52,43 +51,10 @@ Each entry restates the part of this that binds it in its own `### Do not`. This
 
 
 
-## 89. Collapse the superseded 44px one-offs and the declarations the cascade already discards
-
-Status: Done — 2026-08-01
-Notes: Commit `Collapse superseded CSS declarations`. Archived entry 88. index.html 156,624 → 156,324 bytes (-300 bytes, 92.0% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
-
-### Why
-Entry 85 gave the base classes their 44px minimum and its own "Why" named the underlying debt: `.head-actions .text-btn`, `.del` and `#bountyWeekToggle,#claimedToggle` were "three separate one-off patches of the same defect". Now that `.text-btn` carries the minimum itself, those patches are duplicates of the base rule, and a maintainer reading the file still cannot tell where a control's 44px actually comes from. Alongside them sit four declarations that never reach a pixel because a later rule overrides them verbatim.
-
-All in `src/styles.css`, where cascade order is line order:
-
-- `:21` `.head-actions .text-btn{display:inline-flex;align-items:center;min-height:44px}` — a byte-identical declaration block to `.text-btn` at `:34`, at higher specificity. Same computed style.
-- `:24` `#bountyWeekToggle,#claimedToggle{min-height:44px}` — both elements carry `class="text-btn"` (`src/index.template.html:32`), so `:34` already gives them the minimum.
-- `:22` `.undo-bar #undoDelete,.undo-bar #undoDismiss{min-height:44px;flex:none}` — `#undoDelete` is `.text-btn` (44px at `:34`) and `#undoDismiss` is `.icon-btn` (44px at `:3`). **Only `min-height:44px` is redundant here; `flex:none` is load-bearing and stays.**
-- `:9` `.pts,.rank,.bottom-nav button.active{color:var(--orange-ink)}` — all three selectors already set that exact colour at `:3`. The whole rule is a no-op.
-- `:3` `.del{…min-width:35px;min-height:35px}` — overridden verbatim by `.del{min-width:44px;min-height:44px;border-radius:10px}` at `:9`.
-- `:3` `.progress i{…background:var(--green);transition:width .3s}` — both declarations overridden by `.progress i{background:var(--orange-ink);transition:width .4s cubic-bezier(.4,0,.2,1)}` at `:9`.
-- `:18` `.trend-baseline{stroke:var(--line);stroke-width:1}` — `stroke` overridden by `:30`. **`stroke-width:1` is not set at `:30` and stays.**
-
-### Requirements
-- `src/styles.css` only, plus tests. Nothing a user sees may change — every removal is either a byte-identical duplicate or a declaration the cascade already discards. Verify in the built page that the 44px targets entry 85 established are still met.
-- Remove the rules and declarations listed above, keeping `flex:none` in the `.undo-bar` rule and `stroke-width:1` on `.trend-baseline`. `min-height:44px` occurs seven times in the file, so scope that edit inside the `.undo-bar` rule rather than replacing globally.
-- **Explicitly leave alone**, all verified as load-bearing: `.del{min-width:44px…}` at `:9` (the base `.del` is 35px, so this rule is the only thing giving the delete button its target); `.card.table-card{padding:18px 0}` at `:31` (a specificity bump that beats `@media(max-width:430px){.card{padding:17px}}` at `:8`, and is pinned by `tests/static-check.mjs:252`); `.btn.primary` at `:9` (changes the token). Also leave `.tab-panel.active` and `.bottom-nav button.active` — those classes are live.
-- This entry should reduce `index.html` by roughly 300 bytes. Do not raise `BUDGET` (rule 3).
-
-### Tests
-- `tests/static-check.mjs:154` asserts the literal `#bountyWeekToggle,#claimedToggle{min-height:44px}`, which this entry removes. **Per rule 3 this assertion is named here and its coverage is replaced, not dropped:** assert instead that both ids carry `class="text-btn"` in `src/index.template.html` and that `.text-btn` declares `min-height:44px` (already asserted at `:191`). The guarantee — those two controls are 44px tall — stays covered; only its route changes.
-- `tests/static-check.mjs`: assert `.del`, `.progress i` and `.trend-baseline` each appear exactly once with the surviving values, so a future entry cannot quietly re-add a shadowed duplicate.
-- No other assertion touches these rules: `:230` pins only the `:30` form of `.trend-baseline`, and `:70`/`:76` still match after the `.progress i` removal. Confirm that before editing.
-
-### Do not
-Do not remove `flex:none` from the `.undo-bar` rule or `stroke-width:1` from `.trend-baseline`. Do not change any colour token, padding, font or radius — this entry deletes dead text and changes no computed style. Do not "tidy" any rule not listed above. Do not weaken the 44px guarantees entry 85 shipped; this entry consolidates where they come from, it does not relax them.
-
----
-
 ## 90. Delete three class attributes that style nothing
 
-Status: Todo
+Status: Done — 2026-08-01
+Notes: Commit `Delete unused class attributes`. Archived entry 89. index.html 156,324 → 156,244 bytes (-80 bytes, 91.9% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
 
 ### Why
 Three class attributes ship in the page, match no CSS rule, are read by no JavaScript and are named by no test. Each reads like a styling hook that exists, and one of them makes `render()` do work with no effect.

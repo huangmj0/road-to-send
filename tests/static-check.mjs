@@ -24,6 +24,12 @@ for(const tab of ['you','record','crew']){
   assert.match(html,new RegExp(`data-tab="${tab}"`),`${tab} navigation exists`);
 }
 assert.match(html,/class="bottom-nav"[^>]+aria-label="Primary"/,'bottom navigation is named');
+assert.match(html,/id="navYou" class="active"[^>]*>\s*<span>●<\/span>You<\/button>/,'the You navigation button retains its live active class');
+assert.doesNotMatch(html,/id="leaderPointsBtn"[^>]*class="[^"]*\bactive\b/,'the Points toggle carries no dead active class');
+assert.doesNotMatch(html,/id="leaderWeekBtn"[^>]*class="[^"]*\bactive\b/,'the Recent toggle carries no dead active class');
+assert.match(html,/id="leaderPointsBtn"[^>]*aria-pressed=/,'the Points toggle keeps its pressed state');
+assert.match(html,/id="leaderWeekBtn"[^>]*aria-pressed=/,'the Recent toggle keeps its pressed state');
+assert.doesNotMatch(html,/review-dialog|trend-hover/,'the three dead class hooks are absent from the built page');
 assert.match(html,/id="recordMeter"[^>]+aria-label=/,'record preview meter is accessible');
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'persistent sync diagnostics are announced');
 assert.match(html,/id="toast"[^>]+role="status"[^>]+aria-live="polite"/,'toast is announced');

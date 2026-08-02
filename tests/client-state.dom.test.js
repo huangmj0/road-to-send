@@ -784,6 +784,12 @@ const domChecks = `(()=>{
   render();
   assert.equal(leaderRows.innerHTML,beforeRepaint,'repainting the leaderboard with titles is idempotent');
 
+  // Entry 90: segmented leaderboard controls use aria-pressed, not an unstyled active class.
+  const segmentStates={};
+  for(const id of ['#leaderPointsBtn','#leaderBountyBtn','#leaderWeekBtn','#leaderOverallBtn'])document.querySelector(id).setAttribute=(name,value)=>{if(name==='aria-pressed')segmentStates[id]=value};
+  leaderMetric='bounty';leaderScope='overall';render();
+  assert.deepEqual(segmentStates,{'#leaderPointsBtn':'false','#leaderBountyBtn':'true','#leaderWeekBtn':'false','#leaderOverallBtn':'true'},'toggling leaderboard metric and scope flips aria-pressed on the right buttons');
+
   // Entry 71: the rank column and Bounty Hunter mark carry the leaderboard without podium medals.
   leaderMetric='points';leaderScope='week';
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
