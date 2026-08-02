@@ -151,7 +151,8 @@ assert.match(html,/id="claimedToggle"[^>]*aria-controls="claimedList"/,'the clai
 assert.match(html,/id="claimedList"/,'the claimed list has a container');
 assert.match(html,/id="claimedList"[\s\S]*id="claimedSummary"[\s\S]*id="youEmptyState"/,'the claimed caption follows the list and precedes the You empty state');
 assert.match(html,/id="bountyWeek"[\s\S]*id="claimedToggle"[\s\S]*id="claimedList"[\s\S]*id="youEmptyState"/,'the claimed list sits under the week preview and above the You empty state');
-assert.match(html,/#bountyWeekToggle,#claimedToggle\{min-height:44px\}/,'the claimed toggle reuses the 44px touch target');
+assert.match(html,/id="bountyWeekToggle"[^>]*class="text-btn"/,'the week preview toggle reuses the text-button touch target');
+assert.match(html,/id="claimedToggle"[^>]*class="text-btn"/,'the claimed-list toggle reuses the text-button touch target');
 assert.match(script,/function claimedBounties\(/,'a pure helper lists the claims');
 assert.match(script,/function claimedCaption\(/,'a pure helper builds the claimed-list caption');
 assert.match(script,/function claimedRow\(/,'a pure helper owns claimed-bounty row markup');
@@ -230,6 +231,10 @@ assert.match(script,/function trendSvg\(/,'one helper renders every chart SVG');
 assert.doesNotMatch(stylesheet,/\.trend-value\{|\.trend-point\{/,'the stretched SVG text and point styles are retired');
 assert.match(stylesheet,/\.trend-labels\{display:flex;justify-content:space-between;gap:12px;padding:8px 2px 0;font-size:12px;font-weight:800\}\.trend-label\.peak\{color:var\(--ink\)\}\.trend-label\.current\{color:var\(--muted\)\}/,'the curve value labels use HTML text styling');
 assert.match(stylesheet,/\.trend-baseline\{stroke:var\(--line-strong\);vector-effect:non-scaling-stroke\}/,'the curve baseline stays crisp and separates from the fill');
+assert.equal((stylesheet.match(/\.del\{[^}]*min-width:44px;min-height:44px;border-radius:10px\}/g)||[]).length,1,'the delete control has one 44px rule');
+assert.equal((stylesheet.match(/\.progress i\{background:var\(--orange-ink\);transition:width \.4s cubic-bezier\(\.4,0,\.2,1\)\}/g)||[]).length,1,'the progress fill has one surviving colour and transition rule');
+assert.equal((stylesheet.match(/\.trend-baseline\{stroke-width:1\}/g)||[]).length,1,'the baseline keeps its one-pixel width once');
+assert.equal((stylesheet.match(/\.trend-baseline\{stroke:var\(--line-strong\);vector-effect:non-scaling-stroke\}/g)||[]).length,1,'the baseline keeps its crisp stroke once');
 assert.match(stylesheet,/\.breakdown-bar i\.nonzero\{min-width:3px\}\.pyramid-bar i\.nonzero\{min-width:3px\}\.progress i\.nonzero\{min-width:3px\}/,'each nonzero bar fill has a visible minimum width');
 // Entry 53: the person card gets the same weekly trend chart, sitting between the personal
 // records and the grade pyramid.

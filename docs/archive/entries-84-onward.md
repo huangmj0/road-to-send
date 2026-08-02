@@ -175,3 +175,34 @@ With a crew of two where Bo has 48 older points and Alex 30 recent ones, the def
 Do not change how any rank is computed, and do not make the leaderboard and the You tab agree by re-sorting either one — they answer different questions and both answers are wanted. Do not introduce dense ranking for ties; positional ranks with an alphabetical tiebreak are the current behaviour and changing that is a separate entry. Tone rule: do not add a rank-change indicator, a "dropped N places" line, or anything reporting a decline.
 
 ---
+
+## 88. One name key, so one odd Sheet row cannot empty or crash the You tab
+
+Status: Done — 2026-08-01
+Notes: Commit `Handle irregular Sheet names`. Archived entry 87. index.html 156,634 → 156,624 bytes (-10 bytes, 92.1% of the 170,000-byte budget). `npm test`: 5/5 suites. Deviations: None.
+
+### Why
+Every name comparison in the app goes through `nameKey()` — `String(x&&x.name||'').trim().toLowerCase()` (`src/app.js:25`) — except one. `render()` filters the personal feed with `logs.filter(x=>x.name.toLowerCase()===meLower)` (`src/app.js:114`): no trim, no string coercion.
+
+`sanitizeActivities()` (`src/app.js:19`) validates `type` and leaves `name` as it arrived, so a row typed straight into the Sheet reaches this filter raw. Two failures follow, both verified by running `render()`:
+
+- **A leading space** (`name:' Alex'`). The totals use `nameKey()` and count the row; the feed filter does not. The You tab shows "Total points 5" and a crew rank, while `#personalActivity` is hidden and the "New here? … Log something to start your streak" empty state is displayed. One screen, flatly contradicting itself.
+- **A numeric cell** (`name:7`, or a column shifted by one). `x.name.toLowerCase` is not a function, so `render()` throws. `loadRemote()` calls `render()` inside its own `try` (`src/app.js:147`), so the throw is caught by the **network** handler; `syncFailureCode()` (`:144`) has no branch for it and returns the default. The crew sees "Sync failed · retry ↻", "Could not reach the Sheet" and the code `RTS-REFRESH-NETWORK` — while `logs` has already been replaced. The Sheet was reached perfectly well; retrying cannot help, and the diagnostic points at the wrong thing.
+
+### Requirements
+- `src/app.js` only, plus tests. The fix is entirely client-side, and it is a **read-site** fix only.
+- Use the existing `nameKey(x)` helper for the personal-feed filter at `src/app.js:114` — `const myLogs=logs.filter(x=>x.name.toLowerCase()===meLower)` — instead of `x.name.toLowerCase()`, so it matches how the totals were computed. `nameKey()` already does `String(x&&x.name||'')`, so this alone fixes both the whitespace contradiction and the numeric-name throw; no coercion at ingestion is needed.
+- **That one filter is the whole exposure — verify before widening.** Line 114 contains four `x.name.toLowerCase()` reads, but only the `myLogs` filter iterates `logs`; the other three read `model.sorted` and `leaders`. Every other raw `.name.toLowerCase()` in the file (`:44`, `:52`, `:59`, `:109`, `:179`) iterates `config.crew` or a crew-derived model, and `normalizeCrew()` (`:16`) already coerces those with `String(x&&x.name||'')).trim()`. Activity rows are the only unnormalized source.
+- **Do not coerce `name` inside `sanitizeActivities()` (`src/app.js:19`) or anywhere else on the ingestion path.** `sanitizeActivities()` runs on the `roadToSendLogsV9` load (`src/app.js:37`, `:184`), and `persistLocal()` (`src/app.js:40`) serializes `logs` **wholesale** with `JSON.stringify(logs)`. Normalizing on ingestion would therefore rewrite every historical row's stored name on the next save or delete — a rule 1 violation, and a contradiction of this entry's own next requirement. Leave `sanitizeActivities()` exactly as it is.
+- **`src/apps-script.js` is out of scope** (rule 2). `normalizeActivityRow()` there does not trim or coerce, and that stays true; the client must tolerate what the Sheet sends.
+- Do not change any stored data, and do not rewrite what is posted back to the Sheet — only what the client reads (rule 1).
+
+### Tests
+- `tests/client-state.dom.test.js`: with a log row named `' Alex'` for the current user, the personal feed lists it and the "New here?" empty state is **not** shown, while the totals are unchanged. With a row named `7`, `render()` completes without throwing.
+- `tests/client-state.state.test.js`: `sanitizeActivities()` returns each row's `name` **unchanged** — `' Alex'` stays `' Alex'` and `7` stays `7`. This pins the read-site-only approach so a later change cannot reintroduce ingestion normalization and start rewriting stored names.
+- `tests/client-state.shared.test.js`: a remote payload containing a numeric name loads and renders without the sync status falling to the failure state — the Sheet was reachable, so the app must not report a network failure.
+
+### Do not
+Do not touch `src/apps-script.js`, `src/schema.json` or `src/scoring.json` (rule 2). Do not rename or re-key anything in localStorage (rule 4). **Do not normalize, trim, coerce or rewrite any stored activity row** — `persistLocal()` writes `logs` back wholesale, so mutating a row on load silently edits the crew's history (rule 1). Do not silently discard rows with unexpected names — the crew's data stays visible; this is about reading it consistently. Do not add a new user-facing warning about malformed rows; the diagnostics surface already exists and this entry does not add copy to it. Tone rule: removing a false empty state is the whole point — do not replace it with any message about what someone has not logged.
+
+---
