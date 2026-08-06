@@ -16,9 +16,22 @@ const entries=parseEntries(log);
 for(const entry of entries)assert.ok(entry.valid,`entry ${entry.n} has a Status: line reading Todo, In progress — date, Done — date, or Blocked — reason (saw ${JSON.stringify(entry.status)})`);
 assert.ok(entries.length,'IMPROVEMENT_LOG.md still lists numbered entries');
 
-// Shipped work belongs in IMPROVEMENTS.md, so the queue keeps at most the entry finished in this commit.
+// Entries batch: `Done` without a commit subject means implemented and reviewed locally, not yet
+// shipped. Limit that uncommitted exposure to BATCH_MAX. One older shipped entry may remain only
+// long enough for the next tick to perform the rule-10 archive move.
+const batchMax=Number(/const BATCH_MAX = (\d+)/.exec(readFileSync(at('scripts/queue-status.mjs'),'utf8'))?.[1]);
+const batchMin=Number(/const BATCH_MIN = (\d+)/.exec(readFileSync(at('scripts/queue-status.mjs'),'utf8'))?.[1]);
+assert.ok(Number.isInteger(batchMax)&&batchMax>0,'scripts/queue-status.mjs declares a numeric BATCH_MAX the queue and this suite can agree on');
+assert.ok(Number.isInteger(batchMin)&&batchMin>0&&batchMin<=batchMax,'scripts/queue-status.mjs declares a viable BATCH_MIN no larger than BATCH_MAX');
 const done=entries.filter(e=>e.state==='Done');
-assert.ok(done.length<=1,`shipped work belongs in IMPROVEMENTS.md: at most the entry completed in the current commit may be Done in IMPROVEMENT_LOG.md, but ${done.length} are (${done.map(e=>e.n).join(', ')}). Move the finished ones, heading through separator and verbatim, to the archive (rule 10)`);
+const openBatch=done.filter(e=>!e.commitSubject),archiveDue=done.filter(e=>e.commitSubject);
+assert.ok(openBatch.length<=batchMax,`the open batch is capped at BATCH_MAX = ${batchMax}, but ${openBatch.length} entries are unshipped Done (${openBatch.map(e=>e.n).join(', ')})`);
+assert.ok(archiveDue.length<=1,`at most one legacy shipped entry may await the next rule-10 archive move, but ${archiveDue.length} do (${archiveDue.map(e=>e.n).join(', ')})`);
+for(const path of ['IMPROVEMENT_LOG.md','docs/loop-prompt.md']){
+  const text=readFileSync(at(path),'utf8');
+  assert.match(text,/BATCH_MIN/,`${path} names the declared substantiality threshold rather than asking an orchestrator to guess`);
+  assert.match(text,/BATCH_MAX/,`${path} names the cap on uncommitted batch exposure`);
+}
 
 // The queue index at the top names every live entry.
 const index=queueIndex(log);
@@ -75,6 +88,11 @@ assert.match(readFileSync(entryCommand,'utf8'),/npm run queue/,'.claude/commands
 const refillCommand=at('.claude/commands/refill.md');
 assert.ok(existsSync(refillCommand),'refuelling the queue lives in .claude/commands/refill.md, separate from the run that implements entries');
 assert.match(readFileSync(refillCommand,'utf8'),/IMPROVEMENT_LOG\.md.*nothing else/,'.claude/commands/refill.md keeps a refill PR to IMPROVEMENT_LOG.md alone, so proposing work and shipping it stay separate runs');
+const refillText=readFileSync(refillCommand,'utf8');
+assert.match(refillText,/features, UX, and polish/i,'refill has an idea-led app remit rather than proposing cleanup alone');
+for(const forbidden of ['src/apps-script.js','src/schema.json','src/scoring.json'])assert.ok(refillText.includes(forbidden),`refill explicitly excludes contract file ${forbidden}`);
+assert.match(refillText,/moves? `index\.html` off the repository root/i,'refill never proposes changing the live Pages URL');
+assert.match(refillText,/Multi-entry epics/i,'refill keeps every proposal independently bounded');
 // The loop orchestrator delegates implementation and release judgment by name rather than
 // restating them, which is
 // the only reason the loop body still lives in one place. If it stopped naming them it would have
@@ -101,13 +119,13 @@ const frontmatter=path=>{
 // The tiers this repo routes between, cheapest first. Adding another means ranking it here too.
 const ranked=['haiku','sonnet','opus'];
 const efforts=['low','medium','high','xhigh','max'];
-const tier=Object.fromEntries(['drain','entry','review','refill'].map(name=>{
+const tier=Object.fromEntries(['drain','entry','review','refill','precommit-review','design-review'].map(name=>{
   const fm=frontmatter(`.claude/commands/${name}.md`);
   assert.ok(ranked.includes(fm.model),`.claude/commands/${name}.md pins the model it runs on, one of ${ranked.join('/')} — inherit or an unranked alias puts it back on whatever the session happened to be using (saw ${JSON.stringify(fm.model)})`);
   assert.ok(efforts.includes(fm.effort),`.claude/commands/${name}.md pins its reasoning effort, one of ${efforts.join('/')} (saw ${JSON.stringify(fm.effort)})`);
   return [name,fm];
 }));
-for(const [name,agent] of [['entry','queue-entry'],['review','queue-review']]){
+for(const [name,agent] of [['entry','queue-entry'],['review','queue-review'],['precommit-review','queue-precommit-review'],['design-review','queue-design-review']]){
   const fm=frontmatter(`.claude/agents/${agent}.md`);
   assert.equal(fm.name,agent,`.claude/agents/${agent}.md declares name: ${agent}, which is the subagent type /drain spawns`);
   assert.match(drain,new RegExp('subagent_type: "'+agent+'"'),`.claude/commands/drain.md spawns the ${agent} agent for the ${name} step rather than general-purpose, which would inherit the orchestrator's model instead of pinning its own`);
@@ -148,13 +166,50 @@ for(const workflow of ['.claude/commands/entry.md','.claude/commands/refill.md',
   assert.match(text,/[Nn]ever merge it/,`${workflow} stops at ready for review and cannot self-release`);
 }
 assert.match(readFileSync(at('.claude/commands/review.md'),'utf8'),/Never merge/,'.claude/commands/review.md cannot merge the head it judges');
+// Codex generates and Claude discriminates. A reviewer that edits the diff it is judging has
+// approved its own work, and the second opinion this split exists to buy evaporates. These
+// assertions used to require the opposite — that review staged explicit paths before amending —
+// and flipped when implementation moved to Codex. Findings go back to Codex; reviewers only judge.
 for(const review of [readFileSync(at('.claude/commands/review.md'),'utf8'),codexReview]){
   assert.match(review,/BASE: <40-character SHA or none>/,`review binds its verdict to the base as well as the head`);
-  assert.match(review,/git add -- <paths>/,`review stages explicit permitted fix paths before amending`);
-  assert.ok(review.indexOf('git add -- <paths>')<review.indexOf('git commit --amend --no-edit'),`review stages its fix before amending the entry commit`);
   assert.match(review,/draft is\s+recoverable|draft.*becomes fully green/is,`review can recover a transient draft instead of stalling forever`);
   assert.match(review,/parent is that base|parent is `BASE`/i,`review approves only a one-commit integration on the reviewed base`);
 }
+const reviewers=['.claude/commands/review.md','.claude/commands/precommit-review.md','.claude/commands/design-review.md','.agents/skills/road-to-send-review/SKILL.md'];
+for(const path of reviewers){
+  const text=readFileSync(at(path),'utf8');
+  assert.match(text,/VERDICT: <approved\|findings\|blocked>/,`${path} can only judge, so it has no verdict meaning it changed the code itself`);
+  assert.match(text,/never write code|never writes code/i,`${path} states plainly that it does not write code`);
+  assert.doesNotMatch(text,/git add -- <paths>/,`${path} never stages a fix — findings go back to Codex`);
+  assert.doesNotMatch(text,/git commit --amend/,`${path} never amends the commit it is judging`);
+}
+// Implementation is delegated to Codex through one repo-owned wrapper. The wrapper is the only
+// place the sandbox is chosen, so a bypass flag there would silently hand every delegated run full
+// disk access — ~/.codex/config.toml on a developer machine may well default to exactly that.
+const bridge=readFileSync(at('scripts/codex-run.mjs'),'utf8');
+assert.ok(!bridge.includes('--dangerously-bypass-approvals-and-sandbox'),'the Codex bridge never bypasses approvals and the sandbox');
+assert.ok(!bridge.includes('--dangerously-bypass-hook-trust'),'the Codex bridge never bypasses hook trust');
+assert.match(bridge,/'-s',tier\.sandbox/,'the Codex bridge passes an explicit sandbox for every role rather than inheriting the machine default');
+for(const path of ['.claude/commands/entry.md','.claude/agents/queue-entry.md']){
+  const text=readFileSync(at(path),'utf8');
+  assert.match(text,/scripts\/codex-run\.mjs/,`${path} delegates implementation to Codex through the repo-owned bridge`);
+  assert.match(text,/Codex writes the code/i,`${path} states who writes the code, so a future edit cannot quietly take it back`);
+}
+for(const mode of ['FIX','APPROVE','SHIP','PR-FIX'])assert.match(readFileSync(at('.claude/commands/entry.md'),'utf8'),new RegExp(`\\*\\*${mode}\\*\\*`),`.claude/commands/entry.md defines explicit ${mode} mode instead of re-entering the normal queue gate`);
+for(const mode of ['FIX','APPROVE','PR-FIX'])assert.match(drain,new RegExp(`\\*\\*${mode}\\*\\*`),`drain invokes explicit ${mode} mode when that transition is needed`);
+// Entries accumulate uncommitted and ship as one squashed commit, so the entry driver commits in
+// ship mode only. A per-entry commit would put the batch back to one entry per commit and defeat it.
+assert.match(readFileSync(at('.claude/agents/queue-entry.md'),'utf8'),/You do not commit/,'.claude/agents/queue-entry.md leaves committing to the ship step');
+assert.match(readFileSync(at('.claude/commands/entry.md'),'utf8'),/Git index is the boundary between entries/,'.claude/commands/entry.md preserves a reviewable per-entry diff while the batch remains uncommitted');
+assert.match(readFileSync(at('.claude/commands/precommit-review.md'),'utf8'),/unstaged diff is exactly this entry/,'.claude/commands/precommit-review.md judges the current entry rather than the whole staged batch');
+// The design gate is derived from the diff, never self-declared: a flag an agent sets is a flag it
+// can forget, and a layout nobody looked at is exactly what ships green.
+const uiScope=readFileSync(at('scripts/ui-scope.mjs'),'utf8');
+assert.match(uiScope,/export function classify/,'scripts/ui-scope.mjs exposes a pure classifier the suite can test');
+assert.doesNotMatch(uiScope,/\['diff','HEAD'/,'scripts/ui-scope.mjs classifies only the unstaged current entry, not earlier staged batch work');
+assert.match(readFileSync(at('.claude/commands/design-review.md'),'utf8'),/scripts\/ui-scope\.mjs/,'the design reviewer confirms the classification before spending a pass');
+assert.match(drain,/subagent_type: "queue-design-review"/,'/drain spawns the design reviewer for a major UI change rather than judging it inline');
+
 for(const text of [drain,codexDrain]){
   assert.match(text,/node scripts\/queue-git-guard\.mjs release <PR> <ENTRY> <BASE> <HEAD> <SUBJECT>/,`drain releases only through the deterministic base/head guard`);
   assert.match(text,/sole (child|parent)|commit.*parent is `BASE`/s,`drain requires one entry commit directly atop the reviewed base`);

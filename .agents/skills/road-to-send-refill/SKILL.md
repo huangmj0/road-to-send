@@ -12,7 +12,7 @@ Add new `Todo` entries to `IMPROVEMENT_LOG.md`, then stop. Do not implement any 
 This is the loop's design step. Every entry written here becomes a binding spec that a later
 `$road-to-send-entry` run executes literally, on a cheaper model, without re-litigating it — so a
 vague `### Requirements` block, a named helper that does not exist, or two entries colliding in the
-same DOM region each cost a full implementation iteration and a human review. A refill runs once per
+same DOM region each cost a full implementation iteration and two reviews. A refill runs once per
 drained queue, against six to twelve entries, so the cost amortises to almost nothing. `docs/loop-prompt.md`
 explains the split across all four workflows.
 
@@ -43,7 +43,18 @@ Read:
   nudges, reminders, crew-wide participation pressure, or unsolicited surfaces.
 - Only the title index in `IMPROVEMENTS.md` to avoid repeating shipped work. Read a specific archive
   pass only when a title looks like a collision.
-- `src/app.js` and `src/index.template.html` to verify each proposed gap and named helper is real.
+- `src/app.js`, `src/index.template.html`, and `src/styles.css` to verify each proposed gap and named
+  helper is real. Use Graphify as a locator, then read the source it points to.
+
+This is the only loop step that asks what the app should do. Reason from the real usage encoded in
+the screens, Sheet-backed records, and frozen localStorage shapes: what people log, which mobile
+surfaces carry the workflow, what they currently calculate or hunt for, and what is missing.
+Propose features, views, UX improvements, and polish — not a pass made only of internal cleanup.
+
+Every proposal must fit `src/app.js`, `src/index.template.html`, `src/styles.css`, and `tests/`.
+Never propose contract-file changes (`src/apps-script.js`, `src/schema.json`, `src/scoring.json`),
+build/tooling/dependency changes, moving root `index.html`, or a multi-entry epic. Those require
+organizer coordination or broaden the loop beyond its safe frontend scope.
 
 ## 3. Write the entries
 
@@ -63,7 +74,8 @@ Follow the existing entry shape exactly:
 - `---`.
 
 Add every entry to `## Queue index` and preserve ordering. Sequence dependencies top to bottom and
-state them in the later entry. Keep each entry small enough for one commit. Compare estimated
+state them in the later entry. Keep each entry independently implementable and bounded enough for
+one local gate. Compare estimated
 aggregate growth with `BUDGET` in `tests/size-check.mjs`; if the pass is likely to exceed it, make
 the first entry a deliberate, explained re-baseline.
 

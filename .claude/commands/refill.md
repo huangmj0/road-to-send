@@ -7,6 +7,18 @@ effort: high
 Refill `IMPROVEMENT_LOG.md` with new `Todo` entries, then stop. **You are not implementing
 anything in this run.**
 
+This is the design step, and it is the only place in the loop where anyone asks what the app
+*should* do. Everything downstream executes what you write literally: Codex implements the
+`### Requirements` block as a binding spec, and two reviewers check the diff against it. Nobody
+downstream will notice that the app is missing something you did not think of.
+
+So propose **improvements to the app**, not just cleanups of the code. Reason from how the crew
+actually uses this thing: it is a climbing log they open on a phone, at a crag, one-handed,
+between attempts. Read `src/app.js` and `src/index.template.html` to see what it does today, then
+ask what someone would want next — a view they cannot get, a number they have to work out in their
+head, a screen that makes them tap four times to record one send. Features, UX, and polish are all
+in scope, and a pass made only of small internal tidyings is a wasted pass.
+
 ## The one hard rule
 
 The pull request you open changes **`IMPROVEMENT_LOG.md` and nothing else**. No `src/`, no
@@ -35,8 +47,31 @@ Branch from the latest `origin/main`: `git checkout -B claude/queue-<N>-<N+k> or
 - The **index in `IMPROVEMENTS.md`** — titles only, so you do not propose something already
   shipped. Do not read the pass files under `docs/archive/` unless a specific title looks like a
   collision and you need to check.
-- `src/app.js` and `src/index.template.html`, to find gaps that are real. An entry that names a
-  helper which does not exist wastes the iteration that picks it up.
+- `src/app.js`, `src/index.template.html` and `src/styles.css`, to find gaps that are real. An
+  entry that names a helper which does not exist wastes the iteration that picks it up. Use
+  `graphify query` to locate things quickly, but read the files themselves before naming a helper —
+  the graph gives you names and line numbers, not code.
+
+## 2b. What is in scope, and what is not
+
+**In scope**: `src/app.js`, `src/index.template.html`, `src/styles.css`, `tests/`. New features,
+new views, UX and layout changes, and visual polish all count, as long as they live in those files.
+A change that alters the rendered layout gets an automatic design review during implementation, so
+propose it plainly rather than shrinking it to avoid one.
+
+**Out of scope — do not propose these, however tempting**:
+
+- **Contract files.** `src/apps-script.js`, `src/schema.json`, `src/scoring.json` are frozen by
+  rule 2. Changing them forces an API version bump and a manual organizer redeploy of the Apps
+  Script backend, against a live crew's data. A proposal that needs one is a conversation with a
+  human, not a queue entry.
+- **Build, tooling, layout, or dependency changes.** Rule 8 stands: no dependencies, runtime or
+  dev; no frameworks; no build-tool changes.
+- **Anything that moves `index.html` off the repository root.** That changes the published Pages
+  URL and breaks the link the crew already has.
+- **Multi-entry epics.** Each entry stands alone and is implementable in one pass. If an idea only
+  makes sense as four dependent entries, it is too big — propose the smallest version that is
+  useful on its own.
 
 ## 3. Write the entries
 
@@ -64,7 +99,7 @@ Add an index line for each under `## Queue index`, and keep the file's existing 
 same DOM region, put them in an order that works when drained top to bottom, and say so in the
 later entry's `### Requirements`. The loop does not reorder.
 
-Keep each entry small enough to be one commit. Watch the aggregate byte cost against the `BUDGET`
+Keep each entry independently implementable and bounded enough for one local gate. Watch the aggregate byte cost against the `BUDGET`
 in `tests/size-check.mjs` — `npm run queue` and `npm test` both report where `index.html` currently
 sits. If the pass plausibly exceeds it, make the first entry a deliberate re-baseline of `BUDGET`
 that explains the growth, as entries 23 and 24 did.

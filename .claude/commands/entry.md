@@ -1,97 +1,158 @@
 ---
-description: Work exactly one entry from IMPROVEMENT_LOG.md, then stop.
-model: sonnet
-effort: high
+description: Drive Codex through exactly one entry from IMPROVEMENT_LOG.md, or ship the accumulated batch, then stop.
+model: haiku
+effort: medium
 ---
 
-Work exactly ONE entry from `IMPROVEMENT_LOG.md`, then stop.
+Work exactly ONE entry from `IMPROVEMENT_LOG.md`, then stop. **Codex writes the code; you drive
+it.** You never edit `src/` yourself and never fix Codex's output by hand — findings go back to
+Codex.
+
+`/drain` chooses one mode in its prompt:
+
+- **ENTRY** — implement the next Todo locally; follow steps 1–5.
+- **FIX** — provide `ENTRY`, `SESSION`, and the reviewer's complete `FINDINGS`; skip queue
+  orientation and resume Codex as described in step 5.
+- **APPROVE** — provide `ENTRY`, the verified summary, and deviations after all local gates pass;
+  update only that entry's bookkeeping as described in step 5.
+- **SHIP** — publish the approved open batch; follow step 6.
+- **PR-FIX** — provide `PR`, `OLD_HEAD`, and complete `FINDINGS`; follow step 7.
+
+Never infer FIX or PR-FIX from a dirty tree. Require the mode and its fields so findings cannot be
+applied to the wrong entry, session, or published head.
 
 ## 1. Orient
 
 Run `npm run queue`. It refreshes `origin/main` and reports where the loop stands. Branch on its
 exit code and do not go further than it allows:
 
-- **4** — the previous entry has not merged. Report which entry is blocking, then STOP. Do not
-  start a second entry on top of unmerged work; entries routinely overlap in the files they touch.
-- **5** — an entry is stuck `In progress` from a run that died. Report it and STOP: resetting it
-  is a human's call, not yours.
-- **3** — queue empty. Report "queue empty — no Todo entries" and STOP. Do not invent work, re-do
-  a `Done` entry, or reopen anything. Refuelling the queue is `/refill`, a separate run.
-- **0** — the `next:` line names your entry. Continue.
+- **0** — implement the `next:` entry. Continue at step 2.
+- **3** — report `queue empty — no Todo entries` and stop.
+- **4** — report the held entry and stop; `/drain` owns recovery.
+- **5** — report the stuck `In progress` entry and stop.
+- **6** — the batch is ready. Skip to step 6.
 
-Start from the latest `origin/main` — never from local `main`, which has been 37 commits behind
-before: `git checkout -B claude/entry-<N>-<slug> origin/main`.
+Work on the current branch. The batch stays uncommitted until step 6, so do not create a branch,
+reset, or clean here.
 
-Now read the rules block at the top of `IMPROVEMENT_LOG.md` in full, then your entry.
+The Git index is the boundary between entries: already approved batch work is staged; the one
+currently under review is unstaged. Before setting the next entry `In progress`, require
+`git diff --quiet` while allowing `git diff --cached` to contain only prior `Done` entries. Stop on
+any leftover unstaged change, because it belongs to an interrupted entry rather than this one.
 
-## 2. Clear the finished entry first
+## 2. Clear the finished entries first
 
-If `npm run queue` printed an `archive-due:` line, rule 10 applies before you start: move that
-entry — heading through its `---` separator, **verbatim** — into the current archive file and drop
-its index line. Check the lifted block back out of the archive (exactly one occurrence, gone from
-the log, heading at the start of its own line) and confirm the entry above it is intact and unsplit.
+If `npm run queue` reports `archive-due:`, perform the rule-10 archive move for each named entry
+before starting new work: lift the block verbatim, heading through its `---`, into the pass file
+`IMPROVEMENTS.md` marks `current`, and drop its index line. Verify the lifted block is
+byte-identical to what you removed. Start a new pass file rather than raising a cap.
 
-## 3. Implement
+## 3. Build the brief
 
-- Set `Status: In progress — <today>` as your first action.
-- Do exactly what the entry's `### Requirements` says, and nothing its `### Do not` forbids.
-- An entry may carve itself out of rules 2 and 8 in its own `### Requirements`. Honour that
-  carve-out — do **not** go `Blocked` on rules 2/8 for an entry that grants itself one. Absent an
-  explicit carve-out they are hard limits: `src/app.js`, `src/index.template.html`,
-  `src/styles.css` and tests only.
-- Reuse the helpers the entry names. Never fork scoring math, never call `new Date()` for
-  challenge dates (use `challengeToday()`), never add a localStorage key, a dependency, or a
-  network request.
-- **The test files carry their own trap notes in a header comment.** Read the header of any test
-  file before you add assertions to it — that is where the harness's sharp edges are documented.
-- If the entry genuinely cannot be done inside its own rules, set `Status: Blocked — <reason>`,
-  commit that, and stop. Do not bend the rules to finish.
+Set the entry's `Status: In progress — <date>` first.
 
-## 4. Verify
+Assemble the Codex brief into a temporary file, containing in this order:
 
-Run `npm run build`, then `npm test`. All suites must pass; never weaken or delete an existing
-assertion. The runner reports every suite before exiting, so read the `=== summary ===` block, not
-just the first failure. `check:generated` is read-only: if it fails, run `npm run build` and commit
-`index.html` together with your `src/` changes.
+1. The entry verbatim — `### Why`, `### Requirements`, `### Tests`, `### Do not`.
+2. The rules block from `IMPROVEMENT_LOG.md`, and the tone rule for entries 24 onward.
+3. `graphify query "<entry title and every helper it names>" --budget 1500` — the locator block
+   telling Codex which files and symbols this touches, so it does not rediscover the repository.
+   Say plainly that this lists names and line numbers, not code, and that it must read the files.
+4. The `TRAP` header of every test file the entry will touch, quoted.
+5. The hard constraints: edit only `src/app.js`, `src/index.template.html`, `src/styles.css` and
+   `tests/`; never edit `index.html` by hand — run `npm run build`; never weaken an existing
+   assertion; reuse `computeCredits()`, `totalsModel()`, `paceInfo()`, `weekKey()`, `fmtDay()`,
+   `parseDateOnly()`, `challengeToday()`; never `new Date()` in challenge-date logic; no
+   dependencies, no network requests, no frameworks; **do not commit anything**.
 
-## 5. Ship
+## 4. Dispatch
 
-- Set `Status: Done — <today>` and update the queue index.
-- Record the commit subject in `Notes:` in exactly this shape: ``Commit `<subject>`.`` —
-  `npm run queue` reads that subject back out to tell the next iteration whether you landed, so an
-  entry without it reports as unverifiable and stalls the loop. Add any deviations after it.
-- All of that goes in the **same commit** as the implementation. One entry = one commit.
-- Record the full `HEAD`, then run
-  `node scripts/queue-git-guard.mjs publish <N> <HEAD> <SUBJECT>` with safely quoted values. Never
-  publish through a raw `git push`; the guard requires a new controlled branch and exactly one
-  commit directly atop current `origin/main`. Then open a **draft** PR filling in the repository's
-  pull request template.
+```bash
+node scripts/codex-run.mjs --role entry --brief <brief file>
+```
 
-## 6. Hand it to the reviewer
+Read only its report. The JSONL transcript stays in the log file — do not open it unless the run
+failed and you need the reason for your own report.
 
-A draft means "this run has not finished checking itself". Once it has, say so: promote the PR to
-**ready for review** — `update_pull_request` with `draft: false`, or `gh pr ready` — but only when
-every one of these holds.
+If `STATUS: failed`, retry once with `--role entry-hard`. A second failure is blocked: set the
+entry `Blocked — <reason>` and stop.
 
-- `npm test` printed `PASS` for every suite in the `=== summary ===` block. One `FAIL` anywhere,
-  including `check:generated` or `size-check`, means no.
-- The commit touches only what this entry was allowed to touch, plus the regenerated `index.html`,
-  and `git status --short` is clean afterwards — no stray file left behind, nothing uncommitted.
-- `Status: Done — <today>` and the ``Commit `<subject>`.`` note landed in that same commit.
-- CI on the pushed head commit has **concluded successfully** — every check run, not just the first
-  one to report back.
-- The entry is not `Blocked`, and nothing in `Notes:` is a deviation a human has to rule on.
+## 5. Verify, then hand it to the reviewers
 
-CI takes about a minute. Re-read the PR's check runs until they conclude, for up to ten minutes;
-don't spin on a foreground `sleep` — use whatever wait your harness gives you. If they are still
-pending when that budget runs out, leave the PR a draft and report `CI: pending`.
+Run `npm run build`, then `npm test`, and read the whole `=== summary ===` block rather than
+stopping at the first failure. A red suite goes straight back to Codex —
+`node scripts/codex-run.mjs --role fix --brief <findings file> --resume <CODEX session id>` — without spending a
+reviewer on it. At most three fix rounds, then `Blocked`.
 
-If any item above fails, **leave it a draft** and say which one. A draft that names its problem is
-worth more than a ready PR that buries it.
+Run `node scripts/ui-scope.mjs` and report its level; `/drain` uses it to decide whether a design
+review is owed.
 
-**Never merge it.** Not by merging, not by enabling auto-merge, not by approving, not by pushing to
-`main`. Marking ready is the entire handoff. A fresh `review` run must approve the exact base and
-head before the drain orchestrator may perform its guarded fast-forward.
+Then report and stop. **Do not commit.** The entry stays uncommitted for gate 1, and `/drain`
+spawns the reviewers. In explicit FIX mode, write the complete findings to a brief, verify the
+entry and current diff are the named target, and run
+`node scripts/codex-run.mjs --role fix --brief <file> --resume <SESSION>`. Rebuild, retest,
+reclassify UI, and return the same seven lines. In explicit APPROVE mode, confirm the named entry
+is the sole `In progress` entry and its working diff is still present, set `Status: Done — <date>`,
+record its verified summary and deviations but no commit subject in `Notes:`, update the queue
+index, then stage the complete approved working state with explicit paths. That advances the index
+snapshot so the next entry's ordinary `git diff` contains only its own work. APPROVE never touches
+`src/`, rebuilds, commits, or judges the diff.
 
-- Report the entry number, the PR URL, CI status, and whether the PR is ready for review or still a
-  draft and why. Then stop — do not start the next entry.
+Return only:
+
+- `ENTRY: <number> — <title>`
+- `CODEX: <ok|failed> <session id or none>`
+- `TESTS: <green|red>`
+- `UI: <none|minor|major>`
+- `BYTES: <before> -> <after>`
+- `DEVIATIONS: <one line or none>`
+- `STATUS: <implemented|blocked|stopped>`
+
+## 6. Ship mode
+
+Only on exit 6, or when `/drain` explicitly asks. Every unshipped `Done` entry ships as **one**
+commit.
+
+Fetch `origin/main`, but do not try to switch the dirty index directly onto it. First create the
+controlled branch at the batch's current base, preserving the staged and unstaged state:
+
+```bash
+git switch -C claude/entry-<lowest N>-<slug>
+```
+
+Choose a subject that names the batch and a body that lists each entry number and title. Add that
+exact subject to each entry's `Notes:`, then move every batch entry — heading through separator,
+verbatim — to the current archive and update `IMPROVEMENTS.md`. The subject remains available in
+the archived entry for audit and recovery; no shipped batch entry stays in the live queue. Run the
+build and tests, stage explicit paths, and commit once. Then rebase that single commit onto the
+latest `origin/main`; this is the safe way to carry a dirty batch across a moving base. Stop on
+conflicts rather than dropping work. Confirm the branch remains exactly one commit above
+`origin/main` and run `npm run build && npm test` again on the rebased head.
+
+Publish through the guard, never a raw `git push`:
+
+```bash
+node scripts/queue-git-guard.mjs publish <N> <HEAD> <SUBJECT>
+```
+
+Open a **draft** pull request from the template. Mark it **ready for review** only once the
+working tree is clean, the branch is exactly one commit above `origin/main`, `npm test` is green
+locally, every CI check is green, and the log bookkeeping matches. Give CI about ten minutes;
+never `sleep` in the foreground.
+
+**Never merge it.** Marking it ready is the entire handoff — gate 2 reviews it and `/drain`
+releases it. Report `STATUS: shipped` with the PR URL, or say why it stayed a draft.
+
+## 7. Published PR fix mode
+
+Only on an explicit PR-FIX request. Require the controlled PR branch to be clean and exactly at
+`OLD_HEAD`. Put the reviewer's complete findings, every batch entry, and the rules into a brief.
+Run `node scripts/codex-run.mjs --role fix --brief <file>`; add `--resume <SESSION>` only when the
+finding belongs unambiguously to one retained entry session.
+
+Run `npm run build && npm test`, inspect the full diff, and stop unless every changed path is
+permitted by the batch. Stage only those explicit paths, run `git commit --amend --no-edit`, record
+`NEW_HEAD`, and publish only through
+`node scripts/queue-git-guard.mjs amend <PR> <OLD_HEAD> <NEW_HEAD>`. Never raw-force-push. Return
+the PR, old/new heads, tests, CI, deviations, and `STATUS: fixed|blocked|stopped`. The changed head
+must go to a fresh PR reviewer; this mode never judges or releases it.

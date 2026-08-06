@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "findings", "files_changed"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "One line answering the brief. Read-only roles never write, so this is the whole deliverable."
+    },
+    "findings": {
+      "type": "array",
+      "description": "What was found, most important first. Each item names the file and, where it applies, the line.",
+      "items": {"type": "string"}
+    },
+    "files_changed": {
+      "type": "array",
+      "description": "Always empty for read-only roles. Present so every role's report parses the same way.",
+      "items": {"type": "string"}
+    }
+  }
+}

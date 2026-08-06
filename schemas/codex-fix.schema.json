@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "files_changed", "findings_addressed", "findings_rejected", "tests_run"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "One line: what changed in response to the reviewer's findings."
+    },
+    "files_changed": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "findings_addressed": {
+      "type": "array",
+      "description": "Each reviewer finding that was fixed, quoted closely enough to match it back.",
+      "items": {"type": "string"}
+    },
+    "findings_rejected": {
+      "type": "array",
+      "description": "Findings deliberately not acted on, each with the reason. An empty array means every finding was addressed.",
+      "items": {"type": "string"}
+    },
+    "tests_run": {
+      "type": "string"
+    }
+  }
+}

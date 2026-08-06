@@ -1,6 +1,6 @@
 interface:
   display_name: "Road to Send Review"
-  short_description: "Independently review one queue PR"
-  default_prompt: "Use $road-to-send-review to independently review the current queue PR and return its exact approved base and head."
+  short_description: "Independently judge one batch PR"
+  default_prompt: "Use $road-to-send-review to judge the current batch PR without editing it and return findings or its exact approved base and head."
 policy:
   allow_implicit_invocation: false

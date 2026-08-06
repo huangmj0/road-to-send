@@ -6,6 +6,12 @@
 //   3  queue empty — no Todo entries (refill, or stop)
 //   4  the previous entry is not on origin/main yet — stop, do not stack a second entry
 //   5  an entry is stuck In progress — a previous iteration died mid-entry; needs a human
+//   6  the batch is substantial — ship the accumulated Done entries as one commit
+//
+// Entries batch. `Done` means implemented and reviewed locally, not yet shipped: several ship
+// together as one squashed commit. An unshipped entry is told apart from a shipped one by its
+// `Notes:` commit subject, which does not exist until the ship step writes it — so a Done entry
+// with no subject is in the open batch, and one with a subject is expected on origin/main.
 //
 // Exit 4 asks git whether the previous subject is on origin/main and scans remote queue content
 // for a Todo entry already marked Done elsewhere. The `hold:` JSON line gives the orchestrator
@@ -19,6 +25,12 @@ import {formatHold,parseEntries} from './log-model.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const args = process.argv.slice(2);
 const noFetch = args.includes('--no-fetch');
+const forceShip = args.includes('--ship');
+
+// Ship once this many entries are waiting, and never let more than this many accumulate: every
+// unshipped entry is uncommitted work that a lost worktree would take with it.
+const BATCH_MIN = 3;
+const BATCH_MAX = 5;
 
 // Defaults to the real queue; a path argument points it at a fixture so every exit code can
 // be exercised without editing the live log.
@@ -42,22 +54,28 @@ const todo = byState('Todo');
 const inProgress = byState('In progress');
 const done = byState('Done');
 const blocked = byState('Blocked');
+// No recorded commit subject means the ship step has not run for it yet.
+const batch = done.filter(entry => !entry.commitSubject);
+const shipped = done.filter(entry => entry.commitSubject);
 
 console.log(
   `queue: ${todo.length} Todo · ${inProgress.length} In progress · ` +
   `${done.length} Done (unarchived) · ${blocked.length} Blocked`,
 );
+console.log(`batch: ${batch.length}/${BATCH_MIN} unshipped (max ${BATCH_MAX})${batch.length ? ` — ${batch.map(entry => entry.n).join(', ')}` : ''}`);
 
 for (const entry of malformed) {
   console.log(`bad:   ${entry.n} — ${entry.title} — unreadable Status: line (run npm test for the exact rule)`);
 }
 
-// Rule 10: any Done entry still here must be archived before the next entry starts.
-for (const entry of done) console.log(`archive-due: ${entry.n} — ${entry.title}`);
+// Rule 10: a shipped Done entry must be archived before the next entry starts. An unshipped one
+// is still in the open batch and has nothing to archive yet.
+for (const entry of shipped) console.log(`archive-due: ${entry.n} — ${entry.title}`);
 for (const entry of inProgress) console.log(`stale: ${entry.n} — ${entry.title} — left In progress by an earlier run`);
 
-// The newest Done entry is the one whose commit should already be on origin/main.
-const previous = done.length ? done.reduce((a, b) => (b.n > a.n ? b : a)) : null;
+// The newest shipped entry is the one whose commit should already be on origin/main. Unshipped
+// batch entries are deliberately excluded: they have no commit to look for.
+const previous = shipped.length ? shipped.reduce((a, b) => (b.n > a.n ? b : a)) : null;
 let unmerged = null;
 let hold = null;
 let holds = null;
@@ -133,7 +151,19 @@ if (inProgress.length) {
   process.exit(5);
 }
 
+// Ship before starting more work. This is checked ahead of the empty-queue exit so a drained queue
+// with an open batch ships it rather than reporting completion and stranding uncommitted entries.
+if (batch.length >= BATCH_MIN || batch.length >= BATCH_MAX || (forceShip && batch.length)) {
+  const why = forceShip ? 'requested with --ship' : `${batch.length} entries waiting`;
+  console.log(`\nship the batch — ${why}. Squash entries ${batch.map(entry => entry.n).join(', ')} into one commit.`);
+  process.exit(6);
+}
+
 if (!todo.length) {
+  if (batch.length) {
+    console.log(`\nqueue empty, but ${batch.length} unshipped entr${batch.length === 1 ? 'y is' : 'ies are'} waiting — run npm run queue -- --ship to ship them.`);
+    process.exit(3);
+  }
   console.log('\nqueue empty — no Todo entries.');
   process.exit(3);
 }

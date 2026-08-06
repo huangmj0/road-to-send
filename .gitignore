@@ -1,2 +1,10 @@
 .DS_Store
 node_modules/
+
+# Generated knowledge graph. ~1 MB of derived artifacts rebuilt by `graphify update .`, and the
+# loop regenerates it after every write-capable Codex run. Committing it would put a megabyte of
+# churn into batch commits that are enforced to be exactly one commit and capped by size-check.
+graphify-out/
+
+# Machine-local Codex hook wiring: the paths inside point at one developer's install.
+.codex/

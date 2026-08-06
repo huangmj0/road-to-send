@@ -1,6 +1,6 @@
 interface:
   display_name: "Road to Send Entry"
-  short_description: "Ship one queued improvement safely"
-  default_prompt: "Use $road-to-send-entry to ship exactly one queued improvement."
+  short_description: "Drive one queued improvement through Codex"
+  default_prompt: "Use $road-to-send-entry to implement one queued improvement locally, or ship the reviewed batch when queue status requires it."
 policy:
   allow_implicit_invocation: false

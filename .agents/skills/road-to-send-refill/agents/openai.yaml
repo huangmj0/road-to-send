@@ -1,6 +1,6 @@
 interface:
   display_name: "Road to Send Refill"
-  short_description: "Propose the next improvement queue"
-  default_prompt: "Use $road-to-send-refill to propose the next improvement queue."
+  short_description: "Design the next app-improvement queue"
+  default_prompt: "Use $road-to-send-refill to propose the next idea-led app-improvement queue without implementing it."
 policy:
   allow_implicit_invocation: false
