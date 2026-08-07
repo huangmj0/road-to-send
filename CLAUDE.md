@@ -4,35 +4,38 @@
 shared Google Sheet and from their browsers' localStorage. `index.html` is the deployed artifact and
 **stays at the repository root** — moving or renaming it changes the published URL.
 
-## The loop protocol
+## Read this first
 
-- `IMPROVEMENT_LOG.md` is the work queue. Read its rules block in full before touching anything.
-- **Start with `npm run queue`.** It reports the queue in a few lines and exits with the code that
-  says whether you may start: `0` clear · `3` empty · `4` the previous entry has not merged ·
-  `5` an entry is stuck `In progress`. Do not start an entry it told you not to start.
-- Take the **first** entry whose `Status:` is `Todo`, top to bottom. Skip `Done`, `Blocked`, and
-  anyone else's `In progress`. If nothing is `Todo`, stop and report "queue empty — no Todo entries".
-- One entry = one commit. Set `Status: In progress — <date>` first, and `Status: Done — <date>` plus
-  the commit subject and any deviations in `Notes:` in the same commit as the implementation.
-- A run opens its PR as a draft and marks it **ready for review** itself once the suites and CI are
-  green; a run that could not get there leaves the PR a draft and says why. Merging stays yours.
-- Shipped entries live under `docs/archive/`, split by pass and indexed by `IMPROVEMENTS.md`. That
-  is the archive, not a queue — never work from it, and when you do need to look something up, read
-  the one pass file that holds it.
-
-## Working rules
-
-The full, authoritative rules live in the "Rules for implementers" block at the top of
-`IMPROVEMENT_LOG.md`; repository conventions (structure, style, testing, commits) live in
-`AGENTS.md`. Read those two — this file deliberately does not restate them, because a third copy is
-a third thing to drift. The short version:
+`AGENTS.md` is the authoritative repository guide: structure, commands, the hard constraints that
+come from running a live app, tone, style, testing, and commit conventions. Read it before touching
+anything. This file deliberately does not restate it, because a second copy is a second thing to
+drift. The short version:
 
 - Edit `src/app.js`, `src/index.template.html`, `src/styles.css` and `tests/`. **Never** edit
   `index.html` by hand; run `npm run build` to regenerate it, then `npm test`.
 - Commit the regenerated `index.html` with your `src/` changes. Never weaken an existing assertion.
 - `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html`.
-- The loop body is `.claude/commands/entry.md` (`/entry`); `docs/loop-prompt.md` explains how to run
-  it. Harness traps live in a header comment in the test file they apply to — read it before adding
+- `src/apps-script.js`, `src/schema.json` and `src/scoring.json` are the shared browser/backend
+  contract — changing one forces an API version bump and an organizer redeploy.
+- Harness traps live in a header comment in the test file they apply to — read it before adding
   assertions there.
-- Codex mirrors this orientation in `AGENTS.md` and exposes equivalent repository skills under
-  `.agents/skills/`; changes to the loop should keep both agent surfaces aligned.
+
+## Agent skills
+
+This repo uses [Matt Pocock's skills](https://github.com/mattpocock/skills), vendored under
+`.agents/skills/` and exposed to Claude Code through `.claude/skills/` symlinks.
+`skills-lock.json` pins them; `npx skills@latest update` refreshes them.
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues, driven through the `gh` CLI. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, each label string equal to its name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root, both created lazily by
+`/domain-modeling` when a term or decision actually gets resolved. See `docs/agents/domain.md`.
