@@ -39,3 +39,8 @@ The five canonical roles, each label string equal to its name. See `docs/agents/
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root, both created lazily by
 `/domain-modeling` when a term or decision actually gets resolved. See `docs/agents/domain.md`.
+
+### The improvement loop
+
+Claude plans and reviews, Codex executes, one issue per tick. The `/loop` prompt and the reasoning
+behind its stopping points live in `docs/loop-prompt.md`.
