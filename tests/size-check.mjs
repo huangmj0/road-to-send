@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 // The deployed artifact is a single self-contained file the crew downloads on every
-// cold load, so its growth is capped here. Raise BUDGET deliberately in a log entry
-// that explains the growth — never as a side effect of another change.
+// cold load, so its growth is capped here. Raise BUDGET deliberately, in a change that
+// explains the growth — never as a side effect of another change.
+//
+// The re-baselines below are the record of that rule being applied. They cite entry
+// numbers from the improvement queue that used to drive this repo; the queue is gone,
+// but the measurements and the reasoning still say why BUDGET is where it is.
 //
 // Re-baselined 156000 -> 161000 by log entry 24: measured at 135867 bytes after
 // entry 22, plus ~12600 projected for entries 25–41, landing near 148500 — so this
@@ -42,5 +46,5 @@ console.log(`index.html is ${bytes} bytes — ${pct}% of the ${BUDGET}-byte budg
 
 assert.ok(
   bytes <= BUDGET,
-  `index.html is ${bytes} bytes, over the ${BUDGET}-byte budget: raise \`BUDGET\` deliberately in a log entry that explains the growth — never as a side effect of another change.`,
+  `index.html is ${bytes} bytes, over the ${BUDGET}-byte budget: raise \`BUDGET\` deliberately, in a change that explains the growth — never as a side effect of another change.`,
 );

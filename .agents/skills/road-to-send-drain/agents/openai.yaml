@@ -1,6 +1,0 @@
-interface:
-  display_name: "Road to Send Drain"
-  short_description: "Run one context-light queue tick"
-  default_prompt: "Use $road-to-send-drain to run one serialized queue tick."
-policy:
-  allow_implicit_invocation: false

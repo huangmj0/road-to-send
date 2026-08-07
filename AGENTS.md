@@ -1,89 +1,138 @@
-# Road to Send — Codex orientation
+# Road to Send — repository guidelines
 
 **This app is live** at <https://huangmj0.github.io/road-to-send/>, serving a real crew's data from a
 shared Google Sheet and from their browsers' localStorage. `index.html` is the deployed artifact and
 **stays at the repository root** — moving or renaming it changes the published URL.
 
-## The loop protocol
+## Project structure & module organization
 
-- `IMPROVEMENT_LOG.md` is the work queue. Read its rules block in full before touching anything.
-- **Start with `npm run queue`.** It reports the queue in a few lines and exits with the code that
-  says whether you may start: `0` clear · `3` empty · `4` the previous entry has not merged ·
-  `5` an entry is stuck `In progress`. Do not start an entry it told you not to start.
-- Take the **first** entry whose `Status:` is `Todo`, top to bottom. Skip `Done`, `Blocked`, and
-  anyone else's `In progress`. If nothing is `Todo`, stop and report "queue empty — no Todo entries".
-- One entry = one commit. Set `Status: In progress — <date>` first, and `Status: Done — <date>` plus
-  the commit subject and any deviations in `Notes:` in the same commit as the implementation.
-- Shipped entries live under `docs/archive/`, split by pass and indexed by `IMPROVEMENTS.md`. That
-  is the archive, not a queue — never work from it, and when you do need to look something up, read
-  the one pass file that holds it.
+This is an intentionally self-contained static application. The editable sources live in `src/`:
+`index.template.html` (markup), `styles.css`, `app.js` (browser code), `apps-script.js` (the Google
+Apps Script source shown during shared setup), plus the shared `scoring.json` and `schema.json`
+contracts. `scripts/build.mjs` inlines them into the generated `index.html` at the repository root —
+never edit `index.html` by hand; `scripts/check-generated.mjs` fails if the committed artifact is
+stale.
 
-## Codex workflows
+`tests/` contains Node-based behavioral and contract tests. The client-state suites all eval the
+built script and split by harness so a change loads only the one it touches:
+`client-state.state.test.js` covers pure scoring, date and text helpers with no DOM,
+`client-state.dom.test.js` runs `init()`/`render()` against a document stub, and
+`client-state.shared.test.js` covers shared mode behind a stubbed `fetch`; `harness.js` holds the
+script extraction and the element stub they share. Alongside them, `backend-script.test.js`
+validates the embedded Apps Script, `protocol-fixtures.test.js` checks wire-format fixtures against
+`src/schema.json`, `smoke.test.js` covers the shared workflow end to end, `static-check.mjs` checks
+syntax, accessibility, and required UI hooks, `docs-check.mjs` checks the documented invariants
+below, and `size-check.mjs` caps the bundle.
 
-- Invoke `$road-to-send-entry` to implement, verify, commit, push, and open a draft PR for exactly
-  one queue entry.
-- Invoke `$road-to-send-review` only as a fresh independent reviewer for a ready entry PR. It may
-  fix defects by amending the entry commit, but it never merges and never approves a head it changed.
-- Invoke `$road-to-send-refill` only when the queue is empty to propose new entries in a queue-only
-  draft PR.
-- Entry and refill open their PR as a draft and mark it **ready for review** once local suites and
-  CI are green. Neither may merge. Drain sends an entry PR to a fresh review agent and may perform
-  only an atomic non-force fast-forward when the approved head is the sole child of the approved
-  base. `scripts/queue-git-guard.mjs` enforces initial entry publication, reviewer lease updates,
-  and release. If `main` advances, Git rejects the release and a fresh review is required.
-- “Independent” means a fresh agent context that did not implement or modify the head. The current
-  setup uses one GitHub account, so GitHub cannot attest separate reviewer identity. Enforcing that
-  stronger boundary requires a separately credentialed GitHub App or bot; do not represent the
-  fresh-context boundary as a distinct GitHub approval.
-- Invoke `$road-to-send-drain` for one context-light loop tick. It reads queue state, delegates at
-  most one entry plus sequential independent review, performs the guarded merge, and stops. On an
-  empty queue it reports completion; refill remains a separate deliberate design run. The outer
-  automation or operator owns the next tick.
-- The four workflows do not run on the same model. Refill is the design step — its entries are
-  binding specs a later run executes literally — so it gets the most capable model available at high
-  reasoning effort. Review also gets the most capable model at high effort because it is the release
-  gate. Entry executes an already-merged spec that `npm test` checks, so a mid-tier model at high
-  effort is enough. Drain reads state, delegates, and guards one merge, so a mid-tier model at
-  moderate effort covers it. Each skill states its own tier; `docs/loop-prompt.md` explains why.
-- The Codex skills live under `.agents/skills/`; the Claude Code commands remain under
-  `.claude/commands/`, with the subagent tiers pinned in `.claude/agents/`.
-  `docs/loop-prompt.md` is the shared operator guide.
+**Every test file opens with a `TRAP` comment describing its harness's sharp edges — read it before
+adding assertions to that file.** `README.md` documents setup and deployment.
 
-## Loop working rules
+## Build, test, and development commands
 
-The full, authoritative rules live in the "Rules for implementers" block at the top of
-`IMPROVEMENT_LOG.md`. The short version:
-
-- Edit `src/app.js`, `src/index.template.html`, `src/styles.css` and `tests/`. **Never** edit
-  `index.html` by hand; run `npm run build` to regenerate it, then `npm test`.
-- Commit the regenerated `index.html` with your `src/` changes. Never weaken an existing assertion.
+- `npm run build` regenerates `index.html` from `src/`. Run it after any `src/` change and commit the
+  regenerated artifact alongside the source edits.
+- `npm test` runs `scripts/run-tests.mjs`, which runs every suite — the generated-artifact check plus
+  the behavioral, backend-contract, static, documentation, and bundle-size checks — without
+  short-circuiting, prints a `PASS`/`FAIL` line per suite, and exits non-zero if any failed. Run it
+  before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml`
+  runs it again in a `verify` job that gates the deploy job, which publishes only `index.html` to
+  GitHub Pages on pushes to `main`.
 - `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html`.
-- Harness traps live in a header comment in the test file they apply to — read it before adding
-  assertions there.
+- `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to
+  exercise browser behavior.
 
-# Repository Guidelines
+Pushes to `main` are expected to deploy the static page through GitHub Pages. Shared-mode changes may
+also require copying and redeploying the embedded Apps Script as described in `README.md`.
 
-## Project Structure & Module Organization
+## Hard constraints
 
-This is an intentionally self-contained static application. The editable sources live in `src/`: `index.template.html` (markup), `styles.css`, `app.js` (browser code), `apps-script.js` (the Google Apps Script source shown during shared setup), plus the shared `scoring.json` and `schema.json` contracts. `scripts/build.mjs` inlines them into the generated `index.html` at the repository root — never edit `index.html` by hand; `scripts/check-generated.mjs` fails if the committed artifact is stale. `src/scoring.json`, `src/schema.json` and `src/apps-script.js` are the shared browser/backend contract and are **out of scope for log-driven entries** (rule 2 of `IMPROVEMENT_LOG.md`): they change only in an organizer-coordinated task that bumps the API version, gets its own log entry, and ships the Apps Script redeploy together with the frontend change. `tests/` contains Node-based behavioral and contract tests. The client-state suites all eval the built script and split by harness so an entry loads only the one it touches: `client-state.state.test.js` covers pure scoring, date and text helpers with no DOM, `client-state.dom.test.js` runs `init()`/`render()` against a document stub, and `client-state.shared.test.js` covers shared mode behind a stubbed `fetch`; `harness.js` holds the script extraction and the element stub they share. Alongside them, `backend-script.test.js` validates the embedded Apps Script, `protocol-fixtures.test.js` checks wire-format fixtures against `src/schema.json`, `smoke.test.js` covers the shared workflow end to end, and `static-check.mjs` checks syntax, accessibility, and required UI hooks. **Every test file opens with a `TRAP` comment describing its harness's sharp edges — read it before adding assertions to that file.** `README.md` documents setup and deployment; `IMPROVEMENT_LOG.md` tracks queued frontend enhancements, and shipped entries are archived verbatim under `docs/archive/` with `IMPROVEMENTS.md` as the index over them. `docs/loop-prompt.md` explains how the loop that drains the queue is run.
+These are properties of a live app with real users, not workflow preferences. A change may step
+outside one only when it says so explicitly and says why.
 
-## Build, Test, and Development Commands
+1. **This app is LIVE.** Real crew data lives in a shared Google Sheet and in users' localStorage.
+   Nothing you ship may drop, rewrite, or re-key that data, and the GitHub Pages URL must not change
+   (`index.html` stays at the repository root).
+2. **The browser/backend contract is coordinated.** `src/apps-script.js`, `src/schema.json` and
+   `src/scoring.json` are the shared contract; any change there forces an API version bump and an
+   organizer redeploy of the Apps Script alongside the frontend change. Do not touch them as a side
+   effect of a frontend change.
+3. **Never weaken a test to make a change pass.** A change that *deliberately removes a feature* may
+   retire that feature's assertions, but only by naming each assertion retired and why. Retiring an
+   assertion for a feature that still exists is always forbidden. `tests/size-check.mjs` caps
+   `index.html` at a byte `BUDGET`: raise `BUDGET` deliberately, in a change that explains the
+   growth — never as a side effect of another change.
+4. **localStorage keys are frozen:** `roadToSendEndpoint`, `roadToSendMe`, `roadToSendLogsV9`,
+   `roadToSendConfigV9`, `roadToSendConfigV8` (read-only migration source — only the existing
+   one-time migration writes `roadToSendConfigV9` from it), `roadToSendWeekReview`, and
+   `roadToSendShared:{activities|config|meta}:{endpoint}`. Read them; never rename them; only write
+   shapes existing code already reads. `tests/docs-check.mjs` asserts every `roadToSend…` literal in
+   `src/app.js` appears in this list, so a new key means updating this section in the same commit.
+5. **Structural constraints enforced by tests:** exactly **one `<script>` block** in the template
+   (all JS goes in `src/app.js`); exactly **one `<table>`** in the page (new visualizations use
+   divs/CSS grid); the built lines ``const SCRIPT=`…`;`` and the `const SUPPORTED_API_VERSIONS` line
+   immediately after it are untouchable (no backticks may enter the Apps Script string); DOM ids stay
+   unique; every labeled input keeps its `<label for>`.
+6. **Reuse the scoring core:** `computeCredits()`, `totalsModel()`, `paceInfo()`, `weekKey()`,
+   `fmtDay()`, `parseDateOnly()`, and `challengeToday()`. Never call `new Date()` for challenge-date
+   logic — shared mode follows the Sheet's timezone via `challengeToday()`. Never fork or re-derive
+   scoring math; consume the maps `computeCredits()` returns. New display logic = small pure helper
+   functions called from `render()`; `render()` runs often, so keep additions idempotent and cheap.
+7. **Accessibility:** minimum 44px touch targets; graphics get `role="img"` with a meaningful
+   `aria-label` text alternative (decorative inner elements `aria-hidden="true"`); dynamic status text
+   uses `aria-live="polite"`; keep visible focus (site uses `:focus-visible`). **Motion:** CSS-only
+   transitions/animations so the existing `@media(prefers-reduced-motion:reduce)` kill-switch applies;
+   no JS-driven animation.
+8. **No external dependencies (runtime or dev), no new network requests, no frameworks, no
+   build-tool changes.**
 
-- `npm run queue` reports the state of `IMPROVEMENT_LOG.md` — counts, the next `Todo` entry, any entry still awaiting archiving — and refreshes `origin/main` to check that the previously completed entry actually landed there. Its exit code is what a loop iteration branches on: `0` clear to start, `3` queue empty, `4` the previous entry is unmerged so a second entry must not be stacked on it, `5` an entry is stuck `In progress`. `--no-fetch` reports against the local ref; a path argument reads that file instead of the live queue.
-- `npm run build` regenerates `index.html` from `src/`. Run it after any `src/` change and commit the regenerated artifact alongside the source edits.
-- `npm test` runs `scripts/run-tests.mjs`, which runs every suite — the generated-artifact check plus the behavioral, backend-contract, static, documentation, and bundle-size checks — without short-circuiting, prints a `PASS`/`FAIL` line per suite, and exits non-zero if any failed. Run it before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml` runs it again in a `verify` job that gates the deploy job, which publishes only `index.html` to GitHub Pages on pushes to `main`.
-- `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to exercise browser behavior.
+## Tone
 
-Pushes to `main` are expected to deploy the static page through GitHub Pages. Shared-mode changes may also require copying and redeploying the embedded Apps Script as described in `README.md`.
+This app runs on a real crew's shared data, and everyone in it sees the same board. **Nothing here
+adds a nudge, a reminder, or a prompt to participate.**
 
-## Coding Style & Naming Conventions
+- **Surface what people did, never what they didn't.** No absence counts, no laggard lists, no "you
+  haven't logged" copy, no per-person zero-week callout, no streak-loss warnings, no "still time to
+  log today" prompts.
+- **Aggregating does not launder it.** A crew-wide participation figure is the same nudge with the
+  names filed off, and is equally out of scope.
+- **Nothing new opens, appears, or speaks on its own.** Every surface is reached by a tap, and the one
+  persistent element (the undo bar) carries its own dismissal and clears when the user moves on.
+- New information is reported **only where the user went looking for it** — their own card, their own
+  feed, the diagnostics they opened.
 
-Use two-space indentation in HTML and test files. Preserve the existing compact style inside inline CSS, browser code, and the embedded Apps Script unless a change deliberately restructures the file. Prefer `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for scoring/configuration constants, and kebab-case for CSS classes and HTML filenames. Keep DOM IDs descriptive and unique. Use Node built-ins and browser APIs only: **no dependencies — runtime or dev** (rule 8 of `IMPROVEMENT_LOG.md`), no frameworks, and no build-tool changes, unless an entry explicitly carves itself out in its own `### Requirements`.
+## Coding style & naming conventions
 
-## Testing Guidelines
+Use two-space indentation in HTML and test files. Preserve the existing compact style inside inline
+CSS, browser code, and the embedded Apps Script unless a change deliberately restructures the file.
+Prefer `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for scoring/configuration
+constants, and kebab-case for CSS classes and HTML filenames. Keep DOM IDs descriptive and unique.
+Use Node built-ins and browser APIs only.
 
-Tests use `node:test` and `node:assert/strict`; no external framework or coverage threshold is configured. Name behavioral cases by expected outcome, and add regression coverage for scoring limits, date/timezone boundaries, malformed remote data, API validation, accessibility labels, and sync ordering. Because tests extract scripts directly from `index.html`, preserve the script boundaries and embedded `SCRIPT` declaration they match.
+## Testing guidelines
 
-## Commit & Pull Request Guidelines
+Tests use `node:test` and `node:assert/strict`; no external framework or coverage threshold is
+configured. Name behavioral cases by expected outcome, and add regression coverage for scoring
+limits, date/timezone boundaries, malformed remote data, API validation, accessibility labels, and
+sync ordering. Because tests extract scripts directly from `index.html`, preserve the script
+boundaries and embedded `SCRIPT` declaration they match.
 
-Use short, imperative commit subjects such as `Fix weekly bounty eligibility`. Keep commits focused. Pull requests should explain user-visible behavior, identify scoring or API compatibility effects, link relevant issues, include screenshots for UI changes, and report `npm test` results. Never commit live Apps Script endpoints, shared crew URLs, or sensitive Sheet data.
+Behavioral coverage for new helpers goes in the client-state suites, which eval the built script so
+new top-level helper functions are directly reachable — `tests/client-state.state.test.js` for pure
+scoring/date/text helpers, `tests/client-state.dom.test.js` for anything that needs `render()` and a
+document, `tests/client-state.shared.test.js` for shared-mode behaviour behind a stubbed `fetch`.
+DOM/a11y presence assertions go in `tests/static-check.mjs`. Copy must not trip the banned-strings
+assertion in `static-check.mjs` (no "Hard mode", "Super hard mode", "pull-up mode", "Record send
+pyramid", "Balanced week bonus").
+
+## Commit & pull request guidelines
+
+Use short, imperative commit subjects such as `Fix weekly bounty eligibility`. Keep commits focused.
+Pull requests should explain user-visible behavior, identify scoring or API compatibility effects,
+link relevant issues, include screenshots for UI changes, and report `npm test` results. Never commit
+live Apps Script endpoints, shared crew URLs, or sensitive Sheet data.
+
+## Agent skills
+
+This repo uses [Matt Pocock's skills](https://github.com/mattpocock/skills), vendored under
+`.agents/skills/` and pinned by `skills-lock.json`. `CLAUDE.md` records the per-repo configuration
+they read; `npx skills@latest update` refreshes them.
