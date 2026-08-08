@@ -120,6 +120,17 @@ for(const declaration of ['\\.icon-btn\\{[^}]*font:700 var\\(--type-5\\)\\/1 var
 assert.doesNotMatch(stylesheet,/font:[^;}]*\s+inherit(?=[;}])/,'no multi-component font shorthand ends in invalid inherit');
 const displayUses=stylesheet.replace(/@import[^;]+;/,'').replace(/--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif/,'');
 assert.doesNotMatch(displayUses,/'Roboto Condensed'/,'display font uses share the fallback token');
+const styleRules=[...stylesheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([,selectors,declarations])=>({selectors:selectors.split(',').map(selector=>selector.trim()),declarations}));
+const declarationsFor=selector=>styleRules.filter(rule=>rule.selectors.includes(selector)).map(rule=>rule.declarations).join(';');
+for(const selector of ['.brand','.page-head h1','.card h2','.dialog h2','.review-section h3','.person-head','.bounty-day h3'])assert.doesNotMatch(declarationsFor(selector),/var\(--head\)/,`${selector} uses the body face, not the numeric display face`);
+const numericDisplaySelectors=['#youTodayPoints','#youDailyMax','#rawPreview','#totalPoints','#groupGoal','.stat strong','.rank','#leaderTable td:nth-child(3)','#leaderTable td:nth-child(4)','.group-percent','.pyramid-grade','.pts','#youCountdown','.review-countdown','.breakdown-pts','.pyramid-count','.records-value','.wr-big','.cat-chip em','.bounty-peek .bounty-pts'];
+const escapeRegex=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+for(const selector of numericDisplaySelectors){
+  const declarations=declarationsFor(selector);
+  assert.match(declarations,/var\(--head\)/,`${selector} uses the numeric display face`);
+  assert.match(declarations,/font-variant-numeric:tabular-nums/,`${selector} pairs the numeric display face with tabular figures`);
+}
+for(const rule of styleRules.filter(rule=>/var\(--head\)/.test(rule.declarations)))for(const selector of rule.selectors)assert.ok(numericDisplaySelectors.includes(selector),`${selector} is numeric before it uses the display face`);
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
 const heatmapCard=html.match(/<article id="heatmapCard"[\s\S]*?<\/article>/)?.[0]||'';
 const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?.[0]||'';
@@ -333,8 +344,8 @@ assert.match(html,/class="preview"[^>]+role="status"[^>]+aria-live="polite"/,'re
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'sync diagnostics remain a polite live region');
 assert.doesNotMatch(personCardSource,/trendEl\.setAttribute\('aria-label'/,'the role-less person trend wrapper receives no dead aria-label');
 // Entry 84: updating numeric figures does not shift their width, and the stat grid owns its row gap.
-assert.match(stylesheet,/\.stat strong,\.pts,#leaderTable td:nth-child\(3\),#leaderTable td:nth-child\(4\)\{font-variant-numeric:tabular-nums\}/,'stat, feed and leaderboard values use tabular figures');
+assert.match(stylesheet,new RegExp(`${numericDisplaySelectors.map(escapeRegex).join(',')}\\{font-family:var\\(--head\\);font-variant-numeric:tabular-nums\\}`),'numeric display values share the condensed face and tabular figures');
 assert.match(stylesheet,/\.stat-grid \.card\{margin-bottom:0\}/,'stat-grid cards do not add a second vertical gap');
 assert.match(html,/id="groupPercent" class="group-percent"/,'the crew percentage has a headline class');
-assert.match(stylesheet,/\.group-percent\{color:var\(--green\);font:800 var\(--type-5\) var\(--head\);font-variant-numeric:tabular-nums\}/,'the crew percentage is a tabular headline figure');
+assert.match(stylesheet,/\.group-percent\{color:var\(--green\);font-size:var\(--type-5\);font-weight:800\}/,'the crew percentage keeps its green type-5 headline emphasis');
 console.log('Road to Send static accessibility and UX checks passed.');
