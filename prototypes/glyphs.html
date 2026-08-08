@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PROTOTYPE &#183; Road to Send glyph candidates</title>
+<!--
+  THROWAWAY PROTOTYPE - not part of the app, not linked from it, do not ship.
+  Question it answers: what mark replaces the climbing / exercise / mobility emoji?
+  Serve with: python3 -m http.server 8000   ->   /prototypes/glyphs.html
+  Switch sets with the bottom bar or the left/right arrow keys, or ?variant=ship
+  ASCII-only on purpose: python3 -m http.server sends no charset header.
+-->
+<style>
+:root{
+  --sand:#F5EEE3; --card:#FFFAF2; --ink:#1D2B27; --forest:#174A3A;
+  --rust:#C0481F; --muted:#5B665F; --hair:#174A3A22; --tint:#174A3A12;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#E8E3D8;color:var(--ink);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:24px 16px 120px;}
+.wrap{max-width:900px;margin:0 auto;display:grid;gap:24px}
+h1{font-size:20px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13.5px;margin:0;max-width:62ch}
+.warn{background:#C0481F14;border-left:3px solid var(--rust);padding:10px 12px;
+  font-size:12.5px;color:#7A2E13;border-radius:0 6px 6px 0}
+.cols{display:grid;grid-template-columns:322px minmax(0,1fr);gap:24px;align-items:start}
+@media(max-width:760px){.cols{grid-template-columns:1fr}}
+
+/* ---- phone replica of the real feed ---- */
+.phone{width:322px;max-width:100%;background:var(--sand);border-radius:22px;
+  overflow:hidden;box-shadow:0 12px 34px #1d2b2722;position:sticky;top:16px}
+.ph-top{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 15px;background:#F5EEE3ED;border-bottom:1px solid var(--hair)}
+.ph-top b{font-size:15px;color:var(--forest);font-weight:800}
+.ph-body{padding:12px}
+.sect{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 8px}
+.pcard{background:var(--card);border:1px solid var(--hair);border-radius:16px;
+  padding:13px;margin-bottom:12px}
+
+.picker{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pick{border:1.5px solid var(--hair);border-radius:12px;padding:11px 6px;text-align:center;
+  background:var(--card)}
+.pick.on{border-color:var(--rust);background:#C0481F0F}
+.pick .gl{width:26px;height:26px;margin:0 auto 5px;color:var(--forest)}
+.pick strong{display:block;font-size:13.5px;color:var(--forest)}
+.pick small{color:var(--muted);font-size:11px}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;
+  border:1.5px solid #E7DAC7;border-radius:999px;background:var(--card);
+  color:var(--muted);font-size:12px;font-weight:700}
+.chip .gl{width:15px;height:15px}
+.chip.done{border-color:var(--forest);background:#174A3A0B;color:var(--forest)}
+
+.feed{background:var(--card);border:1px solid var(--hair);border-radius:16px;overflow:hidden}
+.act{display:grid;grid-template-columns:38px 1fr auto;gap:11px;align-items:center;
+  padding:10px 12px;border-bottom:1px solid var(--hair)}
+.act:last-child{border-bottom:0}
+.av{width:38px;height:38px;border-radius:50%;background:var(--tint);
+  display:grid;place-items:center;color:var(--forest)}
+.av .gl{width:20px;height:20px}
+.act strong{display:block;font-size:14px;color:var(--forest);font-weight:800}
+.act small{display:block;color:var(--muted);font-size:11.5px}
+.act .pts{font-weight:800;color:var(--forest);font-size:13px}
+.gl svg{width:100%;height:100%;display:block}
+
+/* ---- specimen + notes ---- */
+.panel{background:var(--card);border:1px solid var(--hair);border-radius:14px;padding:16px}
+.panel h2{font-size:13px;margin:0 0 10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);font-weight:800}
+.specrow{display:flex;align-items:center;gap:14px;padding:9px 0;border-bottom:1px solid var(--hair)}
+.specrow:last-child{border-bottom:0}
+.specrow .lb{width:74px;font-size:11px;font-weight:800;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted)}
+.specrow .gl{color:var(--forest);flex:none}
+.s16{width:16px;height:16px}.s20{width:20px;height:20px}
+.s24{width:24px;height:24px}.s34{width:34px;height:34px}
+.verdict{margin-left:auto;font-size:12px;color:var(--muted);text-align:right;max-width:30ch}
+.verdict.good{color:var(--forest);font-weight:700}
+.verdict.bad{color:var(--rust)}
+
+table.rej{border-collapse:collapse;width:100%;font-size:13px}
+table.rej th,table.rej td{text-align:left;padding:8px 12px 8px 0;
+  border-bottom:1px solid var(--hair);vertical-align:top}
+table.rej th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+table.rej td:first-child{font-weight:700;white-space:nowrap}
+
+/* ---- switcher ---- */
+.bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:50;
+  display:flex;align-items:center;gap:2px;background:#1D2B27;color:#F5EEE3;
+  border-radius:999px;padding:5px;box-shadow:0 8px 26px #1d2b2755}
+.bar button{background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;
+  padding:8px 12px;border-radius:999px;line-height:1}
+.bar button:hover{background:#ffffff1f}
+.bar .name{font-size:12.5px;font-weight:700;padding:0 12px;min-width:210px;text-align:center;
+  font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div>
+    <h1>Glyph candidates &#183; climbing / exercise / mobility</h1>
+    <p class="sub">Throwaway prototype. Five candidate sets rendered into a replica of the real
+    activity feed, record picker and daily chips at true size. Cycle with the bar at the bottom
+    or the arrow keys. <b>SHIP</b> is the recommendation.</p>
+  </div>
+
+  <p class="warn"><b>Not shippable code.</b> This file is a prototype and is not linked from the app.
+  The winning paths get re-authored properly in <code>src/app.js</code>; everything else here is
+  kept only as the record of what was tried and why it failed.</p>
+
+  <div class="cols">
+    <div class="phone">
+      <div class="ph-top"><b>Beasts for Bishop</b><span style="color:var(--forest)">&#9881;</span></div>
+      <div class="ph-body">
+        <p class="sect">Record &#183; what did you do?</p>
+        <div class="picker" id="picker"></div>
+        <div style="height:14px"></div>
+        <p class="sect">Today</p>
+        <div class="pcard"><div class="chips" id="chips"></div></div>
+        <p class="sect">Crew activity</p>
+        <div class="feed" id="feed"></div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:20px">
+      <div class="panel">
+        <h2>Specimen &#183; 16 / 20 / 24 / 34 px</h2>
+        <div id="spec"></div>
+      </div>
+      <div class="panel">
+        <h2>Why the others lost</h2>
+        <table class="rej"><thead><tr><th>Set</th><th>What it actually read as</th></tr></thead>
+        <tbody id="rej"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bar">
+  <button id="prev" aria-label="Previous set">&#8592;</button>
+  <span class="name" id="label"></span>
+  <button id="next" aria-label="Next set">&#8594;</button>
+</div>
+
+<script>
+var S = function(body){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" '
+       + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + '</svg>';
+};
+
+var BARBELL = S('<path d="M3 12h18M7 8v8M17 8v8M4 10v4M20 10v4"/>');
+var TARGET  = S('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/>'
+              + '<circle cx="12" cy="12" r="1" fill="currentColor"/>');
+var STONE   = 'M4.2 12.4 9.4 5.2 17.8 6.8 20.3 14.6 13.2 20.4 5.4 17.4Z';
+
+var SETS = [
+  { key:'ship', name:'SHIP — solid stone + reach',
+    climb:    S('<path d="' + STONE + '" fill="currentColor" stroke="none"/>'),
+    exercise: BARBELL,
+    mobility: S('<circle cx="12" cy="6.4" r="2.1" fill="currentColor" stroke="none"/>'
+              + '<path d="M12 9.4V15.8"/><path d="M12 10 9.6 3.4M12 10 14.4 3.4"/>'
+              + '<path d="M12 15.8 10.6 21M12 15.8 13.4 21"/>'),
+    bounty: TARGET,
+    verdict: {climb:'good', exercise:'good', mobility:'good'},
+    note: {climb:'Reads as a rock at 16px. Heavier than the strokes around it, which suits the 3-point category.',
+           exercise:'Fine, but the thinnest mark in the set.',
+           mobility:'Reads as a person lengthening. Legs together keep it from reading as a star jump.'} },
+
+  { key:'r1', name:'R1 — peaked boulder + ROM arc',
+    climb:    S('<path d="M3 19.6h18"/><path d="M3.6 19.6 6.8 10.2 13.2 6 20 11.2 20.4 19.6"/>'
+              + '<path d="M13.2 6 10.2 19.6"/>'),
+    exercise: BARBELL,
+    mobility: S('<path d="M6 18h13.5"/><path d="M6 18 15.8 8.2"/>'
+              + '<path d="M14 18A8 8 0 0 0 11.66 12.34"/>'
+              + '<circle cx="6" cy="18" r="1.7" fill="currentColor" stroke="none"/>'),
+    bounty: TARGET,
+    verdict: {climb:'bad', exercise:'good', mobility:'bad'},
+    note: {climb:'A tent. The flat base plus a central peak is a tent, every time.',
+           exercise:'',
+           mobility:'The swept arc vanishes below 24px; what is left is a checkmark.'} },
+
+  { key:'r2', name:'R2 — lumpy dome + tilde',
+    climb:    S('<path d="M2.9 19.5C2.6 13.8 5.2 7.4 10 7c3.4-.25 4 2.65 6.4 2.95C19.2 10.2 21.2 14.2 21.3 19.5"/>'
+              + '<path d="M2 19.5h20"/><path d="M10 7 8.7 19.5"/>'),
+    exercise: BARBELL,
+    mobility: S('<path d="M2.8 14.6c3.5-6 6.7-6 9.2-2.5s5.7 3.5 9.2-2.5"/>'),
+    bounty: TARGET,
+    verdict: {climb:'bad', exercise:'good', mobility:'bad'},
+    note: {climb:'A hill, or a helmet. The ground line turns the object into a landform.',
+           exercise:'',
+           mobility:'A tilde. Punctuation, not movement.'} },
+
+  { key:'r3', name:'R3 — outline stone + rolled mat',
+    climb:    S('<path d="' + STONE + '"/><path d="M9.4 5.2 11.9 12.4 20.3 14.6"/>'
+              + '<path d="M11.9 12.4 13.2 20.4"/>'),
+    exercise: BARBELL,
+    mobility: S('<rect x="2.8" y="7.6" width="18.4" height="8.8" rx="4.4"/>'
+              + '<path d="M7.2 7.6v8.8"/><circle cx="7.2" cy="12" r="1.9"/>'),
+    bounty: TARGET,
+    verdict: {climb:'bad', exercise:'good', mobility:'bad'},
+    note: {climb:'Right silhouette, wrong treatment - the facets turn it into a pie chart.',
+           exercise:'',
+           mobility:'A toggle switch. Fatal in an app full of controls.'} },
+
+  { key:'r4', name:'R4 — solid stone + star jump',
+    climb:    S('<path d="' + STONE + '" fill="currentColor" stroke="none"/>'),
+    exercise: BARBELL,
+    mobility: S('<circle cx="12" cy="5" r="2.2" fill="currentColor" stroke="none"/>'
+              + '<path d="M12 7.4V14.2"/><path d="M12 9.2 7.8 5.8M12 9.2 16.2 5.8"/>'
+              + '<path d="M12 14.2 9 20.8M12 14.2 15 20.8"/>'),
+    bounty: TARGET,
+    verdict: {climb:'good', exercise:'good', mobility:'bad'},
+    note: {climb:'The winner.',
+           exercise:'',
+           mobility:'A jumping jack - which is an exercise. Collides with the barbell category.'} }
+];
+
+var FEED = [
+  {who:'Priya',  cat:'climb',    det:'Climbing &#183; V4 &#183; Today',                     pts:3},
+  {who:'Dev',    cat:'exercise', det:'Exercise &#183; Hangboard + pull-ups &#183; Today',   pts:2},
+  {who:'Michael',cat:'mobility', det:'Mobility &#183; Today',                               pts:1},
+  {who:'Sam',    cat:'climb',    det:'Climbing &#183; V2 &#183; Slab project &#183; Ystdy', pts:3},
+  {who:'Tomas',  cat:'bounty',   det:'Anti-Style &#183; Yesterday',                         pts:2},
+  {who:'Dev',    cat:'climb',    det:'Climbing &#183; V6 &#183; Yesterday',                 pts:3}
+];
+
+var LABELS = {climb:'Climbing', exercise:'Exercise', mobility:'Mobility', bounty:'Bounty'};
+var POINTS = {climb:'3 points', exercise:'2 points', mobility:'1 point', bounty:'1-3 points'};
+
+var idx = 0;
+
+function draw(){
+  var s = SETS[idx];
+  document.getElementById('label').textContent = s.name;
+
+  document.getElementById('picker').innerHTML = ['climb','exercise','mobility','bounty']
+    .map(function(c, i){
+      return '<div class="pick' + (i === 0 ? ' on' : '') + '">'
+           + '<div class="gl">' + s[c] + '</div>'
+           + '<strong>' + LABELS[c] + '</strong><small>' + POINTS[c] + '</small></div>';
+    }).join('');
+
+  document.getElementById('chips').innerHTML = ['climb','exercise','mobility']
+    .map(function(c, i){
+      return '<span class="chip' + (i < 2 ? ' done' : '') + '">'
+           + '<span class="gl">' + s[c] + '</span>' + LABELS[c] + ' +' + (3 - i) + '</span>';
+    }).join('');
+
+  document.getElementById('feed').innerHTML = FEED.map(function(r){
+    return '<div class="act"><div class="av"><span class="gl">' + s[r.cat] + '</span></div>'
+         + '<div><strong>' + r.who + '</strong><small>' + r.det + '</small></div>'
+         + '<div class="pts">+' + r.pts + '</div></div>';
+  }).join('');
+
+  document.getElementById('spec').innerHTML = ['climb','exercise','mobility','bounty']
+    .map(function(c){
+      var v = (s.verdict && s.verdict[c]) || '';
+      var n = (s.note && s.note[c]) || '';
+      return '<div class="specrow"><span class="lb">' + LABELS[c] + '</span>'
+           + '<span class="gl s16">' + s[c] + '</span>'
+           + '<span class="gl s20">' + s[c] + '</span>'
+           + '<span class="gl s24">' + s[c] + '</span>'
+           + '<span class="gl s34">' + s[c] + '</span>'
+           + '<span class="verdict ' + v + '">' + n + '</span></div>';
+    }).join('');
+
+  document.getElementById('rej').innerHTML = SETS.map(function(x){
+    var bits = ['climb','mobility'].filter(function(c){
+      return x.verdict[c] === 'bad';
+    }).map(function(c){ return x.note[c]; });
+    return '<tr><td>' + x.name.split(' ')[0] + '</td><td>'
+         + (bits.length ? bits.join(' ') : 'Kept.') + '</td></tr>';
+  }).join('');
+
+  try {
+    history.replaceState(null, '', '?variant=' + s.key);
+  } catch (e) {}
+}
+
+function go(step){
+  idx = (idx + step + SETS.length) % SETS.length;
+  draw();
+}
+
+document.getElementById('prev').onclick = function(){ go(-1); };
+document.getElementById('next').onclick = function(){ go(1); };
+document.addEventListener('keydown', function(e){
+  var t = e.target.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA' || e.target.isContentEditable) return;
+  if (e.key === 'ArrowLeft')  go(-1);
+  if (e.key === 'ArrowRight') go(1);
+});
+
+(function(){
+  var want = new URLSearchParams(location.search).get('variant');
+  for (var i = 0; i < SETS.length; i++) if (SETS[i].key === want) idx = i;
+  draw();
+})();
+</script>
+</body>
+</html>
