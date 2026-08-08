@@ -75,7 +75,7 @@ const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
 assert.match(stylesheet,/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/,'the global focus ring uses the shared high-contrast green treatment');
 assert.equal((stylesheet.match(/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/g)||[]).length,1,'the shared focus ring is declared once globally');
 assert.doesNotMatch(stylesheet,/:focus-visible[^}]*var\(--sky\)/,'no focus-visible rule uses the low-contrast sky token');
-assert.match(stylesheet,/button\.bounty:focus-visible\{outline:3px solid var\(--green\);outline-offset:-2px;border-radius:10px\}/,'the bounty row keeps its inset focus ring geometry');
+assert.match(stylesheet,/button\.bounty:focus-visible\{outline:3px solid var\(--green\);outline-offset:-2px;border-radius:var\(--radius-1\)\}/,'the bounty row keeps its inset focus ring geometry');
 assert.match(stylesheet,/\.progress i\{[^}]*background:var\(--orange-ink\)/,'the progress fill uses the contrast-safe orange ink token');
 assert.match(stylesheet,/td\.sorted strong\{color:var\(--orange-ink\)\}/,'the sorted leaderboard value uses the contrast-safe orange ink token');
 assert.match(stylesheet,/\.point-meter i\.seg-exercise\.filled\{background:var\(--orange-ink\);border-color:var\(--orange-ink\)\}/,'the exercise meter fill uses orange ink');
@@ -86,8 +86,37 @@ assert.doesNotMatch(stylesheet,/\.progress i\{[^}]*background:var\(--orange\)/,'
 assert.doesNotMatch(stylesheet,/td\.sorted strong\{color:var\(--orange\)\}/,'the sorted leaderboard value no longer uses low-contrast orange');
 const nonRootStyles=stylesheet.replace(/:root\{[^}]*\}/g,'');
 assert.doesNotMatch(nonRootStyles,/(?:^|[;{])color:var\(--orange\)/,'no non-root text rule paints with low-contrast orange');
+const SPACE=['--space-1','--space-2','--space-3','--space-4','--space-5','--space-6'];
+const RADII=['--radius-1','--radius-2','--radius-3'];
+const TYPE=['--type-1','--type-2','--type-3','--type-4','--type-5','--type-6'];
+function assertScale(propertyPattern,tokens,specials=[]){
+  const properties=propertyPattern==='padding|margin|gap'?'(?:padding|margin)(?:-[a-z-]+)?|(?:row-|column-)?gap':propertyPattern==='font-size'?'font-size|font':propertyPattern;
+  const declarations=[...nonRootStyles.matchAll(new RegExp(`(?:^|[;{])(${properties}):([^;}]+)`,'g'))];
+  for(const [,property,value] of declarations){
+    assert.ok(!value.includes('calc('),`${property}: ${value.trim()} recombines the scale with calc() instead of naming one step`);
+    for(const match of value.matchAll(/-?(?:\d*\.)?\d+(?:[a-z]+|%)/gi))assert.ok(specials.includes(match[0]),`${property}: ${match[0]} is outside the design scale`);
+    for(const match of value.matchAll(/var\((--(?:space|radius|type)-[^)]+)\)/g))assert.ok(tokens.includes(match[1]),`${property}: var(${match[1]}) is outside the design scale`);
+  }
+}
+assertScale('border-radius',RADII,['50%','999px']);
+assertScale('font-size',TYPE);
+assertScale('padding|margin|gap',SPACE);
+assert.equal((stylesheet.match(/:root\{[^}]*--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;/g)||[]).length,1,'the six ranked spacing tokens live once in the root theme');
+assert.equal((stylesheet.match(/:root\{[^}]*--radius-1:8px;--radius-2:14px;--radius-3:20px;/g)||[]).length,1,'the three ranked radius tokens live once in the root theme');
+assert.equal((stylesheet.match(/:root\{[^}]*--type-1:11px;--type-2:13px;--type-3:15px;--type-4:19px;--type-5:27px;--type-6:44px;/g)||[]).length,1,'the six ranked type tokens live once in the root theme');
+const darkStart=stylesheet.indexOf('@media(prefers-color-scheme:dark)');
+assert.notEqual(darkStart,-1,'the dark theme media block exists');
+const darkOpen=stylesheet.indexOf('{',darkStart);
+let darkDepth=0,darkEnd=-1;
+for(let i=darkOpen;i<stylesheet.length;i++){
+  if(stylesheet[i]==='{')darkDepth++;
+  else if(stylesheet[i]==='}'&&!--darkDepth){darkEnd=i;break}
+}
+assert.notEqual(darkEnd,-1,'the dark theme media block has balanced braces');
+const darkStyles=stylesheet.slice(darkOpen+1,darkEnd);
+assert.doesNotMatch(darkStyles,/--(?:space|radius|type)-/,'theme-independent design scales are not duplicated into the dark theme');
 assert.match(stylesheet,/:root\{--font:'DM Sans',system-ui,sans-serif;--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
-for(const declaration of ['\\.icon-btn\\{[^}]*font:700 25px\\/1 var\\(--font\\)','\\.btn\\{[^}]*font:800 15px var\\(--font\\)','\\.text-btn\\{[^}]*font:800 14px var\\(--font\\)','\\.sync\\{[^}]*font:800 12px var\\(--font\\)','\\.bottom-nav button\\{[^}]*font:800 12px var\\(--font\\)','\\.seg-btn\\{[^}]*font:800 13px var\\(--font\\)','\\.review-section h3,\\.person-head\\{font:800 14px var\\(--font\\)'])assert.match(stylesheet,new RegExp(declaration),'each repaired control shorthand keeps its intended body stack');
+for(const declaration of ['\\.icon-btn\\{[^}]*font:700 var\\(--type-5\\)\\/1 var\\(--font\\)','\\.btn\\{[^}]*font:800 var\\(--type-3\\) var\\(--font\\)','\\.text-btn\\{[^}]*font:800 var\\(--type-2\\) var\\(--font\\)','\\.sync\\{[^}]*font:800 var\\(--type-1\\) var\\(--font\\)','\\.bottom-nav button\\{[^}]*font:800 var\\(--type-1\\) var\\(--font\\)','\\.seg-btn\\{[^}]*font:800 var\\(--type-2\\) var\\(--font\\)','\\.review-section h3,\\.person-head\\{font:800 var\\(--type-2\\) var\\(--font\\)'])assert.match(stylesheet,new RegExp(declaration),'each repaired control shorthand keeps its intended body stack');
 assert.doesNotMatch(stylesheet,/font:[^;}]*\s+inherit(?=[;}])/,'no multi-component font shorthand ends in invalid inherit');
 const displayUses=stylesheet.replace(/@import[^;]+;/,'').replace(/--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif/,'');
 assert.doesNotMatch(displayUses,/'Roboto Condensed'/,'display font uses share the fallback token');
@@ -97,7 +126,7 @@ const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?
 const heatmapWeekdays=heatmapCard.match(/<div class="heatmap-weekdays"[\s\S]*?<\/div>/)?.[0]||'';
 assert.match(heatmapCard,/<div class="heatmap-weekdays" aria-hidden="true"><span>M<\/span><span>T<\/span><span>W<\/span><span>T<\/span><span>F<\/span><span>S<\/span><span>S<\/span><\/div><div id="youHeatmap"/,'the weekday axis sits immediately before the heatmap and stays out of its accessible name');
 assert.equal((heatmapWeekdays.match(/<span>/g)||[]).length,7,'the weekday axis has exactly seven cells');
-assert.match(stylesheet,/\.heatmap-weekdays\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:5px;max-width:400px;/,'the weekday axis shares the heatmap grid geometry');
+assert.match(stylesheet,/\.heatmap-weekdays\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:var\(--space-1\);max-width:400px;/,'the weekday axis shares the heatmap grid geometry');
 assert.match(heatmapLegend,/role="img"[^>]*aria-label="[^"]+"/,'the heatmap shade key has one text alternative');
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapLegend"[\s\S]*id="heatmapSummary"/,'the heatmap shade key sits between the graphic and caption');
 for(const shade of [0,1,2,3,4])assert.match(heatmapLegend,new RegExp(`class="heat-cell heat${shade}" aria-hidden="true"`),`the heatmap shade key includes heat${shade}`);
@@ -246,9 +275,9 @@ assert.match(script,/function momentumCurve\(/,'one helper produces every chart 
 assert.match(script,/function trendSvg\(/,'one helper renders every chart SVG');
 assert.doesNotMatch(stylesheet,/\.trend-value\{|\.trend-point\{/,'the stretched SVG text and point styles are retired');
 assert.match(stylesheet,/\.bounty-peek\{grid-template-columns:auto minmax\(0,1fr\) auto\}\.bounty-peek>span:nth-child\(2\)\{min-width:0;overflow-wrap:anywhere\}/,'claimed bounty rows can break a long note without pushing out their points');
-assert.match(stylesheet,/\.trend-labels\{display:flex;justify-content:space-between;gap:12px;padding:8px 2px 0;font-size:12px;font-weight:800\}\.trend-label\.peak\{color:var\(--ink\)\}\.trend-label\.current\{color:var\(--muted\)\}/,'the curve value labels use HTML text styling');
+assert.match(stylesheet,/\.trend-labels\{display:flex;justify-content:space-between;gap:var\(--space-3\);padding:var\(--space-2\) var\(--space-1\) 0;font-size:var\(--type-1\);font-weight:800\}\.trend-label\.peak\{color:var\(--ink\)\}\.trend-label\.current\{color:var\(--muted\)\}/,'the curve value labels use HTML text styling');
 assert.match(stylesheet,/\.trend-baseline\{stroke:var\(--line-strong\);vector-effect:non-scaling-stroke\}/,'the curve baseline stays crisp and separates from the fill');
-assert.equal((stylesheet.match(/\.del\{[^}]*min-width:44px;min-height:44px;border-radius:10px\}/g)||[]).length,1,'the delete control has one 44px rule');
+assert.equal((stylesheet.match(/\.del\{[^}]*min-width:44px;min-height:44px;border-radius:var\(--radius-1\)\}/g)||[]).length,1,'the delete control has one 44px rule');
 assert.equal((stylesheet.match(/\.progress i\{background:var\(--orange-ink\);transition:width \.4s cubic-bezier\(\.4,0,\.2,1\)\}/g)||[]).length,1,'the progress fill has one surviving colour and transition rule');
 assert.equal((stylesheet.match(/\.trend-baseline\{stroke-width:1\}/g)||[]).length,1,'the baseline keeps its one-pixel width once');
 assert.equal((stylesheet.match(/\.trend-baseline\{stroke:var\(--line-strong\);vector-effect:non-scaling-stroke\}/g)||[]).length,1,'the baseline keeps its crisp stroke once');
@@ -273,7 +302,7 @@ assert.match(html,/id="leaderBountyBtn"[^>]*type="button"[^>]*aria-pressed=/,'th
 assert.match(html,/id="leaderMetricToggle"[^>]*aria-label=/,'the points/bounties metric toggle is a labelled group');
 assert.match(html,/id="leaderScopeToggle"[^>]*aria-label=/,'the weekly/overall scope toggle is a labelled group');
 assert.match(html,/\.leader-toggles\{display:flex;flex-wrap:nowrap/,'the four leaderboard buttons stay on one row');
-assert.match(stylesheet,/\.card\.table-card\{padding:18px 0\}/,'the leaderboard card keeps zero horizontal padding on phones');
+assert.match(stylesheet,/\.card\.table-card\{padding:var\(--space-4\) 0\}/,'the leaderboard card keeps zero horizontal padding on phones');
 assert.match(stylesheet,/#leaderTable td:nth-child\(2\)\{white-space:normal;overflow-wrap:anywhere\}/,'the climber column can wrap an unbroken name at its min-content width');
 assert.equal(script.indexOf('podiumMedals'),-1,'the leaderboard no longer builds podium medals');
 assert.equal(html.indexOf('.medal{'),-1,'podium medals no longer have CSS');
@@ -307,5 +336,5 @@ assert.doesNotMatch(personCardSource,/trendEl\.setAttribute\('aria-label'/,'the 
 assert.match(stylesheet,/\.stat strong,\.pts,#leaderTable td:nth-child\(3\),#leaderTable td:nth-child\(4\)\{font-variant-numeric:tabular-nums\}/,'stat, feed and leaderboard values use tabular figures');
 assert.match(stylesheet,/\.stat-grid \.card\{margin-bottom:0\}/,'stat-grid cards do not add a second vertical gap');
 assert.match(html,/id="groupPercent" class="group-percent"/,'the crew percentage has a headline class');
-assert.match(stylesheet,/\.group-percent\{color:var\(--green\);font:800 31px var\(--head\);font-variant-numeric:tabular-nums\}/,'the crew percentage is a tabular headline figure');
+assert.match(stylesheet,/\.group-percent\{color:var\(--green\);font:800 var\(--type-5\) var\(--head\);font-variant-numeric:tabular-nums\}/,'the crew percentage is a tabular headline figure');
 console.log('Road to Send static accessibility and UX checks passed.');
