@@ -93,6 +93,7 @@ function assertScale(propertyPattern,tokens,specials=[]){
   const properties=propertyPattern==='padding|margin|gap'?'(?:padding|margin)(?:-[a-z-]+)?|(?:row-|column-)?gap':propertyPattern==='font-size'?'font-size|font':propertyPattern;
   const declarations=[...nonRootStyles.matchAll(new RegExp(`(?:^|[;{])(${properties}):([^;}]+)`,'g'))];
   for(const [,property,value] of declarations){
+    assert.ok(!value.includes('calc('),`${property}: ${value.trim()} recombines the scale with calc() instead of naming one step`);
     for(const match of value.matchAll(/-?(?:\d*\.)?\d+(?:[a-z]+|%)/gi))assert.ok(specials.includes(match[0]),`${property}: ${match[0]} is outside the design scale`);
     for(const match of value.matchAll(/var\((--(?:space|radius|type)-[^)]+)\)/g))assert.ok(tokens.includes(match[1]),`${property}: var(${match[1]}) is outside the design scale`);
   }
