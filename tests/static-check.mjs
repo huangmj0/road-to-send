@@ -72,6 +72,7 @@ assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption')
 assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
 assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.page-head h1\{overflow-wrap:anywhere\}/,'the page head wraps long names while keeping its actions reachable');
 const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
+assert.doesNotMatch(stylesheet,/#72c1d5|--(?:sky|avatar-bg|notice-bg)/i,'the retired sky accent and its derived tint tokens are absent from the built stylesheet');
 assert.match(stylesheet,/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/,'the global focus ring uses the shared high-contrast green treatment');
 assert.equal((stylesheet.match(/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/g)||[]).length,1,'the shared focus ring is declared once globally');
 assert.doesNotMatch(stylesheet,/:focus-visible[^}]*var\(--sky\)/,'no focus-visible rule uses the low-contrast sky token');
