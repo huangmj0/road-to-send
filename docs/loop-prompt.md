@@ -53,6 +53,10 @@ LAND — clean and green: commit to the branch if Codex has not, then STOP. Repo
 branch, base..head, the test summary line, and both review verdicts. Push and `gh pr create --draft`
 are not pre-approved, so ask me once before either — that is the only checkpoint in the tick.
 
+CLOSE — when a tick's PR merges into an integration branch rather than `main`, close its issue by
+hand. GitHub only honours `Closes #N` for PRs that target the default branch, so on a queue that
+lands as one unit the blocker never clears itself and PICK deadlocks on the first ticket.
+
 PACE — after a completed tick, wait 120–300s so origin/main settles. Stop the loop on "queue empty",
 on ready-for-human, or on any question you have to ask me.
 ```
