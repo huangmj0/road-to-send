@@ -76,7 +76,7 @@ assert.doesNotMatch(stylesheet,/#72c1d5|--(?:sky|avatar-bg|notice-bg)/i,'the ret
 assert.match(stylesheet,/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/,'the global focus ring uses the shared high-contrast green treatment');
 assert.equal((stylesheet.match(/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/g)||[]).length,1,'the shared focus ring is declared once globally');
 assert.doesNotMatch(stylesheet,/:focus-visible[^}]*var\(--sky\)/,'no focus-visible rule uses the low-contrast sky token');
-assert.match(stylesheet,/button\.bounty:focus-visible\{outline:3px solid var\(--green\);outline-offset:-2px;border-radius:var\(--radius-1\)\}/,'the bounty row keeps its inset focus ring geometry');
+assert.match(stylesheet,/button\.bounty:focus-visible\{outline:3px solid var\(--green\);outline-offset:-2px;border-radius:var\(--elevation-raised-radius\)\}/,'the bounty row keeps its inset focus ring geometry');
 assert.match(stylesheet,/\.progress i\{[^}]*background:var\(--orange-ink\)/,'the progress fill uses the contrast-safe orange ink token');
 assert.match(stylesheet,/td\.sorted strong\{color:var\(--orange-ink\)\}/,'the sorted leaderboard value uses the contrast-safe orange ink token');
 assert.match(stylesheet,/\.point-meter i\.seg-exercise\.filled\{background:var\(--orange-ink\);border-color:var\(--orange-ink\)\}/,'the exercise meter fill uses orange ink');
@@ -86,18 +86,22 @@ assert.match(stylesheet,/\.heat1\{background:color-mix\(in srgb,var\(--orange\) 
 assert.doesNotMatch(stylesheet,/\.progress i\{[^}]*background:var\(--orange\)/,'the progress fill no longer uses low-contrast orange');
 assert.doesNotMatch(stylesheet,/td\.sorted strong\{color:var\(--orange\)\}/,'the sorted leaderboard value no longer uses low-contrast orange');
 const nonRootStyles=stylesheet.replace(/:root\{[^}]*\}/g,'');
+const rootStyles=stylesheet.match(/:root\{([^}]*)\}/)?.[1]||'';
 assert.doesNotMatch(nonRootStyles,/(?:^|[;{])color:var\(--orange\)/,'no non-root text rule paints with low-contrast orange');
 const SPACE=['--space-1','--space-2','--space-3','--space-4','--space-5','--space-6'];
 const RADII=['--radius-1','--radius-2','--radius-3'];
 const TYPE=['--type-1','--type-2','--type-3','--type-4','--type-5','--type-6'];
-function assertScale(propertyPattern,tokens,specials=[]){
+function assertScale(propertyPattern,tokens,specials=[],lintValues=true){
   const properties=propertyPattern==='padding|margin|gap'?'(?:padding|margin)(?:-[a-z-]+)?|(?:row-|column-)?gap':propertyPattern==='font-size'?'font-size|font':propertyPattern;
   const declarations=[...nonRootStyles.matchAll(new RegExp(`(?:^|[;{])(${properties}):([^;}]+)`,'g'))];
   for(const [,property,value] of declarations){
-    assert.ok(!value.includes('calc('),`${property}: ${value.trim()} recombines the scale with calc() instead of naming one step`);
-    for(const match of value.matchAll(/-?(?:\d*\.)?\d+(?:[a-z]+|%)/gi))assert.ok(specials.includes(match[0]),`${property}: ${match[0]} is outside the design scale`);
-    for(const match of value.matchAll(/var\((--(?:space|radius|type)-[^)]+)\)/g))assert.ok(tokens.includes(match[1]),`${property}: var(${match[1]}) is outside the design scale`);
+    if(lintValues){
+      assert.ok(!value.includes('calc('),`${property}: ${value.trim()} recombines the scale with calc() instead of naming one step`);
+      for(const match of value.matchAll(/-?(?:\d*\.)?\d+(?:[a-z]+|%)/gi))assert.ok(specials.includes(match[0]),`${property}: ${match[0]} is outside the design scale`);
+      for(const match of value.matchAll(/var\((--(?:space|radius|type)-[^)]+)\)/g))assert.ok(tokens.includes(match[1]),`${property}: var(${match[1]}) is outside the design scale`);
+    }
   }
+  return declarations.map(([,property,value])=>({property,value:value.trim()}));
 }
 assertScale('border-radius',RADII,['50%','999px']);
 assertScale('font-size',TYPE);
@@ -116,6 +120,30 @@ for(let i=darkOpen;i<stylesheet.length;i++){
 assert.notEqual(darkEnd,-1,'the dark theme media block has balanced braces');
 const darkStyles=stylesheet.slice(darkOpen+1,darkEnd);
 assert.doesNotMatch(darkStyles,/--(?:space|radius|type)-/,'theme-independent design scales are not duplicated into the dark theme');
+const escapeRegex=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const elevationLevels={
+  ground:{fill:'transparent',border:'1px solid var(--line-strong)',shadow:'none'},
+  raised:{fill:'var(--card)',border:'1px solid var(--line-strong)',shadow:'0 8px 20px #174a3a18',radius:'var(--radius-2)'},
+  overlay:{fill:'var(--card)',border:'1px solid var(--nav-line)',shadow:'0 14px 36px #102b2338',radius:'var(--radius-3)'}
+};
+const darkElevationLevels={
+  ground:{fill:'transparent',border:'1px solid #ffffff1f',shadow:'none'},
+  raised:{fill:'#2c261f',border:'1px solid #ffffff26',shadow:'0 8px 20px #00000052'},
+  overlay:{fill:'#332b24',border:'1px solid #ffffff33',shadow:'0 14px 36px #00000073'}
+};
+for(const [level,values] of Object.entries(elevationLevels))for(const [job,value] of Object.entries(values))assert.equal((rootStyles.match(new RegExp(`--elevation-${level}-${job}:${escapeRegex(value)}`,'g'))||[]).length,1,`${level} elevation declares its ${job} token exactly once in the light theme`);
+for(const [level,values] of Object.entries(darkElevationLevels))for(const [job,value] of Object.entries(values))assert.equal((darkStyles.match(new RegExp(`--elevation-${level}-${job}:${escapeRegex(value)}`,'g'))||[]).length,1,`${level} elevation declares its ${job} token exactly once in the dark theme`);
+for(const level of Object.keys(elevationLevels))assert.match(darkStyles,new RegExp(`--elevation-${level}-fill:`),`${level} elevation is explicitly themed for dark mode`);
+const boxShadowDeclarations=assertScale('box-shadow',[],[],false);
+const boxShadowValues=new Set(boxShadowDeclarations.map(({value})=>value));
+assert.ok(boxShadowValues.size<=5,`box-shadow uses ${boxShadowValues.size} treatments, exceeding the five-treatment elevation grammar`);
+for(const value of boxShadowValues)assert.ok(['var(--elevation-ground-shadow)','var(--elevation-raised-shadow)','var(--elevation-overlay-shadow)','0 0 0 3px var(--orange-ring)','var(--dialog-shadow)'].includes(value),`box-shadow: ${value} is outside the elevation grammar`);
+assert.match(stylesheet,/\.card\{[^}]*background:var\(--elevation-ground-fill\);border:0;border-bottom:var\(--elevation-ground-border\);border-radius:0;[^}]*box-shadow:var\(--elevation-ground-shadow\)/,'cards default to ground elevation with a hairline rule and no radius');
+assert.match(stylesheet,/\.today-card,\.record-card\{[^}]*background:var\(--elevation-raised-fill\);border:var\(--elevation-raised-border\);border-radius:var\(--elevation-raised-radius\);[^}]*box-shadow:var\(--elevation-raised-shadow\)/,'the daily check-in and record form use raised elevation');
+assert.match(stylesheet,/button\.bounty\{[^}]*background:var\(--elevation-raised-fill\);border:var\(--elevation-raised-border\);[^}]*border-radius:var\(--elevation-raised-radius\);[^}]*box-shadow:var\(--elevation-raised-shadow\)/,'actionable bounty rows use raised elevation');
+assert.match(stylesheet,/\.bounty-peek\{[^}]*border:var\(--elevation-raised-border\);border-radius:var\(--elevation-raised-radius\);background:var\(--elevation-raised-fill\);box-shadow:var\(--elevation-raised-shadow\)/,'preview and claimed bounty rows use raised elevation');
+assert.match(stylesheet,/\.bottom-nav\{[^}]*background:var\(--elevation-overlay-fill\);border-top:var\(--elevation-overlay-border\);[^}]*box-shadow:var\(--elevation-overlay-shadow\)/,'the navigation shell uses overlay elevation');
+assert.match(stylesheet,/\.dialog\{[^}]*background:var\(--elevation-overlay-fill\);border:var\(--elevation-overlay-border\);border-radius:var\(--elevation-overlay-radius\);[^}]*box-shadow:var\(--dialog-shadow\)/,'modal dialogs use overlay fill, border and radius with their dedicated shadow');
 assert.match(stylesheet,/:root\{--font:'DM Sans',system-ui,sans-serif;--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
 for(const declaration of ['\\.icon-btn\\{[^}]*font:700 var\\(--type-5\\)\\/1 var\\(--font\\)','\\.btn\\{[^}]*font:800 var\\(--type-3\\) var\\(--font\\)','\\.text-btn\\{[^}]*font:800 var\\(--type-2\\) var\\(--font\\)','\\.sync\\{[^}]*font:800 var\\(--type-1\\) var\\(--font\\)','\\.bottom-nav button\\{[^}]*font:800 var\\(--type-1\\) var\\(--font\\)','\\.seg-btn\\{[^}]*font:800 var\\(--type-2\\) var\\(--font\\)','\\.review-section h3,\\.person-head\\{font:800 var\\(--type-2\\) var\\(--font\\)'])assert.match(stylesheet,new RegExp(declaration),'each repaired control shorthand keeps its intended body stack');
 assert.doesNotMatch(stylesheet,/font:[^;}]*\s+inherit(?=[;}])/,'no multi-component font shorthand ends in invalid inherit');
@@ -125,7 +153,6 @@ const styleRules=[...stylesheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([,select
 const declarationsFor=selector=>styleRules.filter(rule=>rule.selectors.includes(selector)).map(rule=>rule.declarations).join(';');
 for(const selector of ['.brand','.page-head h1','.card h2','.dialog h2','.review-section h3','.person-head','.bounty-day h3'])assert.doesNotMatch(declarationsFor(selector),/var\(--head\)/,`${selector} uses the body face, not the numeric display face`);
 const numericDisplaySelectors=['#youTodayPoints','#youDailyMax','#rawPreview','#totalPoints','#groupGoal','.stat strong','.rank','#leaderTable td:nth-child(3)','#leaderTable td:nth-child(4)','.group-percent','.pyramid-grade','.pts','#youCountdown','.review-countdown','.breakdown-pts','.pyramid-count','.records-value','.wr-big','.cat-chip em','.bounty-peek .bounty-pts'];
-const escapeRegex=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 for(const selector of numericDisplaySelectors){
   const declarations=declarationsFor(selector);
   assert.match(declarations,/var\(--head\)/,`${selector} uses the numeric display face`);
