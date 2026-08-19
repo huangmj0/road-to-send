@@ -29,24 +29,24 @@ GitHub Pages hosts the interface, while a Google Sheet stores shared settings an
 
 The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains a single `name` column; `Activities` contains raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time.
 
-### Upgrading to API v11
+### Upgrading to API v12
 
-Paste the v11 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
+Paste the v12 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
 
-- Upgrading from v10 keeps every tab and its data; v11 only enlarges the rotating bounty catalog. Because the daily bounties are chosen by hashing the date across the catalog, any change to the catalog reshuffles each day's picks — so the protocol version is bumped whenever the catalog changes. This forces the client to reject a not-yet-redeployed backend (**"Apps Script update required"**) instead of silently offering bounties the stale server would refuse.
-- Upgrading from v9 keeps every tab and its data.
-- Upgrading from v8 or earlier renames any existing `Activities` (and leftover `Benchmarks`) tab to a timestamped archive tab exactly once, then a fresh `Activities` tab is created. The redesigned scoring starts clean. Existing `Settings` remain; the `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
-- Older endpoints are rejected by the new client, so incompatible writes cannot mix with API v11.
+- v12 changes only how the backend works, not the data or the wire format. The Apps Script used to re-provision and re-format every tab on **every** read and write; it now does that formatting once, when a Sheet is first set up, and skips it on every later call. Together with the client no longer reloading the whole `Activities` tab just to confirm one save, logging an activity is markedly faster. An already-set-up Sheet keeps every tab and its data and is never re-archived.
+- Because `src/apps-script.js` is part of the versioned browser/backend contract, the protocol version is bumped even though the JSON is unchanged. The rollout is graceful: the v12 client accepts both a redeployed v12 backend and a not-yet-redeployed v11 one, since their wire format is byte-for-byte identical — there is no outage window, so the site and the script can update in either order. Deploy the v12 script when convenient to pick up the speedup; until you do, clients keep working against v11.
+- Upgrading from v10 or v9 keeps every tab and its data. Upgrading from v8 or earlier renames any existing `Activities` (and leftover `Benchmarks`) tab to a timestamped archive tab exactly once, then a fresh `Activities` tab is created. The redesigned scoring starts clean. Existing `Settings` remain; the `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
+- v11 is accepted only transitionally, to bridge the v12 rollout; v10 and earlier endpoints are still rejected by the new client, so genuinely incompatible writes cannot mix with API v12.
 
 Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
 
-## API v11
+## API v12
 
 Reads return:
 
 ```json
 {
-  "version": 11,
+  "version": 12,
   "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1"],
   "activities": [],
   "config": {
@@ -61,9 +61,9 @@ Reads return:
 }
 ```
 
-Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 11, ok, ... }`; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
+Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 12, ok, ... }` — the full saved activity record, which the app adds to the feed immediately and then reconciles with a background sync; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
 
-The app distinguishes **Save failed** from **Saved to the Sheet, but refresh failed**. In the latter case, do not submit again; use the Crew sync control.
+A save is confirmed as soon as the Sheet accepts the write, so the only outcomes are **Activity saved** and **Save failed** (safe to retry). The Crew sync control refreshes the shared board on demand.
 
 ## Development
 

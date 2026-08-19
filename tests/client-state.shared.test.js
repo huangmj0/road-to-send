@@ -17,7 +17,7 @@ test('background sync respects the open date picker and refreshes stale caches',
   store.set('roadToSendEndpoint', 'https://sheet.example.test/exec');
   store.set('roadToSendMe', 'Alex');
   const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
-  const payload = {version: 11, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: dayShift(0), timeZone: 'America/Los_Angeles'};
+  const payload = {version: 12, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: dayShift(0), timeZone: 'America/Los_Angeles'};
   let gets = 0;
   const syncContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
@@ -79,7 +79,7 @@ test('background sync respects the open date picker and refreshes stale caches',
     const mismatchDetail=document.querySelector('#diagnosticDetail').textContent;
     assert.ok(mismatchDetail.indexOf('This build expects v'+expectedVersion)>=0,'the expected version is still named after an unsupported payload');
     assert.equal(document.querySelector('#diagnosticCode').textContent,'RTS-REFRESH-VERSION','the version-mismatch code is still reported');
-    setPayloadVersion(11);
+    setPayloadVersion(12);
     setNumericActivity({id:'numeric-name',name:7,type:'climb',date:'${dayShift(-1)}',createdAt:'1'});
     await loadRemote();
     assert.equal(syncState,'live','a reachable payload with a numeric activity name remains a live sync');
@@ -134,7 +134,7 @@ test('a denied clipboard copy never reports shared setup as failed', async () =>
   const posted = [];
   const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
   const crewConfig = {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]};
-  const payload = {version: 11, features: [], activities: [], config: crewConfig, configErrors: [], serverDate: '', timeZone: ''};
+  const payload = {version: 12, features: [], activities: [], config: crewConfig, configErrors: [], serverDate: '', timeZone: ''};
   const participantRow = {querySelector: () => ({value: 'Alex'})};
   const setupContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
@@ -251,6 +251,54 @@ test('a full disk never reports a saved entry as failed, and never traps the ide
     assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save activity','and the button is handed back');
   })()`;
   await vm.runInNewContext(`${source}\n${storageChecks}`, storageContext, {filename: 'index.html'});
+});
+
+// Lever 1: a shared-mode save no longer blocks the confirmation on a full reload. The write
+// response is the authoritative row, so it lands in the feed at once; reconciliation is a
+// background loadRemote(). Here that reconcile GET never resolves, proving the save does not wait
+// on it — the pre-optimistic code awaited loadRemote() and would hang forever on this stub.
+test('a shared save shows the entry from the write response without waiting on a reload', async () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const store = new Map();
+  let posted = 0;
+  const today = new Date().toISOString().slice(0, 10);
+  store.set('roadToSendEndpoint', 'https://sheet.example.test/exec');
+  store.set('roadToSendMe', 'Alex');
+  const savedContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''},
+    history: {replaceState() {}},
+    window: {scrollTo() {}},
+    document: {
+      visibilityState: 'visible', activeElement: null,
+      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
+      querySelectorAll: () => [],
+      addEventListener: (type, handler) => listeners.set(type, handler),
+      removeEventListener() {}, createElement: () => makeElement(),
+    },
+    postedCount: () => posted,
+    fetch: async (url, options = {}) => {
+      if (options.method === 'POST') {posted++; return {ok: true, json: async () => ({version: 12, ok: true, id: 'srv-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-01-01T00:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: ''})}}
+      return new Promise(() => {});
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const savedChecks = `(async()=>{
+    endpoint='https://sheet.example.test/exec';
+    config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};
+    logs=[];me='Alex';recordingFor='Alex';
+    document.querySelector('#activityDate').value='${today}';
+    await submitActivity({preventDefault(){}});
+    assert.equal(postedCount(),1,'the activity is written to the Sheet exactly once');
+    assert.equal(logs.length,1,'the saved row appears immediately, without awaiting a full reload');
+    assert.equal(logs[0].id,'srv-1','the row is the authoritative record the write returned');
+    assert.equal(logs[0].points,3,'including the points the backend derived, not the raw request');
+    assert.equal(document.querySelector('#toast').textContent,'Activity saved.','and success is confirmed at once');
+    assert.equal(saving,false,'the save flag is released');
+  })()`;
+  await vm.runInNewContext(`${source}\n${savedChecks}`, savedContext, {filename: 'index.html'});
 });
 
 test('a blocked export says so instead of failing silently', async () => {
