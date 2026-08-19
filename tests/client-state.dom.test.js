@@ -536,8 +536,10 @@ const domChecks = `(()=>{
   performDelete();
   assert.equal(undoBar.classList.contains('hide'),false,'a second delete offers again');
   showTab('crew');
-  render();
-  assert.equal(undoBar.classList.contains('hide'),true,'moving to another tab puts the offer away');
+  assert.equal(undoBar.classList.contains('hide'),true,'moving to another tab puts the offer away on its own, with no render in between');
+  assert.equal(undoTextEl.textContent,'','and takes the text with it, so a spent offer never stays on screen');
+  undoDelete();
+  assert.deepEqual(logs.map(x=>x.id),['u2','u3'],'the retired Undo cannot put the row back behind the tab switch');
   showTab('you');
   // Shared mode never offers undo at all: re-POSTing a deleted row would mint a new id.
   logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
@@ -551,6 +553,20 @@ const domChecks = `(()=>{
   undoDelete();
   assert.equal(logs.length,1,'and undo does nothing in shared mode even if it is called directly');
   endpoint='';
+
+  // A bounty row whose bountyTitle is blank still reads by name: the feed, the delete
+  // confirmation and the undo bar all fall back to the catalogue through bountyTitle().
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  const blankTitled=dailyBounties(challengeToday())[0];
+  logs=[{id:'nb1',name:'Alex',type:'bounty',bountyId:blankTitled.id,bountyTitle:'',category:blankTitled.category,date:challengeToday(),createdAt:'1'}];
+  render();
+  assert.ok(document.querySelector('#personalActivity').innerHTML.indexOf('Delete '+esc(blankTitled.title)+' for Alex')>=0,'the feed names a title-less bounty from the catalogue');
+  requestDelete(0,'nb1','personal');
+  assert.equal(document.querySelector('#confirmBody').textContent,'Delete '+blankTitled.title+' for Alex?','the delete confirmation names it the way the feed does');
+  performDelete();
+  assert.equal(undoTextEl.textContent,'Deleted '+blankTitled.title+'.','and so does the undo bar');
+  lastDeleted=null;
 
   // Entry 38: the feed caps were hard. Across a ten-week challenge the personal feed showed the
   // last five entries and the crew feed the last twenty, with no way to see anything older.
