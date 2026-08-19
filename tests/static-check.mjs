@@ -74,7 +74,10 @@ assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.
 const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
 assert.match(stylesheet,/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/,'the global focus ring uses the shared high-contrast green treatment');
 assert.equal((stylesheet.match(/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/g)||[]).length,1,'the shared focus ring is declared once globally');
-assert.doesNotMatch(stylesheet,/:focus-visible[^}]*var\(--sky\)/,'no focus-visible rule uses the low-contrast sky token');
+// Gold is too low-contrast to ring focus on the cream page, and sage is invisible against the sage
+// hero — so the page keeps its sage ring and the hero, and only the hero, swaps to gold.
+assert.doesNotMatch(stylesheet.replace(/\.today-card :focus-visible\{[^}]*\}/,''),/:focus-visible[^}]*var\(--gold\)/,'no focus ring on the cream page uses the low-contrast gold accent');
+assert.match(stylesheet,/\.today-card :focus-visible\{outline-color:var\(--gold\)\}/,'the sage hero swaps its focus ring to gold, which a sage ring on a sage card would not show');
 assert.match(stylesheet,/button\.bounty:focus-visible\{outline:3px solid var\(--green\);outline-offset:-2px;border-radius:10px\}/,'the bounty row keeps its inset focus ring geometry');
 assert.match(stylesheet,/\.progress i\{[^}]*background:var\(--orange-ink\)/,'the progress fill uses the contrast-safe orange ink token');
 assert.match(stylesheet,/td\.sorted strong\{color:var\(--orange-ink\)\}/,'the sorted leaderboard value uses the contrast-safe orange ink token');
@@ -86,11 +89,11 @@ assert.doesNotMatch(stylesheet,/\.progress i\{[^}]*background:var\(--orange\)/,'
 assert.doesNotMatch(stylesheet,/td\.sorted strong\{color:var\(--orange\)\}/,'the sorted leaderboard value no longer uses low-contrast orange');
 const nonRootStyles=stylesheet.replace(/:root\{[^}]*\}/g,'');
 assert.doesNotMatch(nonRootStyles,/(?:^|[;{])color:var\(--orange\)/,'no non-root text rule paints with low-contrast orange');
-assert.match(stylesheet,/:root\{--font:'DM Sans',system-ui,sans-serif;--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
+assert.match(stylesheet,/:root\{--font:'Inter',system-ui,sans-serif;--head:'Barlow Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
 for(const declaration of ['\\.icon-btn\\{[^}]*font:700 25px\\/1 var\\(--font\\)','\\.btn\\{[^}]*font:800 15px var\\(--font\\)','\\.text-btn\\{[^}]*font:800 14px var\\(--font\\)','\\.sync\\{[^}]*font:800 12px var\\(--font\\)','\\.bottom-nav button\\{[^}]*font:800 12px var\\(--font\\)','\\.seg-btn\\{[^}]*font:800 13px var\\(--font\\)','\\.review-section h3,\\.person-head\\{font:800 14px var\\(--font\\)'])assert.match(stylesheet,new RegExp(declaration),'each repaired control shorthand keeps its intended body stack');
 assert.doesNotMatch(stylesheet,/font:[^;}]*\s+inherit(?=[;}])/,'no multi-component font shorthand ends in invalid inherit');
-const displayUses=stylesheet.replace(/@import[^;]+;/,'').replace(/--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif/,'');
-assert.doesNotMatch(displayUses,/'Roboto Condensed'/,'display font uses share the fallback token');
+const displayUses=stylesheet.replace(/@import[^;]+;/,'').replace(/--head:'Barlow Condensed',Arial Narrow,system-ui,sans-serif/,'');
+assert.doesNotMatch(displayUses,/'Barlow Condensed'/,'display font uses share the fallback token');
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
 const heatmapCard=html.match(/<article id="heatmapCard"[\s\S]*?<\/article>/)?.[0]||'';
 const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?.[0]||'';
@@ -225,6 +228,14 @@ assert.match(html,/class="dial-center"[^>]*aria-hidden="true"/,'the ring centre 
 // with reduced motion looking at an empty dial.
 assert.match(stylesheet,/\.goal-ring path\{[^}]*stroke-dashoffset:0\}/,'the goal ring rests fully drawn so reduced motion keeps a readable dial');
 assert.match(stylesheet,/\.goal-ring path\.filled\{animation:ring-ink/,'the goal ring inks in with a CSS animation rather than a JS tween');
+// The Crag skin leans on CSS motion and a paper-grain texture. Both have to survive the two
+// switches this app cannot negotiate with: the reduced-motion kill switch, and the no-new-network
+// -requests rule. A reveal that animates *to* its resting state, and a grain that is a data URI,
+// are what make that true.
+assert.match(stylesheet,/@keyframes rise\{from\{opacity:0;transform:translateY\(12px\)\}\}/,'the panel reveal animates up from hidden to the element own resting state, so reduced motion shows it settled');
+assert.match(stylesheet,/--grain:url\("data:image\/svg\+xml/,'the paper grain is an inline data URI, not a fetched image');
+assert.doesNotMatch(stylesheet.replace(/@import[^;]+;/,''),/url\((?:'|")?https?:/,'no style rule outside the font import reaches the network');
+assert.match(stylesheet,/\.today-card\{[^}]*color:var\(--hero-ink\)/,'the today hero states its own foreground so the inverted card never inherits page ink');
 assert.match(html,/data-panel="you"[\s\S]*id="youMeter"[\s\S]*id="todayCategories"[\s\S]*id="todayRemaining"[\s\S]*data-tab="record"[\s\S]*id="bountyCapHint"/,'the category chips and remaining line sit between the today meter and the Record button, above the bounty card');
 assert.match(script,/function todayProgress\(/,'the today-progress helper backs the category chips');
 assert.match(html,/data-panel="you"[\s\S]*id="youCountdown"/,'the personal countdown lives in the You panel');
@@ -297,7 +308,7 @@ assert.match(script,/function copyText\(/,'the shared clipboard helper exists');
 assert.match(script,/function publicUrl\(/,'shared text is built from the endpoint-free public URL');
 assert.match(script,/function shareSummary\(/,'the share summary helper backs the Share button');
 assert.equal((html.match(/<table[\s>]/g)||[]).length,1,'all crew share one leaderboard');
-assert.match(html,/<meta[^>]+name="theme-color"[^>]+content="#f5eee3"/,'a theme-color meta tints the browser chrome to the brand background');
+assert.match(html,/<meta[^>]+name="theme-color"[^>]+content="#e8dfca"/,'a theme-color meta tints the browser chrome to the brand background');
 assert.match(html,/<link[^>]+rel="icon"[^>]+href="data:image\/svg\+xml,/,'an inline SVG data-URI favicon is present');
 assert.match(html,/<meta[^>]+name="color-scheme"[^>]+content="[^"]*dark[^"]*"/,'a color-scheme meta opts the page into dark rendering');
 assert.match(html,/@media\(prefers-color-scheme:dark\)/,'a dark-mode media query overrides the theme variables');
