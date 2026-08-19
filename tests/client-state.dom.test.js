@@ -1128,7 +1128,7 @@ const domChecks = `(()=>{
   document.querySelector('#activityNote').value='Different note, same points';
   updateRecordPreview();
   assert.equal(creditWrites,0,'changing only a note leaves the credit preview text node untouched');
-  endpoint='https://example.test/exec';syncState='error';syncDetail='Could not reach the Sheet';syncErrorCode='RTS-NETWORK';protocolVersion=11;
+  endpoint='https://example.test/exec';syncState='error';syncDetail='Could not reach the Sheet';syncErrorCode='RTS-NETWORK';protocolVersion=12;
   render();
   const detailEl=document.querySelector('#diagnosticDetail'),codeEl=document.querySelector('#diagnosticCode');
   let detailWrites=0,detailText=detailEl.textContent,codeWrites=0,codeText=codeEl.textContent;

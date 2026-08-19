@@ -4,43 +4,26 @@
 shared Google Sheet and from their browsers' localStorage. `index.html` is the deployed artifact and
 **stays at the repository root** — moving or renaming it changes the published URL.
 
-## Read this first
+**Read `AGENTS.md` before touching anything.** It is the authoritative guide: structure, commands,
+the hard constraints a live app imposes, tone, style, testing, and commits. The rules that bite
+before you reach it:
 
-`AGENTS.md` is the authoritative repository guide: structure, commands, the hard constraints that
-come from running a live app, tone, style, testing, and commit conventions. Read it before touching
-anything. This file deliberately does not restate it, because a second copy is a second thing to
-drift. The short version:
-
-- Edit `src/app.js`, `src/index.template.html`, `src/styles.css` and `tests/`. **Never** edit
-  `index.html` by hand; run `npm run build` to regenerate it, then `npm test`.
-- Commit the regenerated `index.html` with your `src/` changes. Never weaken an existing assertion.
-- `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html`.
-- `src/apps-script.js`, `src/schema.json` and `src/scoring.json` are the shared browser/backend
-  contract — changing one forces an API version bump and an organizer redeploy.
-- Harness traps live in a header comment in the test file they apply to — read it before adding
+- Edit `src/` and `tests/`; **never** edit `index.html` by hand. After any `src/` change run
+  `npm run build`, then `npm test`, and commit the regenerated `index.html` with the source edit.
+- Never weaken an existing test assertion.
+- `src/apps-script.js`, `src/schema.json` and `src/scoring.json` are the browser/backend contract —
+  changing one forces an API version bump and an organizer redeploy.
+- Each test file's `TRAP` header comment names its harness's sharp edges — read it before adding
   assertions there.
 
-## Agent skills
+## Per-repo skill configuration
 
-This repo uses [Matt Pocock's skills](https://github.com/mattpocock/skills), vendored under
-`.agents/skills/` and exposed to Claude Code through `.claude/skills/` symlinks.
-`skills-lock.json` pins them; `npx skills@latest update` refreshes them.
+The vendored skills read these repo-specific docs. Reach for the one whose surface a skill's work
+lands on:
 
-### Issue tracker
-
-Issues live in this repo's GitHub Issues, driven through the `gh` CLI. See
-`docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The five canonical roles, each label string equal to its name. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root, both created lazily by
-`/domain-modeling` when a term or decision actually gets resolved. See `docs/agents/domain.md`.
-
-### The improvement loop
-
-Claude plans and reviews, Codex executes, one issue per tick. The `/loop` prompt and the reasoning
-behind its stopping points live in `docs/loop-prompt.md`.
+- **Issues, specs, triage** — driven through the `gh` CLI: `docs/agents/issue-tracker.md`.
+- **Triage labels** — the five canonical roles and their label strings: `docs/agents/triage-labels.md`.
+- **Domain terms and decisions** — `CONTEXT.md` and `docs/adr/`, created lazily by `/domain-modeling`:
+  `docs/agents/domain.md`.
+- **The improvement loop** — Claude plans and reviews, Codex executes, one issue per tick:
+  `docs/loop-prompt.md`.

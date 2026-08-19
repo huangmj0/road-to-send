@@ -23,9 +23,9 @@ function loadScript() {
   return context;
 }
 
-test('embedded v11 Apps Script is syntactically valid and exposes only simple capabilities', () => {
+test('embedded v12 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();
-  assert.equal(vm.runInContext('API_VERSION', context), 11);
+  assert.equal(vm.runInContext('API_VERSION', context), 12);
   assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1']);
   assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
 });
@@ -111,4 +111,47 @@ test('v9 setup archives prior activity and benchmark sheets exactly once and rew
   assert.deepEqual(book.sheets.Activities.values[0], Array.from(vm.runInContext('ACTIVITY_HEADERS', context)));
   assert.deepEqual(book.sheets.Participants.values[0], ['name']);
   assert.equal(book.sheets.Participants.values[1][0], 'Alex');
+});
+
+test('formatSheets runs once while provisioning, then every read and write skips it', () => {
+  const context = loadScript();
+  class Sheet {
+    constructor(book, name, values = []) { this.book = book; this.name = name; this.values = values.map(row => [...row]); }
+    getName() { return this.name; }
+    setName(name) { delete this.book.sheets[this.name]; this.name = name; this.book.sheets[name] = this; }
+    getLastRow() { return this.values.length; }
+    getLastColumn() { return Math.max(0, ...this.values.map(row => row.length)); }
+    appendRow(row) { this.values.push([...row]); }
+    getRange(row, col, rows = 1, cols = 1) { return {
+      getValues: () => Array.from({length: rows}, (_, r) => Array.from({length: cols}, (_, c) => this.values[row - 1 + r]?.[col - 1 + c] ?? '')),
+      setValue: value => { this.values[row - 1] ||= []; this.values[row - 1][col - 1] = value; },
+    }; }
+  }
+  const makeBook = () => ({sheets: {}, getSheetByName(name) { return this.sheets[name] || null; }, insertSheet(name) { return this.sheets[name] = new Sheet(this, name); }, getSpreadsheetTimeZone: () => 'UTC'});
+  let formats = 0;
+  context.formatSheets = () => { formats += 1; };
+
+  // A brand-new doc: the first setup() provisions and formats once; a second identical setup()
+  // (schema now stamped) is the steady state every doGet/doPost hits and must not format again.
+  const fresh = makeBook();
+  const freshStore = {};
+  context.SpreadsheetApp.getActive = () => fresh;
+  context.PropertiesService = {getDocumentProperties: () => ({getProperty: key => key in freshStore ? freshStore[key] : null, setProperty: (key, value) => { freshStore[key] = value; }})};
+  context.setup();
+  assert.equal(formats, 1, 'the first setup() on an unprovisioned doc formats exactly once');
+  context.setup();
+  context.setup();
+  assert.equal(formats, 1, 'once the schema is stamped, later setup() calls never re-run formatSheets');
+
+  // An already-provisioned doc (the live Sheet after redeploy) never pays for formatSheets at all.
+  formats = 0;
+  const live = makeBook();
+  live.sheets.Activities = new Sheet(live, 'Activities', [Array.from(vm.runInContext('ACTIVITY_HEADERS', context))]);
+  live.sheets.Settings = new Sheet(live, 'Settings', [['key', 'value']]);
+  live.sheets.Participants = new Sheet(live, 'Participants', [['name'], ['Alex']]);
+  context.SpreadsheetApp.getActive = () => live;
+  context.PropertiesService = {getDocumentProperties: () => ({getProperty: () => '9', setProperty: () => {}})};
+  context.setup();
+  assert.equal(formats, 0, 'a doc already stamped at the current schema formats zero times');
+  assert.equal(Object.keys(live.sheets).filter(name => name.startsWith('Activities Archive')).length, 0, 'and its live data is never archived');
 });

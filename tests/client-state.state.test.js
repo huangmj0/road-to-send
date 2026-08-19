@@ -704,7 +704,8 @@ const checks = `(()=>{
   assert.throws(()=>unpackRemote({version:8,features:[],activities:[],config:null}),/version/,'v8 requires redeployment');
   assert.throws(()=>unpackRemote({version:9,features:[],activities:[],config:null}),/version/,'v9 requires redeployment');
   assert.throws(()=>unpackRemote({version:10,features:[],activities:[],config:null}),/version/,'v10 requires redeployment: its catalog predates the current bounty rotation');
-  assert.equal(unpackRemote({version:11,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1);
+  assert.equal(unpackRemote({version:11,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1,'v11 is accepted through the v12 rollout: its wire format is identical, so a not-yet-redeployed backend keeps working');
+  assert.equal(unpackRemote({version:12,features:['categories-v1'],activities:[null,{type:'exercise'}],config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]}}).activities.length,1);
 
   // Local upgrade: v8 config migrates (pull mode dropped); logs start fresh; identity persists.
   localStorage.setItem('roadToSendConfigV8',JSON.stringify({startDate:'2026-07-01',tripDate:'2026-07-31',goal:600,crew:[{name:'Alex',pullMode:'super-hard'}]}));
