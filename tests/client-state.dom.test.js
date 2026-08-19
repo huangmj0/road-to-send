@@ -319,10 +319,16 @@ const domChecks = `(()=>{
   assert.equal(statusPill.classList.contains('max'),true,'a complete day keeps the max pill styling');
   assert.equal(catRow.innerHTML.split('cat-chip todo').length-1,0,'no category is left to do');
   assert.equal(remaining.textContent,'Balanced day complete — '+DAILY_MAX+' of '+DAILY_MAX+' points.','the remaining line reports the finished day');
+  // The You meter is now the grouped-pip goal ring, so its pips are <path> arcs rather than the
+  // <i> bars the bar meter draws. Every guarantee below is the one the bar meter carried: one pip
+  // per daily point, all of them filled on a balanced day, and the bonus pips still identifiable.
   const meterHtml=document.querySelector('#youMeter').innerHTML;
-  assert.equal(meterHtml.split('<i ').length-1,DAILY_MAX,'the You meter draws one pip per daily point');
+  assert.equal(meterHtml.split('<path ').length-1,DAILY_MAX,'the You meter draws one pip per daily point');
   assert.equal(meterHtml.split('filled').length-1,DAILY_MAX,'a balanced day fills every pip');
   assert.ok(meterHtml.indexOf('seg-bonus')>=0,'the bonus pips are identifiable');
+  assert.ok(meterHtml.indexOf('goal-ring complete')>=0,'a balanced day seals the ring');
+  assert.equal(meterHtml.split('seg-climb').length-1,SCORING.categories.climb,'the ring groups one arc per climbing point');
+  assert.equal(meterHtml.split('seg-bonus').length-1,SCORING.balancedDayBonus,'the ring draws the bonus points as their own group');
 
   // Entry 33: the chips are the one place the today card shows a missing category without offering
   // the action that fixes it. Each chip is now a real button inside its listitem wrapper, and the
@@ -1180,16 +1186,16 @@ const domChecks = `(()=>{
   renderTodayStatus();
   assert.equal(recordMarkupWrites,0,'an unchanged record draft leaves its meter markup untouched');
   assert.equal(recordAriaWrites,0,'an unchanged record draft leaves its meter label untouched');
-  assert.equal(youMarkupWrites,0,'an unchanged day leaves its segmented meter markup untouched');
-  assert.equal(youAriaWrites,0,'an unchanged day leaves its segmented meter label untouched');
+  assert.equal(youMarkupWrites,0,'an unchanged day leaves its goal ring markup untouched');
+  assert.equal(youAriaWrites,0,'an unchanged day leaves its goal ring label untouched');
   typeRadio.value='exercise';
   updateRecordPreview();
   logs=logs.concat([{id:'live-change-2',name:'Alex',type:'mobility',date:challengeToday(),createdAt:'2'}]);
   renderTodayStatus();
   assert.equal(recordMarkupWrites,1,'changing the activity type rebuilds the record meter');
   assert.equal(recordAriaWrites,1,'changing the activity type updates the record meter label');
-  assert.equal(youMarkupWrites,1,'changing the day points rebuilds the segmented meter');
-  assert.equal(youAriaWrites,1,'changing the day points updates the segmented meter label');
+  assert.equal(youMarkupWrites,1,'changing the day points rebuilds the goal ring');
+  assert.equal(youAriaWrites,1,'changing the day points updates the goal ring label');
 
   endpoint='';logs=[];me='';recordingFor='';
 })()`;

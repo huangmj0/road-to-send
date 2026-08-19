@@ -219,6 +219,12 @@ assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring
 assert.match(html,/data-panel="you"[\s\S]*id="todayCategories"[^>]*role="list"/,'the per-category chip row is a list inside the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="todayRemaining"[^>]*role="status"[^>]*aria-live="polite"/,'the what-is-left-today line lives in the You panel and is announced');
 assert.match(html,/id="youMeter"[^>]*role="img"[^>]*aria-label=/,'the today meter stays a labelled graphic');
+assert.match(html,/class="dial-center"[^>]*aria-hidden="true"/,'the ring centre reading is hidden from assistive tech, which gets the host aria-label instead');
+// The reduced-motion kill switch is `*{animation:none!important}`, so the ring must already be
+// drawn at rest and use its animation only to ink in. A non-zero base offset would leave anyone
+// with reduced motion looking at an empty dial.
+assert.match(stylesheet,/\.goal-ring path\{[^}]*stroke-dashoffset:0\}/,'the goal ring rests fully drawn so reduced motion keeps a readable dial');
+assert.match(stylesheet,/\.goal-ring path\.filled\{animation:ring-ink/,'the goal ring inks in with a CSS animation rather than a JS tween');
 assert.match(html,/data-panel="you"[\s\S]*id="youMeter"[\s\S]*id="todayCategories"[\s\S]*id="todayRemaining"[\s\S]*data-tab="record"[\s\S]*id="bountyCapHint"/,'the category chips and remaining line sit between the today meter and the Record button, above the bounty card');
 assert.match(script,/function todayProgress\(/,'the today-progress helper backs the category chips');
 assert.match(html,/data-panel="you"[\s\S]*id="youCountdown"/,'the personal countdown lives in the You panel');
