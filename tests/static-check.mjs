@@ -329,4 +329,26 @@ assert.match(stylesheet,/\.stat strong,\.pts,#leaderTable td:nth-child\(3\),#lea
 assert.match(stylesheet,/\.stat-grid \.card\{margin-bottom:0\}/,'stat-grid cards do not add a second vertical gap');
 assert.match(html,/id="groupPercent" class="group-percent"/,'the crew percentage has a headline class');
 assert.match(stylesheet,/\.group-percent\{color:var\(--green\);font:800 31px var\(--head\);font-variant-numeric:tabular-nums\}/,'the crew percentage is a tabular headline figure');
+// The Crag numeral grammar: a figure you have already banked is sage, a figure still on offer is
+// clay, and both are set in the condensed display face. The two halves are asserted together
+// because the whole point is the contrast — recolouring one without the other erases the signal.
+assert.match(stylesheet,/\.pts,#leaderTable td:nth-child\(3\),#leaderTable td:nth-child\(4\)\{color:var\(--green\);font:800 19px var\(--head\)\}/,'earned figures are sage and condensed');
+assert.match(stylesheet,/button\.bounty \.pts,\.bounty-pts,\.activity-picker small\{color:var\(--orange-ink\)/,'figures still on offer stay clay, even where they reuse the feed point class');
+// The timeline rail runs behind the avatars, so each avatar needs a ring in its own card colour to
+// punch a hole in the line. A ring in any other colour would read as a second border.
+assert.match(stylesheet,/\.activity-list:before\{content:"";position:absolute/,'the field log draws one rail down its gutter');
+assert.match(stylesheet,/\.avatar\{position:relative;box-shadow:0 0 0 3px var\(--card\)\}/,'each avatar rings itself in the card colour so the rail passes behind it');
+// Three one-shot reveals were added with the Crag skin. Reduced motion removes animations outright
+// rather than shortening them, so each has to rest at its finished state: the sheen parks outside
+// the card it sweeps, the bars sit at their real width, and the trend line sits closed. Assert the
+// resting declaration, not the keyframe — the keyframe is the part the kill switch throws away.
+assert.match(stylesheet,/\.today-card:before\{[^}]*transform:translateX\(120%\)/,'the hero sheen rests off-canvas, so a motion-free page never shows it mid-sweep');
+assert.match(stylesheet,/@keyframes sheen\{from\{transform:translateX\(-120%\)\}\}/,'the sheen animates up to that resting position rather than away from it');
+assert.match(stylesheet,/@keyframes grow\{from\{width:0\}\}/,'bars grow up to the width their own inline style already sets');
+assert.match(stylesheet,/\.trend-line\{stroke-dasharray:1;animation:ring-ink/,'the trend line rests fully drawn and reuses the ring stroke keyframe');
+assert.match(script,/<path class="trend-line" d="\$\{line\}" pathLength="1"/,'the trend path declares a unit length, so one dash value draws any line');
+// White on the low-light clay measures 4.43:1 — under the 4.5:1 text floor — so the raised Record
+// pill is the one control that changes fill in the dark, taking the lighter clay and dark ink.
+assert.match(stylesheet,/@media\(prefers-color-scheme:dark\)\{#navRecord\{background:var\(--orange\);color:#211d12\}\}/,'the night Record pill swaps to a fill its label can sit on');
+assert.match(stylesheet,/#navRecord\{margin:-13px 12px 7px;[^}]*background:var\(--accent-solid\);color:#fff/,'the day Record pill rides above the bar in clay');
 console.log('Road to Send static accessibility and UX checks passed.');

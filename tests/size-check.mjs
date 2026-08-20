@@ -37,7 +37,17 @@ import { readFileSync } from 'node:fs';
 // in entries 68 and 72, while entries 70 and 71 remove the champions panel and
 // podium markup, CSS and JS. The 5330 bytes of headroom covers that net pass shape;
 // the next budget entry re-measures rather than assuming.
-const BUDGET = 170000;
+//
+// Re-baselined 170000 -> 174000 by the Crag design pass: measured 169956 bytes, which
+// is the 170000 cap with 44 bytes to spare — two skin commits (the palette, grain,
+// hero and goal ring; then the numeral grammar, timeline rail, raised Record pill and
+// one-shot reveals) spent the whole 5330-byte headroom the entry-66 note set aside.
+// The growth is almost entirely CSS: it re-skins every surface at once, and a
+// token-driven sheet means most of it is new rules rather than edited ones. 174000
+// restores roughly 4000 bytes of room. Per the rule above the next budget entry
+// re-measures rather than assuming, and a pass that lands under its projection
+// lowers the cap again.
+const BUDGET = 174000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
