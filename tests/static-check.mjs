@@ -24,9 +24,9 @@ for(const tab of ['you','record','crew']){
   assert.match(html,new RegExp(`data-tab="${tab}"`),`${tab} navigation exists`);
 }
 assert.match(html,/class="bottom-nav"[^>]+aria-label="Primary"/,'bottom navigation is named');
-assert.match(html,/id="navYou" class="active"[^>]*>\s*<span aria-hidden="true">●<\/span>You<\/button>/,'the You navigation button retains its live active class and hides its glyph');
-assert.match(html,/id="navRecord"[^>]*>\s*<span aria-hidden="true">＋<\/span>Record<\/button>/,'the Record navigation button keeps its visible label and hides its glyph');
-assert.match(html,/id="navCrew"[^>]*>\s*<span aria-hidden="true">♟<\/span>Crew<\/button>/,'the Crew navigation button keeps its visible label and hides its glyph');
+assert.match(html,/id="navYou" class="active"[^>]*>\s*<span aria-hidden="true"><svg class="glyph"><use href="#g-you"\/><\/svg><\/span>You<\/button>/,'the You navigation button retains its live active class and hides its glyph');
+assert.match(html,/id="navRecord"[^>]*>\s*<span aria-hidden="true"><svg class="glyph"><use href="#g-plus"\/><\/svg><\/span>Record<\/button>/,'the Record navigation button keeps its visible label and hides its glyph');
+assert.match(html,/id="navCrew"[^>]*>\s*<span aria-hidden="true"><svg class="glyph"><use href="#g-crew"\/><\/svg><\/span>Crew<\/button>/,'the Crew navigation button keeps its visible label and hides its glyph');
 for(const tab of ['you','record','crew'])assert.match(html,new RegExp(`data-panel="${tab}"[^>]*aria-labelledby="nav${tab[0].toUpperCase()+tab.slice(1)}"`),`the ${tab} section remains labelled by its navigation button`);
 assert.doesNotMatch(html,/id="leaderPointsBtn"[^>]*class="[^"]*\bactive\b/,'the Points toggle carries no dead active class');
 assert.doesNotMatch(html,/id="leaderWeekBtn"[^>]*class="[^"]*\bactive\b/,'the Recent toggle carries no dead active class');
@@ -193,7 +193,7 @@ assert.match(html,/data-panel="you"[\s\S]*id="bountyCapHint"[\s\S]*id="todayBoun
 assert.match(html,/data-panel="you"[\s\S]*today-card[\s\S]*id="bountyCapHint"[\s\S]*id="todayBounties"[\s\S]*class="stat-grid"/,'the bounty card sits directly under the today card, above the stat grid, on the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="todayBounties"[\s\S]*id="personalActivity"[\s\S]*class="stat-grid"/,'the recent activity feed sits above the analytics stat grid on the You panel');
 assert.match(script,/function claimBounty\(/,'a claim handler exists so bounty rows are actionable');
-assert.match(script,/<button class="bounty" type="button"[^>]*data-claim-bounty=[^>]*aria-label="Claim /,'bounty rows render as labelled one-tap claim buttons');
+assert.match(script,/<button class="bounty[^"]*" type="button"[^>]*data-claim-bounty=[^>]*aria-label="Claim /,'bounty rows render as labelled one-tap claim buttons');
 assert.match(script,/function claimedTodayIds\(/,'a pure helper identifies bounties claimed today');
 const populateBountySelectSource=script.split('\n').find(line=>line.startsWith('function populateBountySelect('))||'';
 assert.ok(populateBountySelectSource,'the Record bounty picker has its own named population helper');
@@ -210,7 +210,7 @@ assert.doesNotMatch(html,/\.champions\{|\.champ-line\{|\.champ-scope\{/,'the ret
 assert.match(html,/\.title-tag\{/,'the folded-in leaderboard title tag is styled');
 assert.match(script,/class="title-tag"/,'a leaderboard row can render a title tag beside the climber name');
 assert.match(script,/model\.hunters\.forEach\(name=>titleMap\.set\(name,\(titleMap\.get\(name\)\|\|\[\]\)\.concat\('Bounty Hunter'\)\)\)/,'Bounty Hunter joins the runtime title map without becoming a category');
-assert.match(script,/<span class="hunter" aria-hidden="true">🏹<\/span>/,'the decorative hunter glyph remains beside its visible label');
+assert.match(script,/<span class="hunter" aria-hidden="true">\$\{glyph\('bounty'\)\}<\/span>/,'the decorative hunter glyph remains beside its visible label');
 assert.doesNotMatch(script,/title="Bounty Hunter/,'the hunter no longer relies on a title tooltip');
 assert.match(stylesheet,/\.text-btn\{display:inline-flex;align-items:center;min-height:44px\}/,'text buttons meet the minimum touch target from their base class');
 assert.match(stylesheet,/\.sync\{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px\}/,'the sync control meets the minimum touch target from its base class');

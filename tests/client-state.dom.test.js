@@ -279,12 +279,15 @@ const domChecks = `(()=>{
   const notedFeed=document.querySelector('#personalActivity');
   assert.ok(notedFeed.innerHTML.indexOf(notedTitle)>=0,'the bounty still names itself');
   assert.ok(notedFeed.innerHTML.indexOf('felt strong today')>=0,'and now shows the note that was written on it');
-  // The row already joins detail to date with the same separator, so assert the whole detail.
-  assert.ok(notedFeed.innerHTML.indexOf(notedTitle+' · felt strong today · '+fmtDay(shift(-1)))>=0,'the note joins the title the way the exercise and mobility rows join theirs');
+  // The row joins detail with the same separator the exercise and mobility rows use. The date is
+  // no longer part of that string: it heads the group of rows that share it, so assert it there.
+  assert.ok(notedFeed.innerHTML.indexOf(notedTitle+' · felt strong today')>=0,'the note joins the title the way the exercise and mobility rows join theirs');
+  assert.ok(notedFeed.innerHTML.indexOf('<h3 class="activity-day">'+fmtDay(shift(-1))+'</h3>')>=0,'and the day the entry belongs to heads its group of rows');
   logs=[{id:'n2',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,date:shift(-1),createdAt:'2'}];
   render();
   assert.equal(notedFeed.innerHTML.indexOf('felt strong today'),-1,'a bounty with no note carries no note');
-  assert.ok(notedFeed.innerHTML.indexOf(notedTitle+' · '+fmtDay(shift(-1)))>=0,'and renders exactly as it did before, title straight to date');
+  assert.ok(notedFeed.innerHTML.indexOf('<small>'+notedTitle+'</small>')>=0,'and renders exactly as it did before, the title standing alone in the detail line');
+  assert.ok(notedFeed.innerHTML.indexOf('<h3 class="activity-day">'+fmtDay(shift(-1))+'</h3>')>=0,'with its date still on the heading above it');
   // The note is user-entered text arriving from a shared Sheet, so it stays escaped.
   logs=[{id:'n3',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'<img src=x onerror=alert(1)>',date:shift(-1),createdAt:'3'}];
   render();
@@ -411,7 +414,7 @@ const domChecks = `(()=>{
   const dayOneLine=dayOneSvg.match(/<path class="trend-line" d="([^"]+)"/)[1],dayOneArea=dayOneSvg.match(/<path class="trend-area" d="([^"]+)"/)[1];
   assert.match(dayOneLine,/^M0,[^ ]+ L100,[^ ]+$/,'a day-one curve strokes all the way across the chart');
   assert.match(dayOneArea,/^M0,[^ ]+ L100,[^ ]+ L100,88 L0,88 Z$/,'a day-one curve fills a rectangle instead of the old triangle');
-  const tinyBreakdown=breakdownRow('','Tiny',1,0),zeroBreakdown=breakdownRow('','Zero',0,0);
+  const tinyBreakdown=breakdownRow('Tiny',1,0),zeroBreakdown=breakdownRow('Zero',0,0);
   assert.match(tinyBreakdown,/class="nonzero" style="width:0%"/,'a nonzero breakdown row keeps its visible floor when rounding yields zero percent');
   assert.doesNotMatch(zeroBreakdown,/class="nonzero"/,'a zero-point breakdown row still has no rendered floor');
   const tinyPyramid=pyramidRow('V0',1,0),zeroPyramid=pyramidRow('V0',0,0),groupProgress=document.querySelector('#groupProgress');
@@ -582,14 +585,14 @@ const domChecks = `(()=>{
   for(let i=0;i<8;i++)logs=logs.concat([{id:'p'+i,name:'Alex',type:'mobility',date:shift(-1),createdAt:String(i)}]);
   render();
   const pagedFeed=document.querySelector('#personalActivity'),moreBtn=document.querySelector('#personalShowMore');
-  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,5,'the personal feed opens at its default five');
+  assert.equal(pagedFeed.innerHTML.split('class="activity"').length-1,5,'the personal feed opens at its default five');
   assert.equal(moreBtn.classList.contains('hide'),false,'and offers the rest');
   showMoreFeed('personal');
-  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,8,'showing more renders more');
+  assert.equal(pagedFeed.innerHTML.split('class="activity"').length-1,8,'showing more renders more');
   assert.equal(moreBtn.classList.contains('hide'),true,'and the offer goes away once everything is shown');
   // Growth is bounded by the data: paging past the end renders no phantom rows.
   showMoreFeed('personal');
-  assert.equal(pagedFeed.innerHTML.split('class="activity').length-1,8,'paging past the end changes nothing');
+  assert.equal(pagedFeed.innerHTML.split('class="activity"').length-1,8,'paging past the end changes nothing');
   assert.equal(personalFeedLimit,8,'and the limit never runs beyond the log');
   // A feed that already fits never offers the button at all.
   resetFeedLimits();
@@ -605,19 +608,19 @@ const domChecks = `(()=>{
   logs=[{id:'f1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'f2',name:'Alex',type:'exercise',date:shift(-2),createdAt:'2'},{id:'f3',name:'Alex',type:'mobility',date:shift(-3),createdAt:'3'},{id:'f4',name:'Alex',type:'climb',date:shift(-4),createdAt:'4'}];
   render();
   const filterFeed=document.querySelector('#personalActivity'),filterChips=document.querySelector('#feedFilter');
-  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,4,'the You feed opens showing every category');
+  assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,4,'the You feed opens showing every category');
   assert.equal(filterChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="true"')>=0,true,'All is the pressed chip by default');
   setFeedType('climb');
   assert.equal(feedType,'climb','the choice lives in module state, not read back out of the DOM');
-  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,2,'selecting a category narrows the feed to that category');
+  assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,2,'selecting a category narrows the feed to that category');
   assert.equal(filterFeed.innerHTML.indexOf(CAT_LABELS.exercise)>=0,false,'and the other categories drop out');
   assert.equal(filterChips.innerHTML.indexOf('data-feed-type="climb" aria-pressed="true"')>=0,true,'the chosen chip is the pressed one');
   assert.equal(filterChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="false"')>=0,true,'and All un-presses');
   assert.equal(document.querySelector('#crewFeedFilter').innerHTML.indexOf('data-feed-type="all" aria-pressed="true"')>=0,true,'changing the You row leaves the Crew row untouched');
   setFeedType('mobility');
-  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,1,'switching to another category shows that one');
+  assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,1,'switching to another category shows that one');
   setFeedType('all');
-  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,4,'selecting All restores every row');
+  assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,4,'selecting All restores every row');
   // Entry 38's show-more count is per-filter: carried across, it would open a narrow filter
   // already expanded, or hide rows the new filter has plenty of.
   logs=[];
@@ -627,10 +630,10 @@ const domChecks = `(()=>{
   assert.equal(personalFeedLimit,8,'the show-more count grows under the current filter');
   setFeedType('mobility');
   assert.equal(personalFeedLimit,5,'switching filters resets the show-more limit');
-  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,0,'and a category with nothing logged shows no rows');
+  assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,0,'and a category with nothing logged shows no rows');
   setFeedType('all');
   assert.equal(personalFeedLimit,5,'returning to All resets it again');
-  assert.equal(filterFeed.innerHTML.split('class="activity').length-1,5,'and reopens at the default five');
+  assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,5,'and reopens at the default five');
   // The filter is deliberately not remembered: it is module state, so a reload starts at All.
   assert.equal(feedType,'all','the filter ends where it started, with nothing persisted');
 
@@ -641,7 +644,7 @@ const domChecks = `(()=>{
   logs=[{id:'c1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'c2',name:'Bo',type:'exercise',date:shift(-2),createdAt:'2'},{id:'c3',name:'Alex',type:'mobility',date:shift(-3),createdAt:'3'},{id:'c4',name:'Bo',type:'climb',date:shift(-4),createdAt:'4'}];
   render();
   const bothCrewFeed=document.querySelector('#activityList'),bothCrewChips=document.querySelector('#crewFeedFilter'),bothYouFeed=document.querySelector('#personalActivity');
-  const bothRows=el=>el.innerHTML.split('class="activity').length-1;
+  const bothRows=el=>el.innerHTML.split('class="activity"').length-1;
   assert.equal(bothRows(bothCrewFeed),4,'the Crew feed opens showing every category');
   assert.equal(bothCrewChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="true"')>=0,true,'All is the pressed Crew chip by default');
   assert.equal(bothCrewChips.innerHTML.indexOf('data-feed-type="climb"')>=0,true,'and the Crew row offers a chip per category');

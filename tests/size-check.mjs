@@ -49,7 +49,20 @@ import { readFileSync } from 'node:fs';
 // rule. 174000 leaves roughly 4400. Per the rule above the next budget entry
 // re-measures rather than assuming, and a pass that lands under its projection
 // lowers the cap again.
-const BUDGET = 174000;
+//
+// Re-baselined 174000 -> 184000 by the Crag structural pass: measured 179346 bytes, 9748 over the
+// 169598 the previous note recorded and 5346 past the cap. The growth is three things, measured
+// rather than estimated: +5881 in styles.css (the glyph system, the restructured today hero and
+// meta strip, the stacked category chips, the bounty rows and their claimed state, the day
+// headings and the flat stat grid), +2037 in index.template.html (almost all of it the inline
+// <svg class="sprite"> symbol set, which is paid once and then referenced), and +1830 in app.js
+// (the cap-aware ring geometry with its merge-on-bank pass, the leaderboard comparison rail, and
+// glyph() replacing the emoji tables). It is a structural pass, not a re-skin: it changes what the
+// markup is, so most of the CSS is new rules rather than edited ones, and the sprite is a one-time
+// cost that made every icon site smaller. 184000 leaves roughly 4650 -- the same working room the
+// entry-66 and Crag-skin notes settled on. Per the rule above the next budget entry re-measures
+// rather than assuming, and a pass that lands under its projection lowers the cap again.
+const BUDGET = 184000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
