@@ -243,7 +243,7 @@ assert.match(html,/data-panel="you"[\s\S]*id="youPace"[^>]*class="[^"]*pace[^"]*
 assert.match(html,/data-panel="you"[\s\S]*id="todayCategories"[\s\S]*id="youCountdown"[\s\S]*id="youPace"[\s\S]*data-tab="record"[\s\S]*id="bountyCapHint"/,'the countdown and personal pace sit between the category chips and the Record button, above the bounty card');
 assert.match(script,/function challengeProgress\(/,'the challenge-progress helper backs the personal countdown');
 assert.match(script,/function personalPaceInfo\(/,'the personal pace helper backs the personal share line');
-assert.match(script,/function setSegmentedMeter\(/,'the You meter renders identifiable per-category segments');
+assert.match(script,/function setGoalRing\([^\n]*segments\.map\(\(s,i\)=>[^\n]*<path class="\$\{s\.cls\}"[^\n]*<title>\$\{esc\(s\.label\)\}/,'the You meter renders identifiable per-category segments');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="record"/,'the per-category breakdown card lives inside the You panel');
 assert.match(html,/data-panel="you"[\s\S]*class="stat-grid"[\s\S]*id="youTotal"[\s\S]*id="youRank"[\s\S]*id="youStreak"[\s\S]*id="youBestStreak"[\s\S]*data-panel="record"/,'the current and best streak stat cards join the stat grid on the You panel');
 assert.match(html,/<article class="card stat"><span>All-time rank<\/span><strong id="youRank">/,'the You rank stat names its all-time scope');
