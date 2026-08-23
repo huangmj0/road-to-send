@@ -24,9 +24,9 @@ for(const tab of ['you','record','crew']){
   assert.match(html,new RegExp(`data-tab="${tab}"`),`${tab} navigation exists`);
 }
 assert.match(html,/class="bottom-nav"[^>]+aria-label="Primary"/,'bottom navigation is named');
-assert.match(html,/id="navYou" class="active"[^>]*>\s*<span aria-hidden="true">●<\/span>You<\/button>/,'the You navigation button retains its live active class and hides its glyph');
-assert.match(html,/id="navRecord"[^>]*>\s*<span aria-hidden="true">＋<\/span>Record<\/button>/,'the Record navigation button keeps its visible label and hides its glyph');
-assert.match(html,/id="navCrew"[^>]*>\s*<span aria-hidden="true">♟<\/span>Crew<\/button>/,'the Crew navigation button keeps its visible label and hides its glyph');
+assert.match(html,/id="navYou" class="active"[^>]*>\s*<span aria-hidden="true"><svg class="glyph"><use href="#g-you"\/><\/svg><\/span>You<\/button>/,'the You navigation button retains its live active class and hides its glyph');
+assert.match(html,/id="navRecord"[^>]*>\s*<span aria-hidden="true"><svg class="glyph"><use href="#g-plus"\/><\/svg><\/span>Record<\/button>/,'the Record navigation button keeps its visible label and hides its glyph');
+assert.match(html,/id="navCrew"[^>]*>\s*<span aria-hidden="true"><svg class="glyph"><use href="#g-crew"\/><\/svg><\/span>Crew<\/button>/,'the Crew navigation button keeps its visible label and hides its glyph');
 for(const tab of ['you','record','crew'])assert.match(html,new RegExp(`data-panel="${tab}"[^>]*aria-labelledby="nav${tab[0].toUpperCase()+tab.slice(1)}"`),`the ${tab} section remains labelled by its navigation button`);
 assert.doesNotMatch(html,/id="leaderPointsBtn"[^>]*class="[^"]*\bactive\b/,'the Points toggle carries no dead active class');
 assert.doesNotMatch(html,/id="leaderWeekBtn"[^>]*class="[^"]*\bactive\b/,'the Recent toggle carries no dead active class');
@@ -74,7 +74,10 @@ assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.
 const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
 assert.match(stylesheet,/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/,'the global focus ring uses the shared high-contrast green treatment');
 assert.equal((stylesheet.match(/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/g)||[]).length,1,'the shared focus ring is declared once globally');
-assert.doesNotMatch(stylesheet,/:focus-visible[^}]*var\(--sky\)/,'no focus-visible rule uses the low-contrast sky token');
+// Gold is too low-contrast to ring focus on the cream page, and sage is invisible against the sage
+// hero — so the page keeps its sage ring and the hero, and only the hero, swaps to gold.
+assert.doesNotMatch(stylesheet.replace(/\.today-card :focus-visible\{[^}]*\}/,''),/:focus-visible[^}]*var\(--gold\)/,'no focus ring on the cream page uses the low-contrast gold accent');
+assert.match(stylesheet,/\.today-card :focus-visible\{outline-color:var\(--gold\)\}/,'the sage hero swaps its focus ring to gold, which a sage ring on a sage card would not show');
 assert.match(stylesheet,/button\.bounty:focus-visible\{outline:3px solid var\(--green\);outline-offset:-2px;border-radius:10px\}/,'the bounty row keeps its inset focus ring geometry');
 assert.match(stylesheet,/\.progress i\{[^}]*background:var\(--orange-ink\)/,'the progress fill uses the contrast-safe orange ink token');
 assert.match(stylesheet,/td\.sorted strong\{color:var\(--orange-ink\)\}/,'the sorted leaderboard value uses the contrast-safe orange ink token');
@@ -86,11 +89,11 @@ assert.doesNotMatch(stylesheet,/\.progress i\{[^}]*background:var\(--orange\)/,'
 assert.doesNotMatch(stylesheet,/td\.sorted strong\{color:var\(--orange\)\}/,'the sorted leaderboard value no longer uses low-contrast orange');
 const nonRootStyles=stylesheet.replace(/:root\{[^}]*\}/g,'');
 assert.doesNotMatch(nonRootStyles,/(?:^|[;{])color:var\(--orange\)/,'no non-root text rule paints with low-contrast orange');
-assert.match(stylesheet,/:root\{--font:'DM Sans',system-ui,sans-serif;--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
+assert.match(stylesheet,/:root\{--font:'Inter',system-ui,sans-serif;--head:'Barlow Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
 for(const declaration of ['\\.icon-btn\\{[^}]*font:700 25px\\/1 var\\(--font\\)','\\.btn\\{[^}]*font:800 15px var\\(--font\\)','\\.text-btn\\{[^}]*font:800 14px var\\(--font\\)','\\.sync\\{[^}]*font:800 12px var\\(--font\\)','\\.bottom-nav button\\{[^}]*font:800 12px var\\(--font\\)','\\.seg-btn\\{[^}]*font:800 13px var\\(--font\\)','\\.review-section h3,\\.person-head\\{font:800 14px var\\(--font\\)'])assert.match(stylesheet,new RegExp(declaration),'each repaired control shorthand keeps its intended body stack');
 assert.doesNotMatch(stylesheet,/font:[^;}]*\s+inherit(?=[;}])/,'no multi-component font shorthand ends in invalid inherit');
-const displayUses=stylesheet.replace(/@import[^;]+;/,'').replace(/--head:'Roboto Condensed',Arial Narrow,system-ui,sans-serif/,'');
-assert.doesNotMatch(displayUses,/'Roboto Condensed'/,'display font uses share the fallback token');
+const displayUses=stylesheet.replace(/@import[^;]+;/,'').replace(/--head:'Barlow Condensed',Arial Narrow,system-ui,sans-serif/,'');
+assert.doesNotMatch(displayUses,/'Barlow Condensed'/,'display font uses share the fallback token');
 assert.match(html,/id="youHeatmap"[\s\S]*id="heatmapSummary"/,'the heatmap caption follows the graphic');
 const heatmapCard=html.match(/<article id="heatmapCard"[\s\S]*?<\/article>/)?.[0]||'';
 const heatmapLegend=heatmapCard.match(/<div id="heatmapLegend"[\s\S]*?<\/div>/)?.[0]||'';
@@ -190,7 +193,7 @@ assert.match(html,/data-panel="you"[\s\S]*id="bountyCapHint"[\s\S]*id="todayBoun
 assert.match(html,/data-panel="you"[\s\S]*today-card[\s\S]*id="bountyCapHint"[\s\S]*id="todayBounties"[\s\S]*class="stat-grid"/,'the bounty card sits directly under the today card, above the stat grid, on the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="todayBounties"[\s\S]*id="personalActivity"[\s\S]*class="stat-grid"/,'the recent activity feed sits above the analytics stat grid on the You panel');
 assert.match(script,/function claimBounty\(/,'a claim handler exists so bounty rows are actionable');
-assert.match(script,/<button class="bounty" type="button"[^>]*data-claim-bounty=[^>]*aria-label="Claim /,'bounty rows render as labelled one-tap claim buttons');
+assert.match(script,/<button class="bounty[^"]*" type="button"[^>]*data-claim-bounty=[^>]*aria-label="Claim /,'bounty rows render as labelled one-tap claim buttons');
 assert.match(script,/function claimedTodayIds\(/,'a pure helper identifies bounties claimed today');
 const populateBountySelectSource=script.split('\n').find(line=>line.startsWith('function populateBountySelect('))||'';
 assert.ok(populateBountySelectSource,'the Record bounty picker has its own named population helper');
@@ -207,7 +210,7 @@ assert.doesNotMatch(html,/\.champions\{|\.champ-line\{|\.champ-scope\{/,'the ret
 assert.match(html,/\.title-tag\{/,'the folded-in leaderboard title tag is styled');
 assert.match(script,/class="title-tag"/,'a leaderboard row can render a title tag beside the climber name');
 assert.match(script,/model\.hunters\.forEach\(name=>titleMap\.set\(name,\(titleMap\.get\(name\)\|\|\[\]\)\.concat\('Bounty Hunter'\)\)\)/,'Bounty Hunter joins the runtime title map without becoming a category');
-assert.match(script,/<span class="hunter" aria-hidden="true">🏹<\/span>/,'the decorative hunter glyph remains beside its visible label');
+assert.match(script,/<span class="hunter" aria-hidden="true">\$\{glyph\('bounty'\)\}<\/span>/,'the decorative hunter glyph remains beside its visible label');
 assert.doesNotMatch(script,/title="Bounty Hunter/,'the hunter no longer relies on a title tooltip');
 assert.match(stylesheet,/\.text-btn\{display:inline-flex;align-items:center;min-height:44px\}/,'text buttons meet the minimum touch target from their base class');
 assert.match(stylesheet,/\.sync\{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px\}/,'the sync control meets the minimum touch target from its base class');
@@ -219,6 +222,20 @@ assert.match(html,/id="youDailyMax"/,'the daily max is rendered from the scoring
 assert.match(html,/data-panel="you"[\s\S]*id="todayCategories"[^>]*role="list"/,'the per-category chip row is a list inside the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="todayRemaining"[^>]*role="status"[^>]*aria-live="polite"/,'the what-is-left-today line lives in the You panel and is announced');
 assert.match(html,/id="youMeter"[^>]*role="img"[^>]*aria-label=/,'the today meter stays a labelled graphic');
+assert.match(html,/class="dial-center"[^>]*aria-hidden="true"/,'the ring centre reading is hidden from assistive tech, which gets the host aria-label instead');
+// The reduced-motion kill switch is `*{animation:none!important}`, so the ring must already be
+// drawn at rest and use its animation only to ink in. A non-zero base offset would leave anyone
+// with reduced motion looking at an empty dial.
+assert.match(stylesheet,/\.goal-ring path\{[^}]*stroke-dashoffset:0\}/,'the goal ring rests fully drawn so reduced motion keeps a readable dial');
+assert.match(stylesheet,/\.goal-ring path\.filled\{animation:ring-ink/,'the goal ring inks in with a CSS animation rather than a JS tween');
+// The Crag skin leans on CSS motion and a paper-grain texture. Both have to survive the two
+// switches this app cannot negotiate with: the reduced-motion kill switch, and the no-new-network
+// -requests rule. A reveal that animates *to* its resting state, and a grain that is a data URI,
+// are what make that true.
+assert.match(stylesheet,/@keyframes rise\{from\{opacity:0;transform:translateY\(12px\)\}\}/,'the panel reveal animates up from hidden to the element own resting state, so reduced motion shows it settled');
+assert.match(stylesheet,/--grain:url\("data:image\/svg\+xml/,'the paper grain is an inline data URI, not a fetched image');
+assert.doesNotMatch(stylesheet.replace(/@import[^;]+;/,''),/url\((?:'|")?https?:/,'no style rule outside the font import reaches the network');
+assert.match(stylesheet,/\.today-card\{[^}]*color:var\(--hero-ink\)/,'the today hero states its own foreground so the inverted card never inherits page ink');
 assert.match(html,/data-panel="you"[\s\S]*id="youMeter"[\s\S]*id="todayCategories"[\s\S]*id="todayRemaining"[\s\S]*data-tab="record"[\s\S]*id="bountyCapHint"/,'the category chips and remaining line sit between the today meter and the Record button, above the bounty card');
 assert.match(script,/function todayProgress\(/,'the today-progress helper backs the category chips');
 assert.match(html,/data-panel="you"[\s\S]*id="youCountdown"/,'the personal countdown lives in the You panel');
@@ -226,7 +243,7 @@ assert.match(html,/data-panel="you"[\s\S]*id="youPace"[^>]*class="[^"]*pace[^"]*
 assert.match(html,/data-panel="you"[\s\S]*id="todayCategories"[\s\S]*id="youCountdown"[\s\S]*id="youPace"[\s\S]*data-tab="record"[\s\S]*id="bountyCapHint"/,'the countdown and personal pace sit between the category chips and the Record button, above the bounty card');
 assert.match(script,/function challengeProgress\(/,'the challenge-progress helper backs the personal countdown');
 assert.match(script,/function personalPaceInfo\(/,'the personal pace helper backs the personal share line');
-assert.match(script,/function setSegmentedMeter\(/,'the You meter renders identifiable per-category segments');
+assert.match(script,/function setGoalRing\([^\n]*segments\.map\(\(s,i\)=>[^\n]*<path class="\$\{s\.cls\}"[^\n]*<title>\$\{esc\(s\.label\)\}/,'the You meter renders identifiable per-category segments');
 assert.match(html,/data-panel="you"[\s\S]*id="youBreakdown"[\s\S]*data-panel="record"/,'the per-category breakdown card lives inside the You panel');
 assert.match(html,/data-panel="you"[\s\S]*class="stat-grid"[\s\S]*id="youTotal"[\s\S]*id="youRank"[\s\S]*id="youStreak"[\s\S]*id="youBestStreak"[\s\S]*data-panel="record"/,'the current and best streak stat cards join the stat grid on the You panel');
 assert.match(html,/<article class="card stat"><span>All-time rank<\/span><strong id="youRank">/,'the You rank stat names its all-time scope');
@@ -291,7 +308,7 @@ assert.match(script,/function copyText\(/,'the shared clipboard helper exists');
 assert.match(script,/function publicUrl\(/,'shared text is built from the endpoint-free public URL');
 assert.match(script,/function shareSummary\(/,'the share summary helper backs the Share button');
 assert.equal((html.match(/<table[\s>]/g)||[]).length,1,'all crew share one leaderboard');
-assert.match(html,/<meta[^>]+name="theme-color"[^>]+content="#f5eee3"/,'a theme-color meta tints the browser chrome to the brand background');
+assert.match(html,/<meta[^>]+name="theme-color"[^>]+content="#e8dfca"/,'a theme-color meta tints the browser chrome to the brand background');
 assert.match(html,/<link[^>]+rel="icon"[^>]+href="data:image\/svg\+xml,/,'an inline SVG data-URI favicon is present');
 assert.match(html,/<meta[^>]+name="color-scheme"[^>]+content="[^"]*dark[^"]*"/,'a color-scheme meta opts the page into dark rendering');
 assert.match(html,/@media\(prefers-color-scheme:dark\)/,'a dark-mode media query overrides the theme variables');
@@ -312,4 +329,26 @@ assert.match(stylesheet,/\.stat strong,\.pts,#leaderTable td:nth-child\(3\),#lea
 assert.match(stylesheet,/\.stat-grid \.card\{margin-bottom:0\}/,'stat-grid cards do not add a second vertical gap');
 assert.match(html,/id="groupPercent" class="group-percent"/,'the crew percentage has a headline class');
 assert.match(stylesheet,/\.group-percent\{color:var\(--green\);font:800 31px var\(--head\);font-variant-numeric:tabular-nums\}/,'the crew percentage is a tabular headline figure');
+// The Crag numeral grammar: a figure you have already banked is sage, a figure still on offer is
+// clay, and both are set in the condensed display face. The two halves are asserted together
+// because the whole point is the contrast — recolouring one without the other erases the signal.
+assert.match(stylesheet,/\.pts,#leaderTable td:nth-child\(3\),#leaderTable td:nth-child\(4\)\{color:var\(--green\);font:800 19px var\(--head\)\}/,'earned figures are sage and condensed');
+assert.match(stylesheet,/button\.bounty \.pts,\.bounty-pts,\.activity-picker small\{color:var\(--orange-ink\)/,'figures still on offer stay clay, even where they reuse the feed point class');
+// The timeline rail runs behind the avatars, so each avatar needs a ring in its own card colour to
+// punch a hole in the line. A ring in any other colour would read as a second border.
+assert.match(stylesheet,/\.activity-list:before\{content:"";position:absolute/,'the field log draws one rail down its gutter');
+assert.match(stylesheet,/\.avatar\{position:relative;box-shadow:0 0 0 3px var\(--card\)\}/,'each avatar rings itself in the card colour so the rail passes behind it');
+// Three one-shot reveals were added with the Crag skin. Reduced motion removes animations outright
+// rather than shortening them, so each has to rest at its finished state: the sheen parks outside
+// the card it sweeps, the bars sit at their real width, and the trend line sits closed. Assert the
+// resting declaration, not the keyframe — the keyframe is the part the kill switch throws away.
+assert.match(stylesheet,/\.today-card:before\{[^}]*transform:translateX\(120%\)/,'the hero sheen rests off-canvas, so a motion-free page never shows it mid-sweep');
+assert.match(stylesheet,/@keyframes sheen\{from\{transform:translateX\(-120%\)\}\}/,'the sheen animates up to that resting position rather than away from it');
+assert.match(stylesheet,/@keyframes grow\{from\{width:0\}\}/,'bars grow up to the width their own inline style already sets');
+assert.match(stylesheet,/\.trend-line\{stroke-dasharray:1;animation:ring-ink/,'the trend line rests fully drawn and reuses the ring stroke keyframe');
+assert.match(script,/<path class="trend-line" d="\$\{line\}" pathLength="1"/,'the trend path declares a unit length, so one dash value draws any line');
+// White on the low-light clay measures 4.43:1 — under the 4.5:1 text floor — so the raised Record
+// pill is the one control that changes fill in the dark, taking the lighter clay and dark ink.
+assert.match(stylesheet,/@media\(prefers-color-scheme:dark\)\{#navRecord\{background:var\(--orange\);color:#211d12\}\}/,'the night Record pill swaps to a fill its label can sit on');
+assert.match(stylesheet,/#navRecord\{margin:-13px 12px 7px;[^}]*background:var\(--accent-solid\);color:#fff/,'the day Record pill rides above the bar in clay');
 console.log('Road to Send static accessibility and UX checks passed.');
