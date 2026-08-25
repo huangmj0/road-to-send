@@ -1107,6 +1107,25 @@ const domChecks = `(()=>{
   chooseGrade();
   assert.equal(gradeField.value,'','and the grade can be cleared again');
   gradeField.value='V4';chooseGrade();gradeField.value='';
+  // Clearing suppresses the default, which leaves the last one it applied on record. An explicit
+  // pick that happens to match that stale value is still a pick, and must not be swapped for the
+  // grade the current person would have defaulted to.
+  gradeChosen=false;
+  gradeField.value='';
+  updateRecordPreview();
+  assert.equal(gradeField.value,'V6','Alex opens on the grade Alex logged last');
+  gradeField.value='';
+  chooseGrade();
+  recordingFor='Maya';
+  render();
+  assert.equal(gradeField.value,'','the clear holds after switching the draft to Maya');
+  gradeField.value='V6';
+  chooseGrade();
+  assert.equal(gradeField.value,'V6','explicitly picking the grade Alex had defaulted to is kept, not replaced by the Maya default');
+  render();
+  assert.equal(gradeField.value,'V6','and it survives a repaint');
+  recordingFor='Alex';
+  gradeChosen=false;gradeField.value='';
 
   // Entry 52: a climb can carry a note too, so updateRecordPreview() stops hiding #noteFields for
   // climb and draftActivity() carries the typed note through on that branch.
