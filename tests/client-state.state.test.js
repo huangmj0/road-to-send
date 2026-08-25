@@ -30,8 +30,32 @@ const checks = `(()=>{
   const rawNames=sanitizeActivities([{name:' Alex',type:'climb'},{name:7,type:'exercise'}]);
   assert.equal(rawNames[0].name,' Alex','activity sanitation preserves a leading space in the stored name');
   assert.equal(rawNames[1].name,7,'activity sanitation preserves a numeric stored name');
+  const normalized=normalizeActivities([{id:7,name:'Alex',type:'climb',date:'2026-07-13T07:30:00.000Z',createdAt:9,points:99,category:'nope',hardestGrade:'v5',bountyId:'x'.repeat(60),note:'n'.repeat(200),sheetRow:12}]);
+  assert.equal(normalized[0].id,'7','a numeric sheet id becomes a string so creditKey stops mixing string and number keys');
+  assert.equal(normalized[0].date,'2026-07-13','a date carrying a time component is reduced to the calendar day');
+  assert.equal(normalized[0].createdAt,'9','createdAt is coerced to the string the sort comparator already assumes');
+  assert.equal(normalized[0].points,3,'a stored point value above the schema maximum is clamped');
+  assert.equal(normalized[0].category,'','a category outside the scoring set is dropped');
+  assert.equal(normalized[0].hardestGrade,'V5','a lowercase grade is upcased to a known grade');
+  assert.equal(normalized[0].bountyId.length,40,'bountyId is clamped to the schema maximum');
+  assert.equal(normalized[0].note.length,120,'note is clamped to the schema maximum');
+  assert.equal(normalized[0].sheetRow,12,'an unknown Sheet column survives normalization untouched');
+  const badDate=normalizeActivities([{id:'x1',name:'Alex',type:'climb',date:'next tuesday'}]);
+  assert.equal(badDate.length,1,'an entry the backend could not date is kept, not dropped');
+  assert.equal(badDate[0].date,'','a date the backend could not parse normalizes to blank rather than junk');
+  assert.equal(normalizeActivities([{id:'x2',name:'Alex',type:'climb',date:'2026-07-13not-a-date'}])[0].date,'','a date with trailing junk is rejected whole rather than truncated to its leading ten characters');
+  assert.equal(normalizeActivities([{id:'x3',name:'Alex',type:'climb',date:'2026-07-13 07:30:00'}])[0].date,'2026-07-13','a space-separated timestamp keeps its calendar day');
+  assert.equal(normalizeActivities([{id:'x5',name:'Alex',type:'climb',date:'2026-07-13Tnot-a-date'}])[0].date,'','a delimiter followed by junk rather than a time is rejected');
+  assert.equal(normalizeActivities([{id:'x6',name:'Alex',type:'climb',date:'2026-07-13T07:30'}])[0].date,'2026-07-13','a bare hh:mm timestamp is a recognized suffix');
+  assert.equal(normalizeActivities([{id:'x7',name:'Alex',type:'climb',date:'2026-07-13T07:30:00+02:00'}])[0].date,'2026-07-13','an offset timestamp keeps its calendar day');
+  assert.equal(normalizeActivities([{id:'x4',name:'Alex',type:'climb',date:'2026-02-31'}])[0].date,'','an impossible calendar date normalizes to blank');
+  assert.equal(normalizeActivities([{name:'Alex',type:'nope'}]).length,0,'an unknown type is still rejected outright');
+  const localRow=[{id:0,name:'Alex',type:'climb',date:'2026-07-13oops',hardestGrade:'v5',note:'n'.repeat(200)}];
+  assert.deepEqual(sanitizeActivities(localRow)[0],localRow[0],'the local path leaves a stored row untouched, because persistLocal writes it straight back to the frozen roadToSendLogsV9 key');
+  assert.equal(normalizeActivities([{id:0,name:'Alex',type:'climb',date:'2026-07-13'}])[0].id,'0','a zero id is a real id and survives coercion');
 
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.equal(computeCredits(normalizeActivities([{id:'t1',name:'Alex',type:'climb',date:'2026-07-13T07:30:00.000Z',createdAt:'1'}])).info.get('t1').credit,3,'a date with a time component earns credit instead of reading as outside the challenge');
 
   assert.equal(windowStart('2026-07-13'),'2026-07-07','seven days are inclusive');
   assert.equal(windowStart('2026-07-13',1),'2026-07-13','one-day windows begin today');
