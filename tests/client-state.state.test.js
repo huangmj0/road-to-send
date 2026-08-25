@@ -30,8 +30,23 @@ const checks = `(()=>{
   const rawNames=sanitizeActivities([{name:' Alex',type:'climb'},{name:7,type:'exercise'}]);
   assert.equal(rawNames[0].name,' Alex','activity sanitation preserves a leading space in the stored name');
   assert.equal(rawNames[1].name,7,'activity sanitation preserves a numeric stored name');
+  const normalized=sanitizeActivities([{id:7,name:'Alex',type:'climb',date:'2026-07-13T07:30:00.000Z',createdAt:9,points:99,category:'nope',hardestGrade:'v5',bountyId:'x'.repeat(60),note:'n'.repeat(200),sheetRow:12}]);
+  assert.equal(normalized[0].id,'7','a numeric sheet id becomes a string so creditKey stops mixing string and number keys');
+  assert.equal(normalized[0].date,'2026-07-13','a date carrying a time component is reduced to the calendar day');
+  assert.equal(normalized[0].createdAt,'9','createdAt is coerced to the string the sort comparator already assumes');
+  assert.equal(normalized[0].points,3,'a stored point value above the schema maximum is clamped');
+  assert.equal(normalized[0].category,'','a category outside the scoring set is dropped');
+  assert.equal(normalized[0].hardestGrade,'V5','a lowercase grade is upcased to a known grade');
+  assert.equal(normalized[0].bountyId.length,40,'bountyId is clamped to the schema maximum');
+  assert.equal(normalized[0].note.length,120,'note is clamped to the schema maximum');
+  assert.equal(normalized[0].sheetRow,12,'an unknown Sheet column survives normalization untouched');
+  const badDate=sanitizeActivities([{id:'x1',name:'Alex',type:'climb',date:'next tuesday'}]);
+  assert.equal(badDate.length,1,'an entry the backend could not date is kept, not dropped');
+  assert.equal(badDate[0].date,'','a date the backend could not parse normalizes to blank rather than junk');
+  assert.equal(sanitizeActivities([{name:'Alex',type:'nope'}]).length,0,'an unknown type is still rejected outright');
 
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.equal(computeCredits(sanitizeActivities([{id:'t1',name:'Alex',type:'climb',date:'2026-07-13T07:30:00.000Z',createdAt:'1'}])).info.get('t1').credit,3,'a date with a time component earns credit instead of reading as outside the challenge');
 
   assert.equal(windowStart('2026-07-13'),'2026-07-07','seven days are inclusive');
   assert.equal(windowStart('2026-07-13',1),'2026-07-13','one-day windows begin today');
