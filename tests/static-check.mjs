@@ -1,6 +1,8 @@
-// Presence, source order and accessibility assertions against the built index.html. This is
-// where aria-* coverage belongs — the element stub in tests/harness.js cannot see an attribute
-// set from JS, so the client-state suites cannot assert it.
+// Presence, source order and accessibility assertions against the built index.html. This is where
+// aria-* coverage of the SHIPPED MARKUP belongs — the client-state suites never parse index.html,
+// so an attribute that is only ever authored in the template can only be checked here. An aria-*
+// attribute a handler writes at runtime is now readable from the element stub in tests/harness.js
+// and is better asserted there, next to the behaviour that writes it.
 //
 // TRAP — ADD assertions here; never relax, retarget or delete one:
 //   * Several assertions pin DOM *source order*, so moving an element in

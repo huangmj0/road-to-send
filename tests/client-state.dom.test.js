@@ -5,9 +5,9 @@
 // TRAP — two of them:
 //   * The assertions below live inside a backtick template literal evaluated in a vm context.
 //     Added code may contain no backtick and no `${`. Build strings with `+`.
-//   * The element stub in harness.js cannot observe attributes set from JS and cannot fire a
-//     delegated handler. Read the trap note at the top of tests/harness.js before adding
-//     assertions here.
+//   * The element stub in harness.js stores attributes and fires listeners bound to the element
+//     itself, but elements have no tree, so a DELEGATED handler still cannot be fired. Read the
+//     trap note at the top of tests/harness.js before adding assertions here.
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {test} = require('node:test');
@@ -194,7 +194,7 @@ const domChecks = `(()=>{
   logs=[];
   render();
   const weekBox=document.querySelector('#bountyWeek'),weekToggle=document.querySelector('#bountyWeekToggle');
-  // setAttribute is a no-op in this stub, so the open state is asserted where it actually lives.
+  // The open state lives in a module flag rather than on the element, so it is asserted at source.
   assert.equal(bountyWeekOpen,false,'the preview starts closed');
   assert.equal(weekBox.innerHTML,'','and renders nothing at all until it is opened');
   assert.equal(weekBox.classList.contains('hide'),true,'the container stays hidden');
@@ -221,7 +221,7 @@ const domChecks = `(()=>{
   ];
   render();
   const claimedBox=document.querySelector('#claimedList'),claimedCap=document.querySelector('#claimedSummary');
-  // setAttribute is a no-op in this stub, so the open state is asserted where it actually lives.
+  // The open state lives in a module flag rather than on the element, so it is asserted at source.
   assert.equal(claimedOpen,false,'the claimed list starts closed');
   assert.equal(claimedBox.innerHTML,'','and renders nothing at all until it is opened');
   assert.equal(claimedCap.textContent,'','and its caption is empty while closed');
@@ -1077,6 +1077,55 @@ const domChecks = `(()=>{
   render();
   assert.equal(gradeField.value,'','an unlistable stored grade never reaches the select');
   gradeField.value='';
+  // A grade cleared on purpose stays cleared. Picking the placeholder is a choice like any other,
+  // so the default stops re-applying and a climber with history can log a gradeless climb again.
+  recordingFor='Alex';
+  logs=[
+    {id:'gd6',name:'Alex',type:'climb',hardestGrade:'V6',date:shift(-1),createdAt:'1'},
+    {id:'gd7',name:'Maya',type:'climb',hardestGrade:'V10',date:shift(-1),createdAt:'2'},
+  ];
+  updateRecordPreview();
+  assert.equal(gradeField.value,'V6','the default is still offered before the climber touches the select');
+  gradeField.value='';
+  chooseGrade();
+  assert.equal(gradeField.value,'','choosing the placeholder clears the grade instead of restoring the default');
+  render();
+  assert.equal(gradeField.value,'','a cleared grade survives a repaint');
+  updateRecordPreview();
+  assert.equal(gradeField.value,'','and survives being populated again');
+  assert.equal(draftActivity().hardestGrade,'','so the entry that would be saved carries no grade');
+  recordingFor='Maya';
+  render();
+  assert.equal(gradeField.value,'','a deliberate clear outranks the default across a target switch');
+  recordingFor='Alex';
+  gradeField.value='V4';
+  chooseGrade();
+  assert.equal(gradeField.value,'V4','picking a grade after a clear takes effect');
+  render();
+  assert.equal(gradeField.value,'V4','and is not overwritten by the default');
+  gradeField.value='';
+  chooseGrade();
+  assert.equal(gradeField.value,'','and the grade can be cleared again');
+  gradeField.value='V4';chooseGrade();gradeField.value='';
+  // Clearing suppresses the default, which leaves the last one it applied on record. An explicit
+  // pick that happens to match that stale value is still a pick, and must not be swapped for the
+  // grade the current person would have defaulted to.
+  gradeChosen=false;
+  gradeField.value='';
+  updateRecordPreview();
+  assert.equal(gradeField.value,'V6','Alex opens on the grade Alex logged last');
+  gradeField.value='';
+  chooseGrade();
+  recordingFor='Maya';
+  render();
+  assert.equal(gradeField.value,'','the clear holds after switching the draft to Maya');
+  gradeField.value='V6';
+  chooseGrade();
+  assert.equal(gradeField.value,'V6','explicitly picking the grade Alex had defaulted to is kept, not replaced by the Maya default');
+  render();
+  assert.equal(gradeField.value,'V6','and it survives a repaint');
+  recordingFor='Alex';
+  gradeChosen=false;gradeField.value='';
 
   // Entry 52: a climb can carry a note too, so updateRecordPreview() stops hiding #noteFields for
   // climb and draftActivity() carries the typed note through on that branch.
@@ -1199,6 +1248,43 @@ const domChecks = `(()=>{
   assert.equal(recordAriaWrites,1,'changing the activity type updates the record meter label');
   assert.equal(youMarkupWrites,1,'changing the day points rebuilds the goal ring');
   assert.equal(youAriaWrites,1,'changing the day points updates the goal ring label');
+
+  // Entry 92: the element stub now stores attributes and dispatches listeners bound to the element
+  // itself, so the wiring init() sets up can be exercised instead of inferred. Both halves of this
+  // block were unassertable before: a listener bound by init() could not be fired, and an aria-*
+  // attribute written from JS could not be read back.
+  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
+  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  logs=[{id:'wire1',name:'Alex',type:'climb',hardestGrade:'V6',date:shift(-1),createdAt:'1'}];
+  typeRadio.value='climb';
+  // The grade select reaches chooseGrade() through the change listener init() bound, not through a
+  // direct call, so a listener wired to the wrong function would now fail here.
+  const wiredGrade=document.querySelector('#hardestGrade');
+  gradeChosen=false;
+  wiredGrade.value='';
+  updateRecordPreview();
+  assert.equal(wiredGrade.value,'V6','the record form still opens on the grade this climber logged last');
+  wiredGrade.value='';
+  wiredGrade.dispatchEvent({type:'change'});
+  assert.equal(wiredGrade.value,'','a change event on the grade select clears the grade through the wiring init() bound');
+  render();
+  assert.equal(wiredGrade.value,'','and the clear holds across a repaint');
+  assert.equal(draftActivity().hardestGrade,'','so a gradeless climb is what would be saved');
+
+  // The date toggle is a plain element listener too, and it maintains aria-expanded as it opens.
+  const wiredToggle=document.querySelector('#dateToggle'),wiredBox=document.querySelector('#dateFields');
+  wiredBox.classList.add('hide');
+  wiredToggle.setAttribute('aria-expanded','false');
+  wiredToggle.dispatchEvent({type:'click'});
+  assert.equal(wiredBox.classList.contains('hide'),false,'clicking the date toggle opens the date picker');
+  assert.equal(wiredToggle.getAttribute('aria-expanded'),'true','and marks the toggle expanded for a screen reader');
+  assert.equal(wiredToggle.textContent,'－ Use today instead','and offers the way back');
+  wiredToggle.dispatchEvent({type:'click'});
+  assert.equal(wiredBox.classList.contains('hide'),true,'clicking it again closes the picker');
+  assert.equal(wiredToggle.getAttribute('aria-expanded'),'false','and marks the toggle collapsed again');
+  assert.equal(wiredToggle.textContent,'＋ Different day','and restores the opening label');
+  assert.equal(wiredToggle.getAttribute('aria-controls'),null,'an attribute never written reads as absent, not as empty');
+  gradeChosen=false;wiredGrade.value='';
 
   endpoint='';logs=[];me='';recordingFor='';
 })()`;
