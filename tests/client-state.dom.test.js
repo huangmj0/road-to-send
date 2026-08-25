@@ -1077,6 +1077,36 @@ const domChecks = `(()=>{
   render();
   assert.equal(gradeField.value,'','an unlistable stored grade never reaches the select');
   gradeField.value='';
+  // A grade cleared on purpose stays cleared. Picking the placeholder is a choice like any other,
+  // so the default stops re-applying and a climber with history can log a gradeless climb again.
+  recordingFor='Alex';
+  logs=[
+    {id:'gd6',name:'Alex',type:'climb',hardestGrade:'V6',date:shift(-1),createdAt:'1'},
+    {id:'gd7',name:'Maya',type:'climb',hardestGrade:'V10',date:shift(-1),createdAt:'2'},
+  ];
+  updateRecordPreview();
+  assert.equal(gradeField.value,'V6','the default is still offered before the climber touches the select');
+  gradeField.value='';
+  chooseGrade();
+  assert.equal(gradeField.value,'','choosing the placeholder clears the grade instead of restoring the default');
+  render();
+  assert.equal(gradeField.value,'','a cleared grade survives a repaint');
+  updateRecordPreview();
+  assert.equal(gradeField.value,'','and survives being populated again');
+  assert.equal(draftActivity().hardestGrade,'','so the entry that would be saved carries no grade');
+  recordingFor='Maya';
+  render();
+  assert.equal(gradeField.value,'','a deliberate clear outranks the default across a target switch');
+  recordingFor='Alex';
+  gradeField.value='V4';
+  chooseGrade();
+  assert.equal(gradeField.value,'V4','picking a grade after a clear takes effect');
+  render();
+  assert.equal(gradeField.value,'V4','and is not overwritten by the default');
+  gradeField.value='';
+  chooseGrade();
+  assert.equal(gradeField.value,'','and the grade can be cleared again');
+  gradeField.value='V4';chooseGrade();gradeField.value='';
 
   // Entry 52: a climb can carry a note too, so updateRecordPreview() stops hiding #noteFields for
   // climb and draftActivity() carries the typed note through on that branch.
