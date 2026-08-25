@@ -2,9 +2,9 @@
 // export, dialog focus and the share sheet. Unlike the other two client-state suites these are
 // real async test() blocks, each building its own context.
 //
-// TRAP — the element stub in harness.js cannot observe attributes set from JS and cannot fire a
-// delegated handler. Read the trap note at the top of tests/harness.js before adding assertions
-// here. Assertions inside a `checks` template literal may contain no backtick and no `${`.
+// TRAP — the element stub in harness.js stores attributes and fires listeners bound to the element
+// itself, but elements have no tree, so a delegated handler still cannot be fired. Read the trap
+// note at the top of tests/harness.js before adding assertions here. Assertions inside a `checks` template literal may contain no backtick and no `${`.
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {test} = require('node:test');
