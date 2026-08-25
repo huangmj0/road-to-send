@@ -45,6 +45,9 @@ const checks = `(()=>{
   assert.equal(badDate[0].date,'','a date the backend could not parse normalizes to blank rather than junk');
   assert.equal(normalizeActivities([{id:'x2',name:'Alex',type:'climb',date:'2026-07-13not-a-date'}])[0].date,'','a date with trailing junk is rejected whole rather than truncated to its leading ten characters');
   assert.equal(normalizeActivities([{id:'x3',name:'Alex',type:'climb',date:'2026-07-13 07:30:00'}])[0].date,'2026-07-13','a space-separated timestamp keeps its calendar day');
+  assert.equal(normalizeActivities([{id:'x5',name:'Alex',type:'climb',date:'2026-07-13Tnot-a-date'}])[0].date,'','a delimiter followed by junk rather than a time is rejected');
+  assert.equal(normalizeActivities([{id:'x6',name:'Alex',type:'climb',date:'2026-07-13T07:30'}])[0].date,'2026-07-13','a bare hh:mm timestamp is a recognized suffix');
+  assert.equal(normalizeActivities([{id:'x7',name:'Alex',type:'climb',date:'2026-07-13T07:30:00+02:00'}])[0].date,'2026-07-13','an offset timestamp keeps its calendar day');
   assert.equal(normalizeActivities([{id:'x4',name:'Alex',type:'climb',date:'2026-02-31'}])[0].date,'','an impossible calendar date normalizes to blank');
   assert.equal(normalizeActivities([{name:'Alex',type:'nope'}]).length,0,'an unknown type is still rejected outright');
   const localRow=[{id:0,name:'Alex',type:'climb',date:'2026-07-13oops',hardestGrade:'v5',note:'n'.repeat(200)}];

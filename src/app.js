@@ -26,10 +26,11 @@ function sanitizeConfig(value,fallback=defaultConfig()){return parseRemoteConfig
 // predates some of these checks. Coerce each field to the shape src/schema.json declares, in place, so
 // an unknown Sheet column survives untouched — and normalize rather than reject, because an entry that
 // disappears is a climber's logged session gone. The date is matched whole, not sliced: a time suffix is
-// dropped, but trailing junk like '2026-07-13not-a-date' is not a date the schema allows and blanks out.
+// dropped, but only a real hh:mm time may follow the day — trailing junk like '2026-07-13not-a-date'
+// or '2026-07-13Tnot-a-date' is not a date the schema allows, so it blanks out rather than truncating.
 // `name` stays raw on purpose: nameKey() and totalsModel() already trim it at every point of use,
 // and two assertions pin that pass-through.
-function normalizeActivity(x){const stamp=/^(\d{4}-\d{2}-\d{2})(?:[T ].*)?$/.exec(String(x.date||'').trim()),date=stamp&&parseDateOnly(stamp[1])?stamp[1]:'',grade=String(x.hardestGrade||'').trim().toUpperCase();return Object.assign({},x,{id:x.id==null?'':String(x.id),category:CATEGORIES.includes(x.category)?x.category:'',points:Math.max(0,Math.min(3,Math.round(Number(x.points)||0))),date,createdAt:String(x.createdAt||''),hardestGrade:GRADES.includes(grade)?grade:'',bountyId:String(x.bountyId||'').slice(0,40),bountyTitle:String(x.bountyTitle||'').slice(0,60),note:String(x.note||'').slice(0,120)})}
+function normalizeActivity(x){const stamp=/^(\d{4}-\d{2}-\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.exec(String(x.date||'').trim()),date=stamp&&parseDateOnly(stamp[1])?stamp[1]:'',grade=String(x.hardestGrade||'').trim().toUpperCase();return Object.assign({},x,{id:x.id==null?'':String(x.id),category:CATEGORIES.includes(x.category)?x.category:'',points:Math.max(0,Math.min(3,Math.round(Number(x.points)||0))),date,createdAt:String(x.createdAt||''),hardestGrade:GRADES.includes(grade)?grade:'',bountyId:String(x.bountyId||'').slice(0,40),bountyTitle:String(x.bountyTitle||'').slice(0,60),note:String(x.note||'').slice(0,120)})}
 function sanitizeActivities(value){return Array.isArray(value)?value.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)&&['climb','exercise','mobility','bounty'].includes(x.type)):[]}
 // Only remote rows and the cache derived from them are normalized. roadToSendLogsV9 is a frozen key
 // holding rows this app itself wrote, and persistLocal() writes logs straight back to it — running
