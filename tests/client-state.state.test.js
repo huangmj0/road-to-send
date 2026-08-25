@@ -43,6 +43,9 @@ const checks = `(()=>{
   const badDate=sanitizeActivities([{id:'x1',name:'Alex',type:'climb',date:'next tuesday'}]);
   assert.equal(badDate.length,1,'an entry the backend could not date is kept, not dropped');
   assert.equal(badDate[0].date,'','a date the backend could not parse normalizes to blank rather than junk');
+  assert.equal(sanitizeActivities([{id:'x2',name:'Alex',type:'climb',date:'2026-07-13not-a-date'}])[0].date,'','a date with trailing junk is rejected whole rather than truncated to its leading ten characters');
+  assert.equal(sanitizeActivities([{id:'x3',name:'Alex',type:'climb',date:'2026-07-13 07:30:00'}])[0].date,'2026-07-13','a space-separated timestamp keeps its calendar day');
+  assert.equal(sanitizeActivities([{id:'x4',name:'Alex',type:'climb',date:'2026-02-31'}])[0].date,'','an impossible calendar date normalizes to blank');
   assert.equal(sanitizeActivities([{name:'Alex',type:'nope'}]).length,0,'an unknown type is still rejected outright');
 
   config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};

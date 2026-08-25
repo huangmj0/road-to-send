@@ -25,9 +25,11 @@ function sanitizeConfig(value,fallback=defaultConfig()){return parseRemoteConfig
 // not parse rather than dropping the row, and SUPPORTED_API_VERSIONS still accepts a v11 backend that
 // predates some of these checks. Coerce each field to the shape src/schema.json declares, in place, so
 // an unknown Sheet column survives untouched — and normalize rather than reject, because an entry that
-// disappears is a climber's logged session gone. `name` stays raw on purpose: nameKey() and
-// totalsModel() already trim it at every point of use, and two assertions pin that pass-through.
-function normalizeActivity(x){const date=String(x.date||'').trim().slice(0,10),grade=String(x.hardestGrade||'').trim().toUpperCase();return Object.assign({},x,{id:String(x.id||''),category:CATEGORIES.includes(x.category)?x.category:'',points:Math.max(0,Math.min(3,Math.round(Number(x.points)||0))),date:parseDateOnly(date)?date:'',createdAt:String(x.createdAt||''),hardestGrade:GRADES.includes(grade)?grade:'',bountyId:String(x.bountyId||'').slice(0,40),bountyTitle:String(x.bountyTitle||'').slice(0,60),note:String(x.note||'').slice(0,120)})}
+// disappears is a climber's logged session gone. The date is matched whole, not sliced: a time suffix is
+// dropped, but trailing junk like '2026-07-13not-a-date' is not a date the schema allows and blanks out.
+// `name` stays raw on purpose: nameKey() and totalsModel() already trim it at every point of use,
+// and two assertions pin that pass-through.
+function normalizeActivity(x){const stamp=/^(\d{4}-\d{2}-\d{2})(?:[T ].*)?$/.exec(String(x.date||'').trim()),date=stamp&&parseDateOnly(stamp[1])?stamp[1]:'',grade=String(x.hardestGrade||'').trim().toUpperCase();return Object.assign({},x,{id:String(x.id||''),category:CATEGORIES.includes(x.category)?x.category:'',points:Math.max(0,Math.min(3,Math.round(Number(x.points)||0))),date,createdAt:String(x.createdAt||''),hardestGrade:GRADES.includes(grade)?grade:'',bountyId:String(x.bountyId||'').slice(0,40),bountyTitle:String(x.bountyTitle||'').slice(0,60),note:String(x.note||'').slice(0,120)})}
 function sanitizeActivities(value){return Array.isArray(value)?value.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)&&['climb','exercise','mobility','bounty'].includes(x.type)).map(normalizeActivity):[]}
 function bountyById(id){return BOUNTY_BY_ID.get(String(id||''))||null}
 function hashText(text){let h=2166136261;const s=String(text);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
