@@ -62,7 +62,19 @@ import { readFileSync } from 'node:fs';
 // cost that made every icon site smaller. 184000 leaves roughly 4650 -- the same working room the
 // entry-66 and Crag-skin notes settled on. Per the rule above the next budget entry re-measures
 // rather than assuming, and a pass that lands under its projection lowers the cap again.
-const BUDGET = 184000;
+//
+// Re-baselined 184000 -> 187000 by the activity-normalization pass: measured 182091 bytes, 1925 above
+// the 180166 main carried in, leaving 1909 under the cap. Every byte is app.js — no other bundled
+// source changed — and it splits +752 code against +1173 comment. The code is normalizeActivity(),
+// which coerces each field of a Sheet row to the shape src/schema.json already declares, plus the
+// normalizeActivities() wrapper that keeps the frozen roadToSendLogsV9 rows out of it. The comment is
+// the larger half and is kept deliberately: it records why local rows are exempt and why the date is
+// matched whole rather than sliced, and this pass regressed on both of those points in review before
+// the comments were written. 1909 bytes would halt the next display change on its first rule, so
+// 187000 buys back roughly 4900 — the working room the entry-66 and Crag notes settled on. Per the
+// rule above the next budget entry re-measures rather than assuming, and a pass that lands under its
+// projection lowers the cap again.
+const BUDGET = 187000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
