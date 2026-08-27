@@ -43,6 +43,11 @@ const domContext = {
 const domChecks = `(()=>{
   const todayStart=parseDateOnly(challengeToday());
   const shift=n=>{const d=new Date(todayStart);d.setDate(d.getDate()+n);return localDate(d)};
+  // Two indexOf() checks over one blob prove each string is present SOMEWHERE, never that they are
+  // on the same element — a regression can move an attribute onto a sibling and keep both green.
+  // openTag() returns one element's opening tag so a co-location claim can be asserted as one.
+  // src/app.js escapes '>' in every interpolated value, so the first '>' always ends the tag.
+  const openTag=(html,mark)=>{const at=html.indexOf(mark);return at<0?'':html.slice(at,html.indexOf('>',at)+1)};
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   const dateField=document.querySelector('#activityDate'),dateBox=document.querySelector('#dateFields'),label=document.querySelector('#bountySelectLabel');
 
@@ -408,8 +413,9 @@ const domChecks = `(()=>{
   // Relocated from tests/static-check.mjs, which matched the template literal inside trendSvg().
   // pathLength is what lets one stroke-dasharray value draw a curve of any length, so assert it on
   // the curve that was drawn.
-  assert.ok(curveSvg.indexOf('<path class="trend-line" ')>=0,'the drawn curve carries the trend line path');
-  assert.ok(curveSvg.indexOf(' pathLength="1"')>=0,'and that path declares a unit length, so one dash value draws any line');
+  const trendLineTag=openTag(curveSvg,'<path class="trend-line"');
+  assert.ok(trendLineTag,'the drawn curve carries the trend line path');
+  assert.ok(trendLineTag.indexOf(' pathLength="1"')>=0,'and THAT path declares the unit length, so one dash value draws any line: '+trendLineTag);
 
   assert.equal((curveSvg.match(/<title>/g)||[]).length,personalWeeklyTrend('alex',challengeToday()).length,'each curve day keeps one hover title');
   assert.ok(youTrendCap.textContent.indexOf('Peak ')===0,'and trendCaption writes the caption underneath it');
@@ -869,8 +875,11 @@ const domChecks = `(()=>{
   // Relocated from tests/static-check.mjs, which matched the exact interpolation in render()'s
   // source. What matters is the emitted markup: a decorative glyph, hidden from the accessible
   // name, sitting beside the visible title rather than adding a second text label.
-  assert.ok(weeklyMedalFree.indexOf('<span class="hunter" aria-hidden="true"><svg class="glyph"')>=0,'the hunter mark renders as a hidden glyph, never as extra text in the row name');
-  assert.ok(weeklyMedalFree.indexOf('href="#g-bounty"')>=0,'and it draws the bounty symbol from the shared sprite');
+  const hunterAt=weeklyMedalFree.indexOf('<span class="hunter"');
+  const hunterSpan=hunterAt<0?'':weeklyMedalFree.slice(hunterAt,weeklyMedalFree.indexOf('</span>',hunterAt)+7);
+  assert.ok(hunterSpan,'the leaderboard row carries a hunter mark');
+  assert.ok(hunterSpan.indexOf('aria-hidden="true"')>=0,'which is hidden from the row accessible name: '+hunterSpan);
+  assert.ok(hunterSpan.indexOf('href="#g-bounty"')>=0,'and draws the bounty symbol INSIDE that same hidden span, rather than adding text beside it: '+hunterSpan);
 
   leaderScope='overall';render();
   const overallMedalFree=leaderRows.innerHTML;
@@ -913,8 +922,11 @@ const domChecks = `(()=>{
   // and so could not tell the feed's emitter from the leaderboard's. Read against the leaderboard
   // here, beside the Crew feed above it, so "reuses the leaderboard button" is proved rather than
   // assumed. The wider match than the one at entry 20 is the point: same element, same hook.
-  assert.ok(leaderRows.innerHTML.indexOf('<button class="climber" type="button" data-person=')>=0,'a leaderboard row names its climber with that same button, carrying the same hook');
-  assert.ok(leaderRows.innerHTML.indexOf('aria-haspopup="dialog"')>=0,'and the leaderboard button announces that it opens a dialog');
+  const climberTag=openTag(leaderRows.innerHTML,'<button class="climber"');
+  assert.ok(climberTag,'a leaderboard row names its climber with that same button');
+  assert.ok(climberTag.indexOf('type="button"')>=0,'a real button: '+climberTag);
+  assert.ok(climberTag.indexOf('data-person="')>=0,'carrying the same per-person hook the Crew feed emits: '+climberTag);
+  assert.ok(climberTag.indexOf('aria-haspopup="dialog"')>=0,'and announcing on THAT element that it opens a dialog: '+climberTag);
   assert.ok(feedCrew.innerHTML.indexOf('aria-haspopup="dialog"')>=0,'and announces that it opens a dialog');
   assert.ok(feedYou.innerHTML.length>0,'the You feed has rows of its own to compare against');
   assert.equal(feedYou.innerHTML.indexOf('data-person='),-1,'the You feed lists your own entries, so its names get no per-person hook');
@@ -1199,7 +1211,10 @@ const domChecks = `(()=>{
   // accessible name belongs to the SVG inside it.
   assert.equal(personTrendEl.getAttribute('aria-label'),null,'the role-less trend wrapper carries no aria-label of its own');
   assert.equal(personTrendEl.getAttribute('role'),null,'and takes no role that would make one necessary');
-  assert.ok(personTrendEl.innerHTML.indexOf('role="img"')>=0&&personTrendEl.innerHTML.indexOf('aria-label="')>=0,'the single accessible name belongs to the SVG it wraps');
+  const personSvgTag=openTag(personTrendEl.innerHTML,'<svg');
+  assert.ok(personSvgTag,'the wrapper holds the inline SVG');
+  assert.ok(personSvgTag.indexOf('role="img"')>=0,'which is the element taking the graphic role: '+personSvgTag);
+  assert.ok(personSvgTag.indexOf('aria-label="')>=0,'and the single accessible name sits on THAT element, not on the wrapper: '+personSvgTag);
   assert.ok(document.querySelector('#personPyramid').getAttribute('aria-label')!==null,'while the pyramid, which is itself the graphic, does take one');
   logs=[];
   render();
