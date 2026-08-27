@@ -66,10 +66,15 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
    load. `tests/docs-check.mjs` asserts every `roadToSend…` literal in `src/app.js` appears in this
    list, so a new key means updating this section in the same commit.
 3. **The browser/backend contract is coordinated.** `src/apps-script.js`, `src/schema.json` and
-   `src/scoring.json` are shared with a backend each organizer redeploys by hand. A change there
-   bumps the API version and keeps the previous version in `SUPPORTED_API_VERSIONS` until every crew
-   has redeployed. That overlap is the whole mechanism: without it, shared mode breaks for everyone
-   whose organizer has not redeployed yet.
+   `src/scoring.json` are shared with a backend each organizer redeploys by hand, so a change there
+   bumps the API version. Whether the *previous* version stays in `SUPPORTED_API_VERSIONS` is a
+   judgement about compatibility, not a formality — establish it and say so in the comment, as the
+   v11 entry does with "its JSON is identical". Keep the old version only when an older backend's
+   responses and validation still agree with the new browser; that overlap is what stops shared mode
+   breaking for crews whose organizer has not redeployed yet. Drop it when the change alters
+   scoring, the bounty catalog or the schema: there the browser scores with its new `SCORING` while
+   the old backend validates against its own copy, so claims get rejected and totals disagree.
+   Failing the version check and asking the organizer to redeploy is the kinder outcome.
 4. **Scoring has one implementation:** `computeCredits()`, `totalsModel()`, `paceInfo()`,
    `weekKey()`, `fmtDay()`, `parseDateOnly()`, and `challengeToday()`. Consume the maps
    `computeCredits()` returns rather than re-deriving them. Challenge-date logic goes through

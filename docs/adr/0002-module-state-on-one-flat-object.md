@@ -1,8 +1,16 @@
+---
+status: proposed
+---
+
 # Module state lives on one flat exported object
 
+**Decided, not yet implemented.** `src/app.js` still declares these as bare module-level `let`
+bindings and exports nothing. This ADR records the decision; it lands with the esbuild migration in
+ADR-0001.
+
 The 34 mutable module-level bindings in `src/app.js` (`config`, `logs`, `me`, `endpoint`,
-`renderedDay`, `creditRuns`, the feed and modal flags, …) move onto a single flat exported `state`
-object rather than staying as bare `let` declarations.
+`renderedDay`, `creditRuns`, the feed and modal flags, …) will move onto a single flat exported
+`state` object rather than staying as bare `let` declarations.
 
 This is forced by bundling, not chosen for elegance. The test suites mutate module state from
 outside — roughly 460 assignments assign to those names — and once esbuild wraps the bundle in a
