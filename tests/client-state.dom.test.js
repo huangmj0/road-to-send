@@ -622,9 +622,19 @@ const domChecks = `(()=>{
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,4,'the You feed opens showing every category');
   assert.equal(filterChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="true"')>=0,true,'All is the pressed chip by default');
   // Relocated from tests/static-check.mjs, which matched renderFeedChips()'s source. The claim is
-  // about the chip row the app paints, so it is asserted on that row here.
-  assert.ok(filterChips.innerHTML.indexOf('<button class="cat-chip" type="button" data-feed-type=')>=0,'each filter chip is a real button carrying its category');
-  assert.equal((filterChips.innerHTML.match(/<button class="cat-chip"/g)||[]).length,(filterChips.innerHTML.match(/aria-pressed=/g)||[]).length,'and every chip declares a pressed state');
+  // about the chip row the app paints, so it is asserted on that row here — and per BUTTON, not by
+  // counting. A count of cat-chips against a count of aria-pressed balances just as well when one
+  // chip loses the attribute and some other element in the row gains it, which is the same shape of
+  // hole this PR exists to close. The named-category checks below cover all/climb/mobility, so a
+  // regression confined to Exercise is exactly what only this loop would catch.
+  const chipTags=filterChips.innerHTML.split('<button ').slice(1).map(part=>part.slice(0,part.indexOf('>')));
+  assert.equal(chipTags.length,feedChips().length,'the chip row emits one button per offered filter, so the loop below has every chip to inspect');
+  chipTags.forEach(tag=>{
+    assert.ok(tag.indexOf('class="cat-chip"')>=0,'every button in the chip row is a cat-chip: '+tag);
+    assert.ok(tag.indexOf('type="button"')>=0,'every chip is a real button: '+tag);
+    assert.ok(tag.indexOf('data-feed-type="')>=0,'every chip carries its own category: '+tag);
+    assert.ok(tag.indexOf('aria-pressed="')>=0,'every chip declares its own pressed state: '+tag);
+  });
   setFeedType('climb');
   assert.equal(feedType,'climb','the choice lives in module state, not read back out of the DOM');
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,2,'selecting a category narrows the feed to that category');
