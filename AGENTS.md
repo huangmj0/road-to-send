@@ -46,44 +46,75 @@ also require copying and redeploying the embedded Apps Script as described in `R
 
 ## Hard constraints
 
-These are properties of a live app with real users, not workflow preferences. A change may step
+Each one below protects **the crew** — the real people whose data and daily use this app carries.
+That is the test a constraint has to pass to be here: relaxing it reaches them. A change may step
 outside one only when it says so explicitly and says why.
+
+Rules about shape bind **the artifact** — the `index.html` that `npm run build` produces. How `src/`
+is arranged to produce it is not a constraint; see *Not constraints* below.
 
 1. **This app is LIVE.** Real crew data lives in a shared Google Sheet and in users' localStorage.
    Nothing you ship may drop, rewrite, or re-key that data, and the GitHub Pages URL must not change
-   (`index.html` stays at the repository root).
-2. **The browser/backend contract is coordinated.** `src/apps-script.js`, `src/schema.json` and
-   `src/scoring.json` are the shared contract; any change there forces an API version bump and an
-   organizer redeploy of the Apps Script alongside the frontend change. Do not touch them as a side
-   effect of a frontend change.
-3. **Never weaken a test to make a change pass.** A change that *deliberately removes a feature* may
-   retire that feature's assertions, but only by naming each assertion retired and why. Retiring an
-   assertion for a feature that still exists is always forbidden. `tests/size-check.mjs` caps
-   `index.html` at a byte `BUDGET`: raise `BUDGET` deliberately, in a change that explains the
-   growth — never as a side effect of another change.
-4. **localStorage keys are frozen:** `roadToSendEndpoint`, `roadToSendMe`, `roadToSendLogsV9`,
+   (`index.html` stays at the repository root). `.github/workflows/pages.yml` publishes only from a
+   green `npm test`; that gate is what keeps a broken build off the crew's phones.
+2. **localStorage keys are frozen:** `roadToSendEndpoint`, `roadToSendMe`, `roadToSendLogsV9`,
    `roadToSendConfigV9`, `roadToSendConfigV8` (read-only migration source — only the existing
    one-time migration writes `roadToSendConfigV9` from it), `roadToSendWeekReview`, and
-   `roadToSendShared:{activities|config|meta}:{endpoint}`. Read them; never rename them; only write
-   shapes existing code already reads. `tests/docs-check.mjs` asserts every `roadToSend…` literal in
-   `src/app.js` appears in this list, so a new key means updating this section in the same commit.
-5. **Structural constraints enforced by tests:** exactly **one `<script>` block** in the template
-   (all JS goes in `src/app.js`); exactly **one `<table>`** in the page (new visualizations use
-   divs/CSS grid); the built lines ``const SCRIPT=`…`;`` and the `const SUPPORTED_API_VERSIONS` line
-   immediately after it are untouchable (no backticks may enter the Apps Script string); DOM ids stay
-   unique; every labeled input keeps its `<label for>`.
-6. **Reuse the scoring core:** `computeCredits()`, `totalsModel()`, `paceInfo()`, `weekKey()`,
-   `fmtDay()`, `parseDateOnly()`, and `challengeToday()`. Never call `new Date()` for challenge-date
-   logic — shared mode follows the Sheet's timezone via `challengeToday()`. Never fork or re-derive
-   scoring math; consume the maps `computeCredits()` returns. New display logic = small pure helper
-   functions called from `render()`; `render()` runs often, so keep additions idempotent and cheap.
-7. **Accessibility:** minimum 44px touch targets; graphics get `role="img"` with a meaningful
+   `roadToSendShared:{activities|config|meta}:{endpoint}`. Read them; write only shapes existing code
+   already reads. A new shape ships as a new key plus a migration that reads the old one — the V8→V9
+   path is the worked example. Renaming a key instead makes a climber's history vanish on their next
+   load. `tests/docs-check.mjs` asserts every `roadToSend…` literal in `src/app.js` appears in this
+   list, so a new key means updating this section in the same commit.
+3. **The browser/backend contract is coordinated.** `src/apps-script.js`, `src/schema.json` and
+   `src/scoring.json` are shared with a backend each organizer redeploys by hand, so a change there
+   bumps the API version. Whether the *previous* version stays in `SUPPORTED_API_VERSIONS` is a
+   judgement about compatibility, not a formality — establish it and say so in the comment, as the
+   v11 entry does with "its JSON is identical". Keep the old version only when an older backend's
+   responses and validation still agree with the new browser; that overlap is what stops shared mode
+   breaking for crews whose organizer has not redeployed yet. Drop it when the change alters
+   scoring, the bounty catalog or the schema: there the browser scores with its new `SCORING` while
+   the old backend validates against its own copy, so claims get rejected and totals disagree.
+   Failing the version check and asking the organizer to redeploy is the kinder outcome.
+4. **Scoring has one implementation:** `computeCredits()`, `totalsModel()`, `paceInfo()`,
+   `weekKey()`, `fmtDay()`, `parseDateOnly()`, and `challengeToday()`. Consume the maps
+   `computeCredits()` returns rather than re-deriving them. Challenge-date logic goes through
+   `challengeToday()` — shared mode follows the Sheet's timezone, and a raw `new Date()` scores the
+   wrong day for anyone in another zone. `render()` runs often, so keep display helpers pure,
+   idempotent and cheap.
+5. **Accessibility:** minimum 44px touch targets; graphics get `role="img"` with a meaningful
    `aria-label` text alternative (decorative inner elements `aria-hidden="true"`); dynamic status text
    uses `aria-live="polite"`; keep visible focus (site uses `:focus-visible`). **Motion:** CSS-only
    transitions/animations so the existing `@media(prefers-reduced-motion:reduce)` kill-switch applies;
    no JS-driven animation.
-8. **No external dependencies (runtime or dev), no new network requests, no frameworks, no
-   build-tool changes.**
+6. **The page loads cold, on a trailhead connection.** One self-contained artifact, no runtime
+   dependency on another host, no network request beyond the crew's own Sheet. `tests/size-check.mjs`
+   caps `index.html` at a byte `BUDGET`; move it in a change that reports what it measured and why —
+   in either direction. A cap that only ratchets upward stops being a guard.
+7. **What the built artifact holds:** exactly **one `<script>`** and exactly **one `<table>`** in
+   `index.html` (new visualizations use divs/CSS grid); the built ``const SCRIPT=`…`;`` line and the
+   `const SUPPORTED_API_VERSIONS` line immediately after it survive intact (no backtick enters the
+   Apps Script string); DOM ids stay unique; every labeled input keeps its `<label for>`.
+8. **Tests only get stronger.** Moving an assertion onto a surface that proves more — rendered DOM
+   rather than matched source text — is the encouraged direction, and counts as strengthening it.
+   Retiring one requires the feature to be gone and each retired assertion named. An assertion for a
+   feature that still exists stays.
+
+## Not constraints
+
+Changing these reaches nobody on the crew, so take them freely — in a commit that says what it did.
+They are listed because they read like rules and are not; treating them as rules is what keeps the
+codebase in its current shape.
+
+- **Dev tooling.** Bundlers, minifiers, linters, formatters, type checking, test runners, DOM
+  implementations. A dev dependency the crew never downloads is not a runtime dependency — constraint
+  6 still governs anything that ships.
+- **The layout of `src/`.** One file or thirty, modules or globals, whatever the build can collapse
+  into the artifact constraint 7 describes.
+- **Compact source style.** It exists because the build has no minifier. Given one, write source a
+  person can read and let the build compact it.
+- **The shape of the test suites.** How they split, what harness they use, how the code under test is
+  loaded. Constraint 8 governs what an assertion proves, not the file it lives in.
+- **`BUDGET`'s exact number.** The guard is the ratchet discipline in constraint 6, not the figure.
 
 ## Tone
 
@@ -102,11 +133,13 @@ adds a nudge, a reminder, or a prompt to participate.**
 
 ## Coding style & naming conventions
 
-Use two-space indentation in HTML and test files. Preserve the existing compact style inside inline
-CSS, browser code, and the embedded Apps Script unless a change deliberately restructures the file.
-Prefer `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for scoring/configuration
-constants, and kebab-case for CSS classes and HTML filenames. Keep DOM IDs descriptive and unique.
-Use Node built-ins and browser APIs only.
+Use two-space indentation in HTML and test files. Match the compact style already in `src/styles.css`,
+`src/app.js` and `src/apps-script.js` when editing them in place — it is what the build currently
+relies on for size, not a house preference, and a change that introduces a minifier is free to
+abandon it wholesale. Prefer `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for
+scoring/configuration constants, and kebab-case for CSS classes and HTML filenames. Keep DOM IDs
+descriptive and unique. Anything that ships to the browser uses browser APIs only; build and test
+code may take dev dependencies.
 
 ## Testing guidelines
 
