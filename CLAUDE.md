@@ -10,7 +10,12 @@ before you reach it:
 
 - Edit `src/` and `tests/`; **never** edit `index.html` by hand. After any `src/` change run
   `npm run build`, then `npm test`, and commit the regenerated `index.html` with the source edit.
-- Never weaken an existing test assertion.
+- Every hard constraint protects **the crew** — the real people this app serves. `AGENTS.md` also
+  carries a *Not constraints* list: dev tooling, the layout of `src/`, compact source style, test
+  file shape. Those read like rules and are not. Read both lists before concluding a design is
+  blocked.
+- Assertions only get stronger. Moving one onto a surface that proves more is encouraged; retiring
+  one needs the feature gone and the assertion named.
 - `src/apps-script.js`, `src/schema.json` and `src/scoring.json` are the browser/backend contract —
   changing one forces an API version bump and an organizer redeploy.
 - Each test file's `TRAP` header comment names its harness's sharp edges — read it before adding
