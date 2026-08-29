@@ -17,7 +17,7 @@ export function buildHtml() {
     .replaceAll('__SCORING_CONFIG__', JSON.stringify(scoring))
     .replaceAll('__API_VERSION__', String(apiVersion));
   const appsScript = injectSharedConfig(read('../src/apps-script.js'));
-  const appSource = injectSharedConfig(read('../src/app.js')).replace('const SCRIPT=__APPS_SCRIPT__;\n', '').replace(/const SUPPORTED_API_VERSIONS=.*?\n/, '');
+  const appSource = injectSharedConfig(read('../src/app-core.js')+'\n'+read('../src/app.js')).replace('const SCRIPT=__APPS_SCRIPT__;\n', '').replace(/const SUPPORTED_API_VERSIONS=.*?\n/, '');
   const app = buildSync({stdin:{contents:appSource,loader:'js'},bundle:true,minify:true,format:'iife',write:false}).outputFiles[0].text;
   const prefix = `const SCRIPT=\`${appsScript.replaceAll('\\', '\\\\').replaceAll('`', '\\`').replaceAll('${', '\\${')}\`;\nconst SUPPORTED_API_VERSIONS=new Set([${apiVersion},11]);\n`;
 

@@ -64,8 +64,9 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
    `roadToSendShared:{activities|config|meta}:{endpoint}`. Read them; write only shapes existing code
    already reads. A new shape ships as a new key plus a migration that reads the old one — the V8→V9
    path is the worked example. Renaming a key instead makes a climber's history vanish on their next
-   load. `tests/docs-check.mjs` asserts every `roadToSend…` literal in `src/app.js` appears in this
-   list, so a new key means updating this section in the same commit.
+   load. `tests/docs-check.mjs` asserts every `roadToSend…` literal in the browser sources the build
+   bundles — every `src/*.js` except `src/apps-script.js` — appears in this list, so a new key means
+   updating this section in the same commit, and splitting a source file cannot narrow the check.
 3. **The browser/backend contract is coordinated.** `src/apps-script.js`, `src/schema.json` and
    `src/scoring.json` are shared with a backend each organizer redeploys by hand, so a change there
    bumps the API version. Whether the *previous* version stays in `SUPPORTED_API_VERSIONS` is a
@@ -136,9 +137,10 @@ adds a nudge, a reminder, or a prompt to participate.**
 ## Coding style & naming conventions
 
 Use two-space indentation in HTML and test files. Match the compact style already in `src/styles.css`,
-`src/app.js` and `src/apps-script.js` when editing them in place — it is what the build currently
-relies on for size, not a house preference, and a change that introduces a minifier is free to
-abandon it wholesale. Prefer `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for
+`src/app.js`, `src/app-core.js` and `src/apps-script.js` when editing them in place — it is local
+consistency, not a house preference. The build now minifies the bundled browser sources through
+esbuild, so new code there may be written for a person to read and left for the build to compact;
+`src/styles.css` and `src/apps-script.js` are still inlined as written. Prefer `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for
 scoring/configuration constants, and kebab-case for CSS classes and HTML filenames. Keep DOM IDs
 descriptive and unique. Anything that ships to the browser uses browser APIs only; build and test
 code may take dev dependencies.

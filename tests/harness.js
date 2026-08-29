@@ -28,7 +28,7 @@ const apiVersion = String(JSON.parse(read('../src/schema.json')).properties.vers
 const appsScript = read('../src/apps-script.js')
   .replaceAll('__SCORING_CONFIG__', scoring)
   .replaceAll('__API_VERSION__', apiVersion);
-const source = read('../src/app.js')
+const source = (read('../src/app-core.js') + '\n' + read('../src/app.js'))
   .replaceAll('__SCORING_CONFIG__', scoring)
   .replaceAll('__API_VERSION__', apiVersion)
   .replace('const SCRIPT=__APPS_SCRIPT__;', `const SCRIPT=${JSON.stringify(appsScript)};`);

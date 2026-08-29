@@ -20,7 +20,7 @@ import {readFileSync} from 'node:fs';
 
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const artifactScript=html.match(/<script>([\s\S]*)<\/script>/)?.[1];
-const script=readFileSync(new URL('../src/app.js',import.meta.url),'utf8');
+const script=readFileSync(new URL('../src/app-core.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../src/app.js',import.meta.url),'utf8');
 const scoring=JSON.parse(readFileSync(new URL('../src/scoring.json',import.meta.url),'utf8'));
 assert.ok(artifactScript,'index.html contains an inline application script');
 assert.doesNotThrow(()=>new Function(artifactScript),'application JavaScript parses');
