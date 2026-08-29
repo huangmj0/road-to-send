@@ -48,6 +48,11 @@ const domChecks = `(()=>{
   // openTag() returns one element's opening tag so a co-location claim can be asserted as one.
   // src/app.js escapes '>' in every interpolated value, so the first '>' always ends the tag.
   const openTag=(html,mark)=>{const at=html.indexOf(mark);return at<0?'':html.slice(at,html.indexOf('>',at)+1)};
+  // ...and the collection form. Checking ONE matching element proves nothing about the rest: a
+  // regression can break the first row while a later row keeps the assertion green. Every claim
+  // about what a renderer emits per row is asserted over all of them, with a count so an empty
+  // match set cannot pass either.
+  const openTags=(html,mark)=>{const out=[];let at=html.indexOf(mark);while(at>=0){out.push(html.slice(at,html.indexOf('>',at)+1));at=html.indexOf(mark,at+1)}return out};
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   const dateField=document.querySelector('#activityDate'),dateBox=document.querySelector('#dateFields'),label=document.querySelector('#bountySelectLabel');
 
@@ -187,9 +192,15 @@ const domChecks = `(()=>{
   assert.ok(todayBounties.innerHTML.includes('data-claim-bounty')&&todayBounties.innerHTML.includes('aria-label="Claim '),'claimed rows remain labelled claim buttons');
   // Relocated from tests/static-check.mjs, which matched the button markup in the SOURCE of
   // renderBounties(). Asserted here against what #todayBounties actually holds after render().
-  assert.ok(todayBounties.innerHTML.indexOf('<button class="bounty')>=0,'a today bounty row is a real button, not a tappable div');
   assert.ok(todayBounties.innerHTML.indexOf('<button class="bounty done" type="button" data-claim-bounty=')>=0,'the claimed row keeps the button element while marking itself done');
-  assert.equal((todayBounties.innerHTML.match(/<button class="bounty/g)||[]).length,dailyBounties(challengeToday()).length,'every offered bounty renders one such button');
+  const bountyTags=openTags(todayBounties.innerHTML,'<button class="bounty');
+  assert.equal(bountyTags.length,dailyBounties(challengeToday()).length,'every offered bounty renders one such button, so the loop below sees them all');
+  bountyTags.forEach(tag=>{
+    assert.ok(tag.indexOf('type="button"')>=0,'every bounty row is a real button, not a tappable div: '+tag);
+    assert.ok(tag.indexOf('data-claim-bounty="')>=0,'every bounty row carries its own claim hook: '+tag);
+    assert.ok(tag.indexOf('aria-label="Claim ')>=0,'and its own claim label: '+tag);
+  });
+  assert.equal((todayBounties.innerHTML.match(/data-claim-bounty=/g)||[]).length,bountyTags.length,'and no claim hook is emitted outside those buttons');
   const bountyRadio=document.querySelector('input[name="activityType"][value="bounty"]');
   const claimSelect=document.querySelector('#bountySelect'),claimDateBox=document.querySelector('#dateFields');
   bountyRadio.checked=false;claimSelect.value='';claimDateBox.classList.remove('hide');
@@ -875,11 +886,12 @@ const domChecks = `(()=>{
   // Relocated from tests/static-check.mjs, which matched the exact interpolation in render()'s
   // source. What matters is the emitted markup: a decorative glyph, hidden from the accessible
   // name, sitting beside the visible title rather than adding a second text label.
-  const hunterAt=weeklyMedalFree.indexOf('<span class="hunter"');
-  const hunterSpan=hunterAt<0?'':weeklyMedalFree.slice(hunterAt,weeklyMedalFree.indexOf('</span>',hunterAt)+7);
-  assert.ok(hunterSpan,'the leaderboard row carries a hunter mark');
-  assert.ok(hunterSpan.indexOf('aria-hidden="true"')>=0,'which is hidden from the row accessible name: '+hunterSpan);
-  assert.ok(hunterSpan.indexOf('href="#g-bounty"')>=0,'and draws the bounty symbol INSIDE that same hidden span, rather than adding text beside it: '+hunterSpan);
+  const hunterSpans=weeklyMedalFree.split('<span class="hunter"').slice(1).map(part=>'<span class="hunter"'+part.slice(0,part.indexOf('</span>')+7));
+  assert.ok(hunterSpans.length,'the leaderboard carries a hunter mark');
+  hunterSpans.forEach(span=>{
+    assert.ok(span.indexOf('aria-hidden="true"')>=0,'every hunter mark is hidden from the row accessible name: '+span);
+    assert.ok(span.indexOf('href="#g-bounty"')>=0,'and draws the bounty symbol INSIDE that same hidden span, rather than adding text beside it: '+span);
+  });
 
   leaderScope='overall';render();
   const overallMedalFree=leaderRows.innerHTML;
@@ -917,17 +929,24 @@ const domChecks = `(()=>{
   const feedCrew=document.querySelector('#activityList'),feedYou=document.querySelector('#personalActivity');
   assert.ok(feedCrew.innerHTML.indexOf('data-person="Bo"')>=0,'a Crew row carries the climber it names as a per-person hook');
   assert.ok(feedCrew.innerHTML.indexOf('data-person="Alex"')>=0,'every Crew row carries one, not just the newest');
-  assert.ok(feedCrew.innerHTML.indexOf('<button class="climber" type="button" data-person=')>=0,'the Crew name reuses the leaderboard climber button rather than a new control');
   // Relocated from tests/static-check.mjs, which matched the button markup once in the whole script
-  // and so could not tell the feed's emitter from the leaderboard's. Read against the leaderboard
-  // here, beside the Crew feed above it, so "reuses the leaderboard button" is proved rather than
-  // assumed. The wider match than the one at entry 20 is the point: same element, same hook.
-  const climberTag=openTag(leaderRows.innerHTML,'<button class="climber"');
-  assert.ok(climberTag,'a leaderboard row names its climber with that same button');
-  assert.ok(climberTag.indexOf('type="button"')>=0,'a real button: '+climberTag);
-  assert.ok(climberTag.indexOf('data-person="')>=0,'carrying the same per-person hook the Crew feed emits: '+climberTag);
-  assert.ok(climberTag.indexOf('aria-haspopup="dialog"')>=0,'and announcing on THAT element that it opens a dialog: '+climberTag);
-  assert.ok(feedCrew.innerHTML.indexOf('aria-haspopup="dialog"')>=0,'and announces that it opens a dialog');
+  // and so could not tell the feed's emitter from the leaderboard's. Both surfaces are read here,
+  // so "the Crew feed reuses the leaderboard button" is proved rather than assumed — and read over
+  // EVERY row, because one good button elsewhere in the same blob would otherwise cover a row that
+  // regressed to a plain element still carrying the hook.
+  const climberCheck=(html,where)=>{
+    const tags=openTags(html,'<button class="climber"');
+    assert.ok(tags.length,where+' names its climbers with the climber button');
+    tags.forEach(tag=>{
+      assert.ok(tag.indexOf('type="button"')>=0,where+' climber name is a real button: '+tag);
+      assert.ok(tag.indexOf('data-person="')>=0,where+' climber button carries the per-person hook: '+tag);
+      assert.ok(tag.indexOf('aria-haspopup="dialog"')>=0,where+' climber button announces that it opens a dialog: '+tag);
+    });
+    assert.equal((html.match(/data-person=/g)||[]).length,tags.length,where+' emits no per-person hook outside those buttons');
+    return tags;
+  };
+  assert.equal(climberCheck(feedCrew.innerHTML,'the Crew feed').length,feedCrew.innerHTML.split('class="activity"').length-1,'one climber button per Crew row, not one row carrying the whole assertion');
+  assert.equal(climberCheck(leaderRows.innerHTML,'the leaderboard').length,leaderRows.innerHTML.split('<tr').length-1,'and one per leaderboard row');
   assert.ok(feedYou.innerHTML.length>0,'the You feed has rows of its own to compare against');
   assert.equal(feedYou.innerHTML.indexOf('data-person='),-1,'the You feed lists your own entries, so its names get no per-person hook');
   assert.ok(feedYou.innerHTML.indexOf('<strong>Alex</strong>')>=0,'the You feed keeps the plain name it always rendered');
