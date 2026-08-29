@@ -5,6 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 const {source} = require('./harness.js');
 
+/** Load the browser-side daily bounty rotation from the generated page source. */
 function loadBrowserRotation() {
   const values = new Map();
   const context = {
@@ -23,6 +24,7 @@ function loadBrowserRotation() {
   return date => Array.from(context.dailyBounties(date), bounty => bounty.id);
 }
 
+/** Load the backend daily bounty rotation from the editable Apps Script sources. */
 function loadBackendRotation() {
   const scoring = JSON.parse(fs.readFileSync(new URL('../src/scoring.json', `file://${__filename}`), 'utf8'));
   const schema = JSON.parse(fs.readFileSync(new URL('../src/schema.json', `file://${__filename}`), 'utf8'));
@@ -35,10 +37,12 @@ function loadBackendRotation() {
   return date => Array.from(context.dailyBounties(date), bounty => bounty.id);
 }
 
+/** Convert a Date to the YYYY-MM-DD key consumed by the rotation implementations. */
 function isoDay(date) {
   return date.toISOString().slice(0, 10);
 }
 
+/** Return the first browser/backend rotation mismatch within an inclusive date range. */
 function firstMismatch(browserRotation, backendRotation, start, end) {
   for (let cursor = new Date(start + 'T12:00:00Z'); cursor <= new Date(end + 'T12:00:00Z'); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
     const date = isoDay(cursor);
