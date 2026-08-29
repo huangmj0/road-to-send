@@ -65,12 +65,9 @@ test('rotation drift diagnosis names the first disagreeing date', () => {
   };
   const mismatch = firstMismatch(changedBrowser, backend, '2026-02-27', '2026-03-03');
   assert.equal(mismatch.date, '2026-03-01');
+  const expectedMessage = `bounty rotation first disagrees on ${mismatch.date}: browser=${mismatch.browser.join(',')} backend=${mismatch.backend.join(',')}`;
   assert.throws(
-    () => assert.equal(
-      mismatch,
-      null,
-      `bounty rotation first disagrees on ${mismatch.date}: browser=${mismatch.browser.join(',')} backend=${mismatch.backend.join(',')}`,
-    ),
-    /bounty rotation first disagrees on 2026-03-01/,
+    () => assert.equal(mismatch, null, expectedMessage),
+    error => error instanceof assert.AssertionError && error.message.includes(expectedMessage),
   );
 });
