@@ -28,4 +28,9 @@ test('the committed artifact records a local activity through its form', async (
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(window.document.querySelector('#youTotal').textContent, '3');
   assert.match(window.localStorage.getItem('roadToSendLogsV9'), /"type":"climb"/);
+  const bounty = window.document.querySelector('#todayBounties [data-claim-bounty]');
+  assert.ok(bounty, 'a daily bounty claim is rendered');
+  bounty.dispatchEvent(new window.Event('click', {bubbles: true}));
+  assert.equal(window.document.querySelector('input[name="activityType"][value="bounty"]').checked, true);
+  assert.equal(window.document.querySelector('#bountySelect').value, bounty.dataset.claimBounty);
 });
