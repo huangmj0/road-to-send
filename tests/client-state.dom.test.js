@@ -8,6 +8,21 @@
 //   * The element stub in harness.js stores attributes and fires listeners bound to the element
 //     itself, but elements have no tree, so a DELEGATED handler still cannot be fired. Read the
 //     trap note at the top of tests/harness.js before adding assertions here.
+//   * An assertion over rendered innerHTML is easy to write so that it proves LESS than its message
+//     says, and it then passes forever without saying so. Four rounds of review on one PR found
+//     four variants of exactly that. Before adding one, walk the list:
+//       - a NEGATIVE check (indexOf(...)===-1, doesNotMatch) needs a positive assertion nearby
+//         proving the thing it reads is non-empty; '' satisfies every negative;
+//       - a COUNT of one thing against a count of another balances when a value moves between
+//         elements — inspect the items, do not tally them;
+//       - two indexOf() checks over one blob prove each string is present SOMEWHERE, not that they
+//         are on the same element — slice the element with openTag() and assert against that;
+//       - one matching element proves nothing about its siblings — use openTags() and loop, with a
+//         count so an empty match set fails too;
+//       - an attribute's PRESENCE is not its value: 'aria-label="' matches aria-label="" — read it
+//         with attrOf() and reject '' as well as null.
+//     Then break the rendered output ONE WAY AT A TIME and confirm the suite fails by message —
+//     including a break that damages one row while leaving its neighbour intact.
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {test} = require('node:test');
@@ -52,6 +67,10 @@ const domChecks = `(()=>{
   // regression can break the first row while a later row keeps the assertion green. Every claim
   // about what a renderer emits per row is asserted over all of them, with a count so an empty
   // match set cannot pass either.
+  // Presence is not a value: indexOf('aria-label="') is satisfied by aria-label="", and an empty
+  // accessible name is exactly as broken as a missing one. attrOf() answers null when the attribute
+  // is absent and '' when it is empty, so an assertion can tell those apart and reject both.
+  const attrOf=(tag,name)=>{const mark=' '+name+'="',at=tag.indexOf(mark);return at<0?null:tag.slice(at+mark.length,tag.indexOf('"',at+mark.length))};
   const openTags=(html,mark)=>{const out=[];let at=html.indexOf(mark);while(at>=0){out.push(html.slice(at,html.indexOf('>',at)+1));at=html.indexOf(mark,at+1)}return out};
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   const dateField=document.querySelector('#activityDate'),dateBox=document.querySelector('#dateFields'),label=document.querySelector('#bountySelectLabel');
@@ -197,7 +216,7 @@ const domChecks = `(()=>{
   assert.equal(bountyTags.length,dailyBounties(challengeToday()).length,'every offered bounty renders one such button, so the loop below sees them all');
   bountyTags.forEach(tag=>{
     assert.ok(tag.indexOf('type="button"')>=0,'every bounty row is a real button, not a tappable div: '+tag);
-    assert.ok(tag.indexOf('data-claim-bounty="')>=0,'every bounty row carries its own claim hook: '+tag);
+    assert.ok(attrOf(tag,'data-claim-bounty'),'every bounty row carries its own non-empty claim hook: '+tag);
     assert.ok(tag.indexOf('aria-label="Claim ')>=0,'and its own claim label: '+tag);
   });
   assert.equal((todayBounties.innerHTML.match(/data-claim-bounty=/g)||[]).length,bountyTags.length,'and no claim hook is emitted outside those buttons');
@@ -649,8 +668,8 @@ const domChecks = `(()=>{
   chipTags.forEach(tag=>{
     assert.ok(tag.indexOf('class="cat-chip"')>=0,'every button in the chip row is a cat-chip: '+tag);
     assert.ok(tag.indexOf('type="button"')>=0,'every chip is a real button: '+tag);
-    assert.ok(tag.indexOf('data-feed-type="')>=0,'every chip carries its own category: '+tag);
-    assert.ok(tag.indexOf('aria-pressed="')>=0,'every chip declares its own pressed state: '+tag);
+    assert.ok(attrOf(tag,'data-feed-type'),'every chip carries its own non-empty category: '+tag);
+    assert.ok(['true','false'].indexOf(attrOf(tag,'aria-pressed'))>=0,'every chip declares its own pressed state as a real boolean: '+tag);
   });
   setFeedType('climb');
   assert.equal(feedType,'climb','the choice lives in module state, not read back out of the DOM');
@@ -939,7 +958,7 @@ const domChecks = `(()=>{
     assert.ok(tags.length,where+' names its climbers with the climber button');
     tags.forEach(tag=>{
       assert.ok(tag.indexOf('type="button"')>=0,where+' climber name is a real button: '+tag);
-      assert.ok(tag.indexOf('data-person="')>=0,where+' climber button carries the per-person hook: '+tag);
+      assert.ok(attrOf(tag,'data-person'),where+' climber button carries a non-empty per-person hook: '+tag);
       assert.ok(tag.indexOf('aria-haspopup="dialog"')>=0,where+' climber button announces that it opens a dialog: '+tag);
     });
     assert.equal((html.match(/data-person=/g)||[]).length,tags.length,where+' emits no per-person hook outside those buttons');
@@ -1233,7 +1252,9 @@ const domChecks = `(()=>{
   const personSvgTag=openTag(personTrendEl.innerHTML,'<svg');
   assert.ok(personSvgTag,'the wrapper holds the inline SVG');
   assert.ok(personSvgTag.indexOf('role="img"')>=0,'which is the element taking the graphic role: '+personSvgTag);
-  assert.ok(personSvgTag.indexOf('aria-label="')>=0,'and the single accessible name sits on THAT element, not on the wrapper: '+personSvgTag);
+  const personSvgName=attrOf(personSvgTag,'aria-label');
+  assert.ok(personSvgName,'and a NON-EMPTY accessible name sits on THAT element, not on the wrapper: '+personSvgTag);
+  assert.equal(personSvgName,trendAria(personalWeeklyTrend('alex',challengeToday())),'naming the same curve the chart draws, so the label cannot drift from the data');
   assert.ok(document.querySelector('#personPyramid').getAttribute('aria-label')!==null,'while the pyramid, which is itself the graphic, does take one');
   logs=[];
   render();
