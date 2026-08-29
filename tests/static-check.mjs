@@ -137,8 +137,8 @@ assert.match(html,/id="crewFeedFilter"[^>]*class="[^"]*feed-filter/,'the Crew ch
 assert.match(html,/id="crewLocalHint"[\s\S]*id="crewFeedFilter"[\s\S]*id="activityList"/,'the Crew filter chips sit between the local-mode hint and the feed they filter');
 assert.match(script,/renderFeedChips\('#crewFeedFilter',crewFeedType\)/,'the Crew chip row is painted from the Crew feed\'s own filter');
 assert.match(script,/renderFeedChips\('#feedFilter',feedType\)/,'and the You chip row from the You feed\'s own filter');
-assert.match(script,/crewFeedType=next;else feedType=next;resetFeedLimits\(\)/,'the two feeds filter independently and either change resets the show-more count');
-assert.match(script,/filterByType\(logs,crewFeedType\)/,'the Crew feed reuses filterByType() rather than a second narrowing helper');
+assert.match(script,/state\.crewFeedType=next;else state\.feedType=next;resetFeedLimits\(\)/,'the two feeds filter independently and either change resets the show-more count');
+assert.match(script,/filterByType\(state\.logs,crewFeedType\)/,'the Crew feed reuses filterByType() rather than a second narrowing helper');
 assert.equal((script.match(/function filterByType\(/g)||[]).length,1,'filterByType() is defined exactly once');
 assert.match(html,/id="personalShowMore"[^>]*type="button"/,'the You feed can show more');
 assert.match(html,/id="crewShowMore"[^>]*type="button"/,'the crew feed can show more');
@@ -181,7 +181,7 @@ assert.doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|
 // retry" outcome no longer exists. A shared save is confirmed by the write response and the returned
 // record is added to the feed at once, with loadRemote() reconciling in the background — so there is
 // no blocking reload left to fail on the success path. This asserts that replacement invariant.
-assert.match(script,/logs=logs\.concat\(\[\{id:saved\.id/,'a shared save adds the record the write returned straight to the feed');
+assert.match(script,/state\.logs=state\.logs\.concat\(\[\{id:saved\.id/,'a shared save adds the record the write returned straight to the feed');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');
 assert.match(html,/id="bountyHint"/,'the Record tab has a slot for the chosen bounty description');
