@@ -1,10 +1,7 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const test = require('node:test');
 const vm = require('node:vm');
-
-const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
-const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const {source} = require('./harness.js');
 
 test('shared workflow connects, saves a name-only roster, adds, syncs, and deletes activity', async () => {
   const values = new Map(), requests = [];
@@ -28,21 +25,21 @@ test('shared workflow connects, saves a name-only roster, adds, syncs, and delet
   const context = {assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Promise, Intl, fetch, location: {search: '', href: 'https://example.test/'}, localStorage: {getItem: key => values.has(key) ? values.get(key) : null, setItem: (key, value) => values.set(key, String(value)), removeItem: key => values.delete(key)}, setTimeout() {}, clearTimeout() {}};
   const checks = `(async()=>{
     render=()=>{};renderSync=()=>{};setDefaultRecordDate=()=>{};
-    endpoint='https://script.google.com/macros/s/smoke/exec';
-    const probe=unpackRemote(await (await fetchShared(endpoint)).json());
+    state.endpoint='https://script.google.com/macros/s/smoke/exec';
+    const probe=unpackRemote(await (await fetchShared(state.endpoint)).json());
     assert.equal(probe.version,12);
     assert.equal(probe.config.crew[0].name,'Old Crew');
     assert.equal(probe.config.crew[0].pullMode,undefined);
     const next={startDate:'2026-07-01',tripDate:'2026-07-31',goal:3000,crew:[{name:'Alex'}]};
-    let saved=await (await fetchShared(endpoint,{method:'POST',body:JSON.stringify({action:'saveConfig',config:next})})).json();
-    assert.equal(saved.ok,true);config=saved.config;me='Alex';recordingFor='Alex';
-    const joined=await (await fetchShared(endpoint,{method:'POST',body:JSON.stringify({action:'addParticipant',name:'Maya'})})).json();
+    let saved=await (await fetchShared(state.endpoint,{method:'POST',body:JSON.stringify({action:'saveConfig',config:next})})).json();
+    assert.equal(saved.ok,true);state.config=saved.config;state.me='Alex';state.recordingFor='Alex';
+    const joined=await (await fetchShared(state.endpoint,{method:'POST',body:JSON.stringify({action:'addParticipant',name:'Maya'})})).json();
     assert.equal(joined.participant.name,'Maya');assert.equal(joined.config.crew.length,2);
-    saved=await (await fetchShared(endpoint,{method:'POST',body:JSON.stringify({name:'Alex',type:'climb',date:'2026-07-13',hardestGrade:'V4',points:999})})).json();
+    saved=await (await fetchShared(state.endpoint,{method:'POST',body:JSON.stringify({name:'Alex',type:'climb',date:'2026-07-13',hardestGrade:'V4',points:999})})).json();
     assert.equal(saved.points,3);assert.equal(saved.category,'climb');
-    assert.equal(await loadRemote(),true,syncDetail||syncErrorCode);assert.equal(logs.length,1);assert.equal(logs[0].id,'activity-1');assert.equal(syncState,'live');
-    const deleted=await (await fetchShared(endpoint,{method:'POST',body:JSON.stringify({action:'delete',id:'activity-1'})})).json();
-    assert.equal(deleted.ok,true);await loadRemote();assert.equal(logs.length,0);
+    assert.equal(await loadRemote(),true,state.syncDetail||state.syncErrorCode);assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,'activity-1');assert.equal(state.syncState,'live');
+    const deleted=await (await fetchShared(state.endpoint,{method:'POST',body:JSON.stringify({action:'delete',id:'activity-1'})})).json();
+    assert.equal(deleted.ok,true);await loadRemote();assert.equal(state.logs.length,0);
   })()`;
   await vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
   assert.deepEqual(requests.filter(x => x.method === 'POST').map(x => x.body.action || 'activity'), ['saveConfig', 'addParticipant', 'activity', 'delete']);

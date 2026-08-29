@@ -53,9 +53,9 @@ function runFingerprint() {
   const credits = context.computeCredits(logs, settings);
   context.fingerprintSettings = settings;
   context.fingerprintLogs = logs;
-  vm.runInContext("config=fingerprintSettings;logs=fingerprintLogs;me='Alex';recordingFor='Alex';fingerprintChallengeToday=challengeToday;challengeToday=()=> '2026-07-15';", context);
+  vm.runInContext("state.config=fingerprintSettings;state.logs=fingerprintLogs;state.me='Alex';state.recordingFor='Alex';fingerprintChallengeToday=challengeToday;challengeToday=()=> '2026-07-15';", context);
   context.render();
-  vm.runInContext("challengeToday=fingerprintChallengeToday;endpoint='https://sheet.example.test/exec';challengeTimeZone='America/Los_Angeles';sharedPacificDay=challengeToday();challengeTimeZone='Pacific/Auckland';sharedAucklandDay=challengeToday();", context);
+  vm.runInContext("challengeToday=fingerprintChallengeToday;state.endpoint='https://sheet.example.test/exec';state.challengeTimeZone='America/Los_Angeles';sharedPacificDay=challengeToday();state.challengeTimeZone='Pacific/Auckland';sharedAucklandDay=challengeToday();", context);
   const rendered = Object.fromEntries([...elements].filter(([selector]) => [
     '#youTotal', '#youRank', '#todayCategories', '#todayRemaining', '#todayBounties', '#leaderRows', '#activityList', '#goalPace', '#goalProjection', '#personalActivity',
   ].includes(selector)).map(([selector, el]) => [selector, createHash('sha256').update(JSON.stringify({text: el.textContent, html: el.innerHTML, aria: el.getAttribute('aria-label')})).digest('hex')]));
