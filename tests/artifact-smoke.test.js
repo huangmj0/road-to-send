@@ -34,3 +34,16 @@ test('the committed artifact records a local activity through its form', async (
   assert.equal(window.document.querySelector('input[name="activityType"][value="bounty"]').checked, true);
   assert.equal(window.document.querySelector('#bountySelect').value, bounty.dataset.claimBounty);
 });
+
+test('the committed artifact renders a shared Sheet response', async () => {
+  const now = new Date();
+  const day = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  const window = new Window({url: 'https://example.test/'});
+  window.localStorage.setItem('roadToSendEndpoint', 'https://sheet.example.test/exec');
+  window.fetch = async () => ({ok: true, json: async () => ({version: 12, features: [], activities: [{id: 'shared-1', name: 'Alex', type: 'exercise', date: day, createdAt: '1'}], config: {startDate: day, tripDate: day, goal: 50, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: day, timeZone: 'America/Los_Angeles'})});
+  window.document.write(html.replace(/<script>[\s\S]*?<\/script>/, ''));
+  window.eval(script);
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(window.document.querySelector('#totalPoints').textContent, '2');
+  assert.match(window.document.querySelector('#syncStatus').textContent, /^Live/);
+});
