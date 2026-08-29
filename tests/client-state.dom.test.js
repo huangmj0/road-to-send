@@ -59,7 +59,7 @@ const domChecks = `(()=>{
   // is absent and '' when it is empty, so an assertion can tell those apart and reject both.
   const attrOf=(tag,name)=>{const mark=' '+name+'="',at=tag.indexOf(mark);return at<0?null:tag.slice(at+mark.length,tag.indexOf('"',at+mark.length))};
   const openTags=(html,mark)=>{const out=[];let at=html.indexOf(mark);while(at>=0){out.push(html.slice(at,html.indexOf('>',at)+1));at=html.indexOf(mark,at+1)}return out};
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   const dateField=document.querySelector('#activityDate'),dateBox=document.querySelector('#dateFields'),label=document.querySelector('#bountySelectLabel');
 
   // Closed picker: render() re-syncs the record date to the current challenge day,
@@ -88,15 +88,15 @@ const domChecks = `(()=>{
 
   // Day rollover: becoming visible re-renders when the rendered day is stale.
   dateBox.classList.add('hide');
-  assert.equal(renderedDay,challengeToday(),'render records the day it drew');
-  renderedDay='2000-01-01';
+  assert.equal(state.renderedDay,challengeToday(),'render records the day it drew');
+  state.renderedDay='2000-01-01';
   dateField.value=shift(-1);
   fireDocumentEvent('visibilitychange');
-  assert.equal(renderedDay,challengeToday(),'visibilitychange re-renders after a day rollover');
+  assert.equal(state.renderedDay,challengeToday(),'visibilitychange re-renders after a day rollover');
   assert.equal(recordDate(),challengeToday(),'the record date follows the rollover');
 
   // Outside the challenge window the record date clamps and the label says so.
-  config={startDate:shift(-20),tripDate:shift(-10),goal:500,crew:[{name:'Alex'}]};
+  state.config={startDate:shift(-20),tripDate:shift(-10),goal:500,crew:[{name:'Alex'}]};
   render();
   assert.equal(recordDate(),shift(-10),'record date clamps to the window end');
   assert.ok(paceEl.textContent.startsWith('Challenge complete'),'a finished window reports the outcome');
@@ -105,9 +105,9 @@ const domChecks = `(()=>{
   assert.equal(label.textContent,'Bounties for '+fmtDay(shift(-10)),'label names the clamped bounty day');
 
   // Entry 9: the You onboarding empty state shows only when the person has no logs, and the Crew local hint tracks the endpoint.
-  me='Alex';recordingFor='Alex';endpoint='';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
   render();
   const youEmpty=document.querySelector('#youEmptyState'),youEmptyCopy=document.querySelector('#youEmptyCopy'),personalFeed=document.querySelector('#personalActivity');
   assert.equal(youEmpty.classList.contains('hide'),false,'the empty state is visible when the person has no logs');
@@ -115,23 +115,23 @@ const domChecks = `(()=>{
   assert.equal(personalFeed.classList.contains('hide'),true,'the personal feed is hidden while the empty state shows');
   const crewHint=document.querySelector('#crewLocalHint');
   assert.equal(crewHint.classList.contains('hide'),false,'the crew local hint shows in local mode');
-  logs=[{id:'first',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'first',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
   assert.equal(youEmpty.classList.contains('hide'),true,'the empty state hides once the person has a log');
   assert.equal(personalFeed.classList.contains('hide'),false,'the personal feed shows once the person has a log');
-  endpoint='https://sheet.example.test/exec';
+  state.endpoint='https://sheet.example.test/exec';
   render();
   assert.equal(crewHint.classList.contains('hide'),true,'the crew local hint hides when an endpoint is connected');
 
   // Entry 88: activity rows keep their stored names, but the personal feed compares them through
   // the same canonical key as totals so odd Sheet values neither disappear nor crash render().
-  endpoint='';
-  logs=[{id:'spaced-name',name:' Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  state.endpoint='';
+  state.logs=[{id:'spaced-name',name:' Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
   assert.equal(document.querySelector('#youTotal').textContent,'3','the spaced row still contributes its existing points total');
   assert.equal(youEmpty.classList.contains('hide'),true,'a leading-space name does not trigger the false personal empty state');
   assert.ok(personalFeed.innerHTML.indexOf('spaced-name')>=0,'the leading-space row remains visible in the personal feed');
-  logs=[{id:'numeric-name',name:7,type:'climb',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'numeric-name',name:7,type:'climb',date:shift(-1),createdAt:'1'}];
   assert.doesNotThrow(()=>render(),'a numeric activity name cannot crash the You tab');
 
   // Entry 25: one render() runs the raw scorer a FIXED number of times. Before the memo it was
@@ -140,58 +140,58 @@ const domChecks = `(()=>{
   // pass a DERIVED array and so bypass the memo by design: updateRecordPreview() passes
   // [...logs,draft]. If this delta rises, a new derived-array caller appeared inside render() —
   // find it rather than editing the number.
-  endpoint='';me='Alex';recordingFor='Alex';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  state.endpoint='';state.me='Alex';state.recordingFor='Alex';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
-  const runsBefore=creditRuns;
+  const runsBefore=state.creditRuns;
   render();
-  assert.equal(creditRuns-runsBefore,1,'one render scores the live log exactly once');
-  const liveMemo=computeCredits(logs);
-  assert.equal(creditRuns-runsBefore,1,'reading the live pair again after a render costs no scan at all');
+  assert.equal(state.creditRuns-runsBefore,1,'one render scores the live log exactly once');
+  const liveMemo=computeCredits(state.logs);
+  assert.equal(state.creditRuns-runsBefore,1,'reading the live pair again after a render costs no scan at all');
   // The point of the memo is that this number is now a constant. Before it, weekTrend() ran inside
   // leaders.map(), so the count grew with the crew; here a six-person crew costs exactly what a
   // one-person crew costs.
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cass'},{name:'Dee'},{name:'Eli'},{name:'Fay'}]};
-  logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'r2',name:'Bo',type:'exercise',date:shift(-1),createdAt:'2'},{id:'r3',name:'Cass',type:'mobility',date:shift(-2),createdAt:'3'}];
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cass'},{name:'Dee'},{name:'Eli'},{name:'Fay'}]};
+  state.logs=[{id:'r1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'r2',name:'Bo',type:'exercise',date:shift(-1),createdAt:'2'},{id:'r3',name:'Cass',type:'mobility',date:shift(-2),createdAt:'3'}];
   render();
-  const runsCrewBefore=creditRuns;
+  const runsCrewBefore=state.creditRuns;
   render();
-  assert.equal(creditRuns-runsCrewBefore,1,'a six-person crew costs the same one scan as a one-person crew');
+  assert.equal(state.creditRuns-runsCrewBefore,1,'a six-person crew costs the same one scan as a one-person crew');
   // updateRecordPreview() is the one render-path caller that passes a DERIVED array ([...logs,draft]),
   // so it always pays its own scan and must never disturb the live memo.
-  const runsAfterRender=creditRuns;
+  const runsAfterRender=state.creditRuns;
   updateRecordPreview();
-  assert.equal(creditRuns-runsAfterRender,1,'the preview array is scored on its own terms, never from the memo');
-  assert.equal(computeCredits(logs),computeCredits(logs),'the live pair still answers from one memoized object');
-  assert.notEqual(computeCredits(logs),liveMemo,'and that object is the current one, not the pre-crew answer');
+  assert.equal(state.creditRuns-runsAfterRender,1,'the preview array is scored on its own terms, never from the memo');
+  assert.equal(computeCredits(state.logs),computeCredits(state.logs),'the live pair still answers from one memoized object');
+  assert.notEqual(computeCredits(state.logs),liveMemo,'and that object is the current one, not the pre-crew answer');
 
   // Entry 10: the Personal records card hides until the person logs something, and its grade rows track graded climbs.
-  endpoint='';me='Alex';recordingFor='Alex';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[];
+  state.endpoint='';state.me='Alex';state.recordingFor='Alex';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
   render();
   const recordsCard=document.querySelector('#recordsCard'),recordsList=document.querySelector('#recordsList');
   assert.equal(recordsCard.classList.contains('hide'),true,'the records card hides when the person has no logs');
-  logs=[{id:'r1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'r1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
   render();
   assert.equal(recordsCard.classList.contains('hide'),false,'the records card shows once the person has a log');
   assert.ok(recordsList.innerHTML.includes('Hardest')&&recordsList.innerHTML.includes('V4'),'a graded climb surfaces the hardest-grade rows');
-  logs=[{id:'r2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'r2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'1'}];
   render();
   assert.equal(recordsCard.classList.contains('hide'),false,'a non-climb log still reveals the card');
   assert.equal(recordsList.innerHTML.includes('Hardest'),false,'grade rows are suppressed without a graded climb');
   assert.ok(recordsList.innerHTML.includes('Best single day'),'best day/week still render without graded climbs');
 
   // Entry 11: tapping a bounty on the You card preselects it on the Record form for a one-tap claim.
-  me='Alex';recordingFor='Alex';endpoint='';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
   render();
   const claimId=dailyBounties(challengeToday())[0].id;
   const todayBounties=document.querySelector('#todayBounties');
   assert.equal(todayBounties.innerHTML.includes('claimed today'),false,'unclaimed bounty rows have no claimed-today suffix');
-  logs=[{id:'claimed',name:'Alex',type:'bounty',bountyId:claimId,date:challengeToday(),createdAt:'1'}];
+  state.logs=[{id:'claimed',name:'Alex',type:'bounty',bountyId:claimId,date:challengeToday(),createdAt:'1'}];
   render();
   assert.ok(todayBounties.innerHTML.includes('data-claim-bounty="'+claimId+'"')&&todayBounties.innerHTML.includes('claimed today'),'the claimed row carries its claim state');
   assert.equal((todayBounties.innerHTML.match(/claimed today/g)||[]).length,2,'only the claimed row names the state in its text and label');
@@ -216,32 +216,32 @@ const domChecks = `(()=>{
   assert.equal(claimDateBox.classList.contains('hide'),true,'claiming a bounty snaps to today and closes the date picker');
 
   // Entry 41: the preview is closed by default and renders nothing until it is opened.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(20),goal:500,crew:[{name:'Alex'}]};
-  logs=[];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(20),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
   render();
   const weekBox=document.querySelector('#bountyWeek'),weekToggle=document.querySelector('#bountyWeekToggle');
   // The open state lives in a module flag rather than on the element, so it is asserted at source.
-  assert.equal(bountyWeekOpen,false,'the preview starts closed');
+  assert.equal(state.bountyWeekOpen,false,'the preview starts closed');
   assert.equal(weekBox.innerHTML,'','and renders nothing at all until it is opened');
   assert.equal(weekBox.classList.contains('hide'),true,'the container stays hidden');
   toggleBountyWeek();
-  assert.equal(bountyWeekOpen,true,'tapping the toggle opens it');
+  assert.equal(state.bountyWeekOpen,true,'tapping the toggle opens it');
   assert.equal(weekBox.classList.contains('hide'),false,'and reveals the container');
   assert.ok(weekBox.innerHTML.indexOf('bounty-day')>=0,'which now lists the coming days');
   assert.equal(weekBox.innerHTML.indexOf('data-claim-bounty'),-1,'future days are plain rows, never claim buttons');
   render();
   assert.ok(weekBox.innerHTML.indexOf('bounty-day')>=0,'a repaint keeps an open preview open');
   toggleBountyWeek();
-  assert.equal(bountyWeekOpen,false,'tapping again closes it');
+  assert.equal(state.bountyWeekOpen,false,'tapping again closes it');
   assert.equal(weekBox.innerHTML,'','and it renders nothing again');
 
   // Entry 46: the claimed list follows the same closed-by-default contract, and lists only claims.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(20),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(20),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
   const claimedId=dailyBounties(challengeToday())[0].id,claimedTitle=bountyById(claimedId).title;
   const unbrokenClaimNote='https://example.test/thisisareallylongunbrokennotethatmustwrapwithoutmovingthepointscolumn';
-  logs=[
+  state.logs=[
     {id:'k1',name:'Alex',type:'bounty',bountyId:claimedId,bountyTitle:claimedTitle,note:unbrokenClaimNote,date:shift(-1),createdAt:'1'},
     {id:'k2',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'2'},
     {id:'k3',name:'Maya',type:'bounty',bountyId:claimedId,bountyTitle:'Maya only',date:shift(-1),createdAt:'3'},
@@ -249,12 +249,12 @@ const domChecks = `(()=>{
   render();
   const claimedBox=document.querySelector('#claimedList'),claimedCap=document.querySelector('#claimedSummary');
   // The open state lives in a module flag rather than on the element, so it is asserted at source.
-  assert.equal(claimedOpen,false,'the claimed list starts closed');
+  assert.equal(state.claimedOpen,false,'the claimed list starts closed');
   assert.equal(claimedBox.innerHTML,'','and renders nothing at all until it is opened');
   assert.equal(claimedCap.textContent,'','and its caption is empty while closed');
   assert.equal(claimedBox.classList.contains('hide'),true,'the container stays hidden');
   toggleClaimed();
-  assert.equal(claimedOpen,true,'tapping the toggle opens it');
+  assert.equal(state.claimedOpen,true,'tapping the toggle opens it');
   assert.equal(claimedBox.classList.contains('hide'),false,'and reveals the container');
   assert.ok(claimedBox.innerHTML.indexOf(claimedTitle)>=0,'which now names the bounty that was claimed');
   assert.ok(claimedBox.innerHTML.indexOf(unbrokenClaimNote)>=0,'and a long unbroken note remains present in full');
@@ -269,39 +269,39 @@ const domChecks = `(()=>{
   assert.equal(claimedBox.innerHTML.split('bounty-peek').length-1,1,'and redraws one row rather than appending a second');
   assert.ok(claimedCap.textContent.indexOf('1 claim')>=0,'and keeps the caption on repaint');
   toggleClaimed();
-  assert.equal(claimedOpen,false,'tapping again closes it');
+  assert.equal(state.claimedOpen,false,'tapping again closes it');
   assert.equal(claimedBox.innerHTML,'','and it empties again');
   assert.equal(claimedCap.textContent,'','and clears the caption again');
   // Someone with nothing claimed opens to a plain empty state, not a zero-of-total figure.
-  logs=[{id:'k4',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'k4',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'}];
   toggleClaimed();
-  assert.equal(claimedOpen,true,'it still opens for a climber with no claims');
+  assert.equal(state.claimedOpen,true,'it still opens for a climber with no claims');
   assert.equal(claimedBox.innerHTML.indexOf('bounty-peek'),-1,'listing no rows');
   toggleClaimed();
   assert.equal(claimedBox.innerHTML,'','and closes back to nothing');
 
   // Entry 50: the claimed list also shows what each claim scored, calling out a capped one.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
-  logs=[
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  state.logs=[
     {id:'s1',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'},
     {id:'s2',name:'Alex',type:'bounty',bountyId:'outdoor-send',bountyTitle:'Outdoor Send',date:'2026-07-14',createdAt:'1'},
     {id:'s3',name:'Alex',type:'bounty',bountyId:'century-club',bountyTitle:'Century Club',date:'2026-07-15',createdAt:'1'},
   ];
   toggleClaimed();
-  assert.equal(claimedOpen,true,'opens for the scored-claims case');
+  assert.equal(state.claimedOpen,true,'opens for the scored-claims case');
   assert.ok(claimedBox.innerHTML.indexOf('bounty-pts">+3</span>')>=0,'the first two, uncapped claims show their full credit');
   assert.ok(claimedBox.innerHTML.indexOf('bounty-pts">+0</span>')>=0,'the claim past the weekly cap shows its reduced credit');
   assert.ok(claimedBox.innerHTML.indexOf('weekly bounty cap')>=0,'and names the weekly bounty cap as the reason');
   assert.equal(claimedBox.innerHTML.split('weekly bounty cap').length-1,1,'only the capped row carries the cap wording');
   toggleClaimed();
-  assert.equal(claimedOpen,false,'closes again');
+  assert.equal(state.claimedOpen,false,'closes again');
 
   // Entry 34: a note written on a bounty claim round-trips to the Sheet and back, and until now was
   // rendered to nobody — the bounty branch showed the title and stopped.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   const notedId=dailyBounties(challengeToday())[0].id,notedTitle=bountyById(notedId).title;
-  logs=[{id:'n1',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'felt strong today',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'n1',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'felt strong today',date:shift(-1),createdAt:'1'}];
   render();
   const notedFeed=document.querySelector('#personalActivity');
   assert.ok(notedFeed.innerHTML.indexOf(notedTitle)>=0,'the bounty still names itself');
@@ -310,21 +310,21 @@ const domChecks = `(()=>{
   // no longer part of that string: it heads the group of rows that share it, so assert it there.
   assert.ok(notedFeed.innerHTML.indexOf(notedTitle+' · felt strong today')>=0,'the note joins the title the way the exercise and mobility rows join theirs');
   assert.ok(notedFeed.innerHTML.indexOf('<h3 class="activity-day">'+fmtDay(shift(-1))+'</h3>')>=0,'and the day the entry belongs to heads its group of rows');
-  logs=[{id:'n2',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,date:shift(-1),createdAt:'2'}];
+  state.logs=[{id:'n2',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,date:shift(-1),createdAt:'2'}];
   render();
   assert.equal(notedFeed.innerHTML.indexOf('felt strong today'),-1,'a bounty with no note carries no note');
   assert.ok(notedFeed.innerHTML.indexOf('<small>'+notedTitle+'</small>')>=0,'and renders exactly as it did before, the title standing alone in the detail line');
   assert.ok(notedFeed.innerHTML.indexOf('<h3 class="activity-day">'+fmtDay(shift(-1))+'</h3>')>=0,'with its date still on the heading above it');
   // The note is user-entered text arriving from a shared Sheet, so it stays escaped.
-  logs=[{id:'n3',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'<img src=x onerror=alert(1)>',date:shift(-1),createdAt:'3'}];
+  state.logs=[{id:'n3',name:'Alex',type:'bounty',bountyId:notedId,bountyTitle:notedTitle,note:'<img src=x onerror=alert(1)>',date:shift(-1),createdAt:'3'}];
   render();
   assert.equal(notedFeed.innerHTML.indexOf('<img'),-1,'a note carrying markup is escaped, never injected');
   assert.ok(notedFeed.innerHTML.indexOf('&lt;img')>=0,'and is shown as the text it is');
 
   // Entry 17: the today card names which categories are done and whether the balanced-day bonus is still live.
-  me='Alex';recordingFor='Alex';endpoint='';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
   render();
   const statusPill=document.querySelector('#todayStatus'),catRow=document.querySelector('#todayCategories'),remaining=document.querySelector('#todayRemaining');
   assert.equal(statusPill.textContent,'Ready','an untouched day still reads Ready');
@@ -335,7 +335,7 @@ const domChecks = `(()=>{
   assert.ok(remaining.textContent.indexOf('+'+SCORING.balancedDayBonus)>=0,'the remaining line names the balanced-day bonus');
   assert.ok(remaining.textContent.indexOf('+'+(DAILY_MAX-SCORING.balancedDayBonus)+' more')>=0,'the remaining line names the points still on the table');
 
-  logs=[{id:'tc1',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'},{id:'tc2',name:'Alex',type:'exercise',date:challengeToday(),createdAt:'2'}];
+  state.logs=[{id:'tc1',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'},{id:'tc2',name:'Alex',type:'exercise',date:challengeToday(),createdAt:'2'}];
   render();
   assert.equal(statusPill.textContent,'1 more for +'+SCORING.balancedDayBonus,'two of three categories counts down to the bonus');
   assert.equal(catRow.innerHTML.split('cat-chip done').length-1,2,'the two logged categories read as done');
@@ -343,7 +343,7 @@ const domChecks = `(()=>{
   assert.ok(remaining.textContent.indexOf(CAT_LABELS.mobility)>=0,'the remaining line names the missing category');
   assert.equal(remaining.textContent.indexOf(CAT_LABELS.climb)>=0,false,'a logged category drops out of the remaining line');
 
-  logs=logs.concat([{id:'tc3',name:'Alex',type:'mobility',date:challengeToday(),createdAt:'3'}]);
+  state.logs=state.logs.concat([{id:'tc3',name:'Alex',type:'mobility',date:challengeToday(),createdAt:'3'}]);
   render();
   assert.equal(statusPill.textContent,'Balanced day','all three categories complete the day');
   assert.equal(statusPill.classList.contains('max'),true,'a complete day keeps the max pill styling');
@@ -370,10 +370,10 @@ const domChecks = `(()=>{
   chipRadio.checked=false;chipDateBox.classList.remove('hide');
   // Dispatch through the real tree and its delegated today-card listener. lastDeleted is cleared
   // by showTab(), so it also proves the jump to the Record tab happened.
-  lastDeleted={entry:logs[0],index:0,label:'a climb'};
+  state.lastDeleted={entry:state.logs[0],index:0,label:'a climb'};
   catRow.querySelector('[data-cat="exercise"]').click();
   assert.equal(chipRadio.checked,true,'tapping a chip preselects that category on the Record form');
-  assert.equal(lastDeleted,null,'and it goes to the Record tab, the same jump claimBounty makes');
+  assert.equal(state.lastDeleted,null,'and it goes to the Record tab, the same jump claimBounty makes');
   assert.equal(chipDateBox.classList.contains('hide'),true,'the date fields are reset the way a bounty claim resets them');
   assert.equal(prefillCategory('not-a-category'),undefined,'an unknown category does nothing at all');
   // An already-logged category stays tappable: logging it twice is legal and simply scores 0, so
@@ -383,9 +383,9 @@ const domChecks = `(()=>{
   showTab('you');
 
   // Entry 36: the captions track their cards -- filled when the card is drawn, empty when hidden.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'h1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'h2',name:'Alex',type:'exercise',date:shift(-3),createdAt:'2'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'h1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'h2',name:'Alex',type:'exercise',date:shift(-3),createdAt:'2'}];
   const heatmapEl=document.querySelector('#youHeatmap');let heatmapLabel='';heatmapEl.setAttribute=(name,value)=>{if(name==='aria-label')heatmapLabel=value};
   render();
   const heatCard=document.querySelector('#heatmapCard'),heatCap=document.querySelector('#heatmapSummary');
@@ -393,29 +393,29 @@ const domChecks = `(()=>{
   assert.equal(heatmapLabel,'Active 2 of 6 days, 5 points','the weekday axis leaves the heatmap graphic label unchanged');
   assert.ok(heatCap.textContent.length>0,'so its caption says something');
   assert.ok(heatCap.textContent.indexOf('active day')>=0,'and reports the active-day count');
-  logs=[{id:'bounty-heat',name:'Alex',type:'bounty',bountyId:'send-it',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'bounty-heat',name:'Alex',type:'bounty',bountyId:'send-it',date:shift(-1),createdAt:'1'}];
   render();
   const bountyHeatCell=document.querySelector('#youHeatmap').innerHTML.match(new RegExp('<i class="heat-cell heat([1-4])"[^>]*title="'+fmtDay(shift(-1))));
   assert.ok(bountyHeatCell,'a bounty-only day is not rendered as an empty heat0 cell');
   const trendCard=document.querySelector('#weeklyTrendCard'),trendCap=document.querySelector('#trendSummary');
   assert.equal(trendCard.classList.contains('hide'),false,'the trend card is showing');
   assert.ok(trendCap.textContent.indexOf('Peak ')===0,'so its caption names the curve peak');
-  logs=[];
+  state.logs=[];
   render();
   assert.equal(heatCap.textContent,'','a hidden heatmap card carries no caption');
   assert.equal(trendCap.textContent,'','and neither does a hidden trend card');
 
   // Entry 74: each trend card renders the same accessible daily momentum SVG.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
-  logs=[];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+  state.logs=[];
   render();
   const youTrendCard=document.querySelector('#youTrendCard'),youTrendEl=document.querySelector('#youTrend'),youTrendCap=document.querySelector('#youTrendSummary');
   assert.equal(youTrendCard.classList.contains('hide'),false,'a climber with nothing logged still gets the all-zero curve');
   assert.ok(youTrendEl.innerHTML.indexOf('<svg')>=0,'the personal chart is an inline SVG');
   assert.ok(youTrendEl.innerHTML.indexOf('role="img"')>=0&&youTrendEl.innerHTML.indexOf('aria-label=')>=0,'the SVG has one accessible name');
   assert.ok(youTrendEl.innerHTML.indexOf('Peak 0')>=0&&youTrendEl.innerHTML.indexOf('Current 0')>=0,'the peak and current values are visible without a hover');
-  logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt2',name:'Maya',type:'climb',date:shift(-1),createdAt:'2'}];
+  state.logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt2',name:'Maya',type:'climb',date:shift(-1),createdAt:'2'}];
   render();
   assert.equal(youTrendCard.classList.contains('hide'),false,'logging something leaves the card open');
   const youCurve=youTrendEl.innerHTML;
@@ -440,8 +440,8 @@ const domChecks = `(()=>{
   assert.equal(youTrendCard.classList.contains('hide'),false,'and leaves the card open');
 
   // Entry 78: a one-day curve has a real horizontal stroke and a rectangular fill.
-  config={startDate:challengeToday(),tripDate:shift(5),goal:1000,crew:[{name:'Alex'}]};
-  logs=[{id:'day-one',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'}];
+  state.config={startDate:challengeToday(),tripDate:shift(5),goal:1000,crew:[{name:'Alex'}]};
+  state.logs=[{id:'day-one',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'}];
   render();
   const dayOneSvg=youTrendEl.innerHTML.slice(0,youTrendEl.innerHTML.indexOf('</svg>')+6);
   const dayOneLine=dayOneSvg.match(/<path class="trend-line" d="([^"]+)"/)[1],dayOneArea=dayOneSvg.match(/<path class="trend-area" d="([^"]+)"/)[1];
@@ -455,31 +455,31 @@ const domChecks = `(()=>{
   assert.doesNotMatch(zeroPyramid,/class="nonzero"/,'a zero-send pyramid row still has no rendered floor');
   assert.equal(groupProgress.style.width,'0%','a tiny crew total can round to zero percent');
   assert.equal(groupProgress.classList.contains('nonzero'),true,'but a positive crew total keeps the progress floor');
-  logs=[];
+  state.logs=[];
   render();
   assert.equal(groupProgress.classList.contains('nonzero'),false,'a true zero crew total removes the progress floor');
-  config={startDate:shift(-5),tripDate:shift(5),goal:1,crew:[{name:'Alex'}]};
-  logs=[{id:'goal-hit',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:1,crew:[{name:'Alex'}]};
+  state.logs=[{id:'goal-hit',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
   assert.equal(document.querySelector('#groupPercent').classList.contains('reached'),true,'the headline percentage keeps its reached state at 100 percent');
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   render();
   assert.equal(document.querySelector('#groupPercent').classList.contains('reached'),false,'the headline percentage clears its reached state below 100 percent');
 
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
-  logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt2',name:'Maya',type:'climb',date:shift(-1),createdAt:'2'}];
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+  state.logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt2',name:'Maya',type:'climb',date:shift(-1),createdAt:'2'}];
   render();
   assert.equal(personalWeeklyTrend('alex',challengeToday()).slice(-1)[0].points,3,'the personal curve counts only this climber points in its current window');
   assert.equal(weeklyTrend(challengeToday()).slice(-1)[0].points,6,'while the crew curve includes both climbers in its current window');
-  me='Maya';recordingFor='Maya';
-  logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  state.me='Maya';state.recordingFor='Maya';
+  state.logs=[{id:'pt1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
   assert.equal(youTrendCard.classList.contains('hide'),false,'switching to a climber with nothing logged keeps the zero curve available');
   assert.ok(youTrendEl.innerHTML.indexOf('Current 0')>=0,'and the visible current label reads zero');
   // Entry 18: the today card carries the personal countdown and the person share of the crew pace.
-  me='Alex';recordingFor='Alex';endpoint='';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
   render();
   const countdown=document.querySelector('#youCountdown'),youPace=document.querySelector('#youPace');
   assert.ok(countdown.textContent.indexOf('Day 6 of 11')>=0,'the countdown names the day and the window length');
@@ -488,16 +488,16 @@ const domChecks = `(()=>{
   assert.equal(youPace.textContent.indexOf('0 / 500 pts'),0,'the pace line opens with the person total over their share');
   assert.ok(youPace.textContent.indexOf('behind')>=0,'zero points partway through the window reads behind your share');
   assert.equal(youPace.classList.contains('behind'),true,'the pace line reuses the crew pace colour classes');
-  config={startDate:shift(-20),tripDate:shift(-10),goal:500,crew:[{name:'Alex'}]};
+  state.config={startDate:shift(-20),tripDate:shift(-10),goal:500,crew:[{name:'Alex'}]};
   render();
   assert.equal(youPace.classList.contains('hide'),true,'a finished window hides the personal pace line');
   assert.equal(countdown.textContent.indexOf('Challenge complete'),0,'a finished window reads as complete');
   assert.ok(countdown.textContent.indexOf(fmtDay(shift(-10)))>=0,'the finished countdown names the end date');
 
   // Entry 19: the You feed deletes your own entries behind the in-app confirm dialog.
-  me='Alex';recordingFor='Alex';endpoint='';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'d1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-1),createdAt:'1'},{id:'d2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'d3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'d1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-1),createdAt:'1'},{id:'d2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'d3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
   render();
   const ownFeed=document.querySelector('#personalActivity'),crewFeed=document.querySelector('#activityList');
   assert.ok(ownFeed.innerHTML.indexOf('data-del=')>=0,'the You feed offers delete buttons for your own entries');
@@ -515,37 +515,37 @@ const domChecks = `(()=>{
   assert.ok(confirmBody.textContent.indexOf('Alex')>=0,'the confirm copy names the person');
   assert.equal(confirmNote.textContent,'You can undo this from the bar that appears.','a local delete confirmation names the undo bar');
   assert.equal(confirmNote.classList.contains('hide'),false,'the local undo note is shown');
-  const beforeCount=logs.length;
+  const beforeCount=state.logs.length;
   performDelete();
-  assert.equal(logs.length,beforeCount-1,'confirming removes exactly one entry in local mode');
-  assert.equal(logs.some(x=>x.id==='d1'),false,'the confirmed entry is the one that goes');
+  assert.equal(state.logs.length,beforeCount-1,'confirming removes exactly one entry in local mode');
+  assert.equal(state.logs.some(x=>x.id==='d1'),false,'the confirmed entry is the one that goes');
   assert.equal(confirmDialog.classList.contains('open'),false,'confirming closes the dialog');
   performDelete();
-  assert.equal(logs.length,beforeCount-1,'a second confirm with nothing pending deletes nothing');
+  assert.equal(state.logs.length,beforeCount-1,'a second confirm with nothing pending deletes nothing');
   // Entry 26: a dismissed confirm leaves no intent behind, and a confirmed one acts on the row it
   // described rather than on a position that may since have come to mean something else.
-  me='Alex';recordingFor='Alex';endpoint='';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'c1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'c2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'c3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'c1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'c2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'c3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
   render();
   requestDelete(1,'c2','personal');
   assert.equal(confirmDialog.classList.contains('open'),true,'requesting a delete opens the dialog');
   closeModal('confirmModal');
-  assert.equal(logs.length,3,'cancelling deletes nothing');
+  assert.equal(state.logs.length,3,'cancelling deletes nothing');
   performDelete();
-  assert.equal(logs.length,3,'and a confirm that arrives after the cancel is a no-op, not a delayed delete');
+  assert.equal(state.logs.length,3,'and a confirm that arrives after the cancel is a no-op, not a delayed delete');
   // The middle of three rows, by identity: the other two survive in their original order.
   requestDelete(1,'c2','personal');
   performDelete();
-  assert.equal(logs.length,2,'confirming removes exactly one row');
-  assert.deepEqual(logs.map(x=>x.id),['c1','c3'],'the row that goes is the one the dialog described, and the rest keep their order');
+  assert.equal(state.logs.length,2,'confirming removes exactly one row');
+  assert.deepEqual(state.logs.map(x=>x.id),['c1','c3'],'the row that goes is the one the dialog described, and the rest keep their order');
   // A row that has left logs between the request and the confirm is not replaced by a positional guess.
   requestDelete(0,'c1','personal');
-  logs=logs.filter(x=>x.id!=='c1');
+  state.logs=state.logs.filter(x=>x.id!=='c1');
   performDelete();
-  assert.deepEqual(logs.map(x=>x.id),['c3'],'a captured row that is already gone takes nothing with it');
+  assert.deepEqual(state.logs.map(x=>x.id),['c3'],'a captured row that is already gone takes nothing with it');
   assert.equal(confirmDialog.classList.contains('open'),false,'and the dialog still closes');
-  endpoint='https://sheet.example.test/exec';
+  state.endpoint='https://sheet.example.test/exec';
   requestDelete(0,'c3','personal');
   assert.equal(confirmNote.textContent,'This cannot be undone.','a shared delete keeps the irreversible warning');
   assert.equal(confirmNote.classList.contains('hide'),false,'the shared delete warning is shown');
@@ -553,13 +553,13 @@ const domChecks = `(()=>{
   disconnect();
   assert.equal(confirmNote.classList.contains('hide'),true,'disconnecting hides the irreversible warning');
   closeModal('confirmModal');
-  endpoint='';
+  state.endpoint='';
 
   // Entry 28: a local delete offers itself back. performDelete()'s local branch contains no await,
   // so its effects land synchronously and the bar can be inspected straight after the call.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'u3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'u3',name:'Alex',type:'mobility',date:shift(-1),createdAt:'3'}];
   render();
   const undoBar=document.querySelector('#undoBar'),undoTextEl=document.querySelector('#undoText');
   assert.equal(undoBar.classList.contains('hide'),true,'nothing has been deleted, so the bar stays away');
@@ -567,10 +567,10 @@ const domChecks = `(()=>{
   performDelete();
   assert.equal(undoBar.classList.contains('hide'),false,'a local delete offers an undo');
   assert.ok(undoTextEl.textContent.indexOf('Deleted ')===0,'and the bar names what it is offering back');
-  assert.deepEqual(logs.map(x=>x.id),['u1','u3'],'the row is gone while the offer stands');
+  assert.deepEqual(state.logs.map(x=>x.id),['u1','u3'],'the row is gone while the offer stands');
   undoDelete();
-  assert.equal(logs.length,3,'undo restores the row');
-  assert.deepEqual(logs.map(x=>x.id),['u1','u2','u3'],'and puts it back at the index it came from, not on the end');
+  assert.equal(state.logs.length,3,'undo restores the row');
+  assert.deepEqual(state.logs.map(x=>x.id),['u1','u2','u3'],'and puts it back at the index it came from, not on the end');
   render();
   assert.equal(undoBar.classList.contains('hide'),true,'the offer is spent once it is taken');
   // Switching tabs puts the bar away, so it never outlives the action it describes.
@@ -581,41 +581,41 @@ const domChecks = `(()=>{
   assert.equal(undoBar.classList.contains('hide'),true,'moving to another tab puts the offer away on its own, with no render in between');
   assert.equal(undoTextEl.textContent,'','and takes the text with it, so a spent offer never stays on screen');
   undoDelete();
-  assert.deepEqual(logs.map(x=>x.id),['u2','u3'],'the retired Undo cannot put the row back behind the tab switch');
+  assert.deepEqual(state.logs.map(x=>x.id),['u2','u3'],'the retired Undo cannot put the row back behind the tab switch');
   showTab('you');
   // Shared mode never offers undo at all: re-POSTing a deleted row would mint a new id.
-  logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  state.logs=[{id:'u1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'u2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
   render();
   requestDelete(1,'u2','personal');
   performDelete();
   assert.equal(undoBar.classList.contains('hide'),false,'still offered in local mode');
-  endpoint='https://sheet.example.test/exec';
+  state.endpoint='https://sheet.example.test/exec';
   renderUndo();
   assert.equal(undoBar.classList.contains('hide'),true,'an endpoint appearing takes the offer away');
   undoDelete();
-  assert.equal(logs.length,1,'and undo does nothing in shared mode even if it is called directly');
-  endpoint='';
+  assert.equal(state.logs.length,1,'and undo does nothing in shared mode even if it is called directly');
+  state.endpoint='';
 
   // A bounty row whose bountyTitle is blank still reads by name: the feed, the delete
   // confirmation and the undo bar all fall back to the catalogue through bountyTitle().
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   const blankTitled=dailyBounties(challengeToday())[0];
-  logs=[{id:'nb1',name:'Alex',type:'bounty',bountyId:blankTitled.id,bountyTitle:'',category:blankTitled.category,date:challengeToday(),createdAt:'1'}];
+  state.logs=[{id:'nb1',name:'Alex',type:'bounty',bountyId:blankTitled.id,bountyTitle:'',category:blankTitled.category,date:challengeToday(),createdAt:'1'}];
   render();
   assert.ok(document.querySelector('#personalActivity').innerHTML.indexOf('Delete '+esc(blankTitled.title)+' for Alex')>=0,'the feed names a title-less bounty from the catalogue');
   requestDelete(0,'nb1','personal');
   assert.equal(document.querySelector('#confirmBody').textContent,'Delete '+blankTitled.title+' for Alex?','the delete confirmation names it the way the feed does');
   performDelete();
   assert.equal(undoTextEl.textContent,'Deleted '+blankTitled.title+'.','and so does the undo bar');
-  lastDeleted=null;
+  state.lastDeleted=null;
 
   // Entry 38: the feed caps were hard. Across a ten-week challenge the personal feed showed the
   // last five entries and the crew feed the last twenty, with no way to see anything older.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;resetFeedLimits();
-  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[];
-  for(let i=0;i<8;i++)logs=logs.concat([{id:'p'+i,name:'Alex',type:'mobility',date:shift(-1),createdAt:String(i)}]);
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;resetFeedLimits();
+  state.config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
+  for(let i=0;i<8;i++)state.logs=state.logs.concat([{id:'p'+i,name:'Alex',type:'mobility',date:shift(-1),createdAt:String(i)}]);
   render();
   const pagedFeed=document.querySelector('#personalActivity'),moreBtn=document.querySelector('#personalShowMore');
   assert.equal(pagedFeed.innerHTML.split('class="activity"').length-1,5,'the personal feed opens at its default five');
@@ -626,19 +626,19 @@ const domChecks = `(()=>{
   // Growth is bounded by the data: paging past the end renders no phantom rows.
   showMoreFeed('personal');
   assert.equal(pagedFeed.innerHTML.split('class="activity"').length-1,8,'paging past the end changes nothing');
-  assert.equal(personalFeedLimit,8,'and the limit never runs beyond the log');
+  assert.equal(state.personalFeedLimit,8,'and the limit never runs beyond the log');
   // A feed that already fits never offers the button at all.
   resetFeedLimits();
-  logs=[{id:'one',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'one',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
   assert.equal(moreBtn.classList.contains('hide'),true,'a feed that already shows everything makes no offer');
   assert.equal(document.querySelector('#crewShowMore').classList.contains('hide'),true,'and neither does the crew feed');
 
   // Entry 43: the You feed narrows to one category. Element listeners are no-ops in this stub
   // and elements have no closest(), so the chip handler setFeedType() is called directly.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;feedType='all';resetFeedLimits();
-  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'f1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'f2',name:'Alex',type:'exercise',date:shift(-2),createdAt:'2'},{id:'f3',name:'Alex',type:'mobility',date:shift(-3),createdAt:'3'},{id:'f4',name:'Alex',type:'climb',date:shift(-4),createdAt:'4'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;state.feedType='all';resetFeedLimits();
+  state.config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'f1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'f2',name:'Alex',type:'exercise',date:shift(-2),createdAt:'2'},{id:'f3',name:'Alex',type:'mobility',date:shift(-3),createdAt:'3'},{id:'f4',name:'Alex',type:'climb',date:shift(-4),createdAt:'4'}];
   render();
   const filterFeed=document.querySelector('#personalActivity'),filterChips=document.querySelector('#feedFilter');
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,4,'the You feed opens showing every category');
@@ -658,7 +658,7 @@ const domChecks = `(()=>{
     assert.ok(['true','false'].indexOf(attrOf(tag,'aria-pressed'))>=0,'every chip declares its own pressed state as a real boolean: '+tag);
   });
   setFeedType('climb');
-  assert.equal(feedType,'climb','the choice lives in module state, not read back out of the DOM');
+  assert.equal(state.feedType,'climb','the choice lives in module state, not read back out of the DOM');
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,2,'selecting a category narrows the feed to that category');
   assert.equal(filterFeed.innerHTML.indexOf(CAT_LABELS.exercise)>=0,false,'and the other categories drop out');
   assert.equal(filterChips.innerHTML.indexOf('data-feed-type="climb" aria-pressed="true"')>=0,true,'the chosen chip is the pressed one');
@@ -670,25 +670,25 @@ const domChecks = `(()=>{
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,4,'selecting All restores every row');
   // Entry 38's show-more count is per-filter: carried across, it would open a narrow filter
   // already expanded, or hide rows the new filter has plenty of.
-  logs=[];
-  for(let i=0;i<8;i++)logs=logs.concat([{id:'h'+i,name:'Alex',type:'climb',date:shift(-1),createdAt:String(i)}]);
+  state.logs=[];
+  for(let i=0;i<8;i++)state.logs=state.logs.concat([{id:'h'+i,name:'Alex',type:'climb',date:shift(-1),createdAt:String(i)}]);
   render();
   showMoreFeed('personal');
-  assert.equal(personalFeedLimit,8,'the show-more count grows under the current filter');
+  assert.equal(state.personalFeedLimit,8,'the show-more count grows under the current filter');
   setFeedType('mobility');
-  assert.equal(personalFeedLimit,5,'switching filters resets the show-more limit');
+  assert.equal(state.personalFeedLimit,5,'switching filters resets the show-more limit');
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,0,'and a category with nothing logged shows no rows');
   setFeedType('all');
-  assert.equal(personalFeedLimit,5,'returning to All resets it again');
+  assert.equal(state.personalFeedLimit,5,'returning to All resets it again');
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,5,'and reopens at the default five');
   // The filter is deliberately not remembered: it is module state, so a reload starts at All.
-  assert.equal(feedType,'all','the filter ends where it started, with nothing persisted');
+  assert.equal(state.feedType,'all','the filter ends where it started, with nothing persisted');
 
   // Entry 44: the Crew feed carries the same chips over its own module-level filter. The two feeds
   // must not share one variable, so every assertion below checks the other feed is untouched.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;feedType='all';crewFeedType='all';resetFeedLimits();
-  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
-  logs=[{id:'c1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'c2',name:'Bo',type:'exercise',date:shift(-2),createdAt:'2'},{id:'c3',name:'Alex',type:'mobility',date:shift(-3),createdAt:'3'},{id:'c4',name:'Bo',type:'climb',date:shift(-4),createdAt:'4'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;state.feedType='all';state.crewFeedType='all';resetFeedLimits();
+  state.config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.logs=[{id:'c1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'c2',name:'Bo',type:'exercise',date:shift(-2),createdAt:'2'},{id:'c3',name:'Alex',type:'mobility',date:shift(-3),createdAt:'3'},{id:'c4',name:'Bo',type:'climb',date:shift(-4),createdAt:'4'}];
   render();
   const bothCrewFeed=document.querySelector('#activityList'),bothCrewChips=document.querySelector('#crewFeedFilter'),bothYouFeed=document.querySelector('#personalActivity');
   const bothRows=el=>el.innerHTML.split('class="activity"').length-1;
@@ -699,8 +699,8 @@ const domChecks = `(()=>{
   setFeedType('mobility');
   assert.equal(bothRows(bothYouFeed),1,'the You feed narrows to its own category');
   setFeedType('climb',true);
-  assert.equal(crewFeedType,'climb','the Crew choice lives in its own module state');
-  assert.equal(feedType,'mobility','and setting it leaves the You feed filter alone');
+  assert.equal(state.crewFeedType,'climb','the Crew choice lives in its own module state');
+  assert.equal(state.feedType,'mobility','and setting it leaves the You feed filter alone');
   assert.equal(bothRows(bothCrewFeed),2,'the Crew feed narrows to that category across every climber');
   assert.equal(bothRows(bothYouFeed),1,'while the You feed keeps the rows its own filter selected');
   assert.equal(bothCrewChips.innerHTML.indexOf('data-feed-type="climb" aria-pressed="true"')>=0,true,'the chosen Crew chip is the pressed one');
@@ -710,21 +710,21 @@ const domChecks = `(()=>{
   assert.equal(bothRows(bothCrewFeed),1,'switching the Crew filter shows the next category');
   assert.equal(bothRows(bothYouFeed),1,'still without disturbing the You feed');
   setFeedType('all',true);
-  assert.equal(crewFeedType,'all','the Crew filter returns to All');
+  assert.equal(state.crewFeedType,'all','the Crew filter returns to All');
   assert.equal(bothRows(bothCrewFeed),4,'restoring every Crew row');
-  assert.equal(feedType,'mobility','and the You feed filter survives the round trip untouched');
+  assert.equal(state.feedType,'mobility','and the You feed filter survives the round trip untouched');
   // Symmetry: changing the You filter must not reach back into the Crew feed either.
   setFeedType('climb');
-  assert.equal(crewFeedType,'all','the You filter never writes the Crew feed variable');
+  assert.equal(state.crewFeedType,'all','the You filter never writes the Crew feed variable');
   assert.equal(bothRows(bothCrewFeed),4,'so the Crew feed still shows everything');
   assert.equal(bothRows(bothYouFeed),1,'and the You feed shows its own narrowed rows');
   setFeedType('all');
 
   // Entry 49: a filter that empties a feed says so by name, in that feed alone, rather than
   // falling back to the same "no activity" sentence a truly empty feed shows.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;feedType='all';crewFeedType='all';resetFeedLimits();
-  config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
-  logs=[{id:'n1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'n2',name:'Bo',type:'climb',date:shift(-2),createdAt:'2'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;state.feedType='all';state.crewFeedType='all';resetFeedLimits();
+  state.config={startDate:shift(-20),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.logs=[{id:'n1',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'n2',name:'Bo',type:'climb',date:shift(-2),createdAt:'2'}];
   render();
   const namedYouFeed=document.querySelector('#personalActivity'),namedCrewFeed=document.querySelector('#activityList');
   setFeedType('mobility');
@@ -740,7 +740,7 @@ const domChecks = `(()=>{
   assert.equal(namedCrewFeed.innerHTML.indexOf('entries in this view.'),-1,'clearing the Crew filter drops the category sentence too');
 
   // With nothing logged at all, the unfiltered feed keeps the original, plain sentence.
-  logs=[];
+  state.logs=[];
   render();
   assert.ok(namedYouFeed.innerHTML.indexOf('No activity yet.')>=0,'a genuinely empty You feed still reads the plain sentence');
   assert.ok(namedCrewFeed.innerHTML.indexOf('No activity yet.')>=0,'a genuinely empty Crew feed still reads the plain sentence');
@@ -750,9 +750,9 @@ const domChecks = `(()=>{
 
   // Entry 20: tapping a leaderboard row opens the per-person card. Element listeners are
   // no-ops in this stub and elements have no closest(), so call openPersonCard directly.
-  me='Alex';recordingFor='Alex';endpoint='';
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
-  logs=[{id:'q1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-1),createdAt:'1'},{id:'q2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'q3',name:'Bo',type:'climb',hardestGrade:'V2',date:shift(-1),createdAt:'3'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.logs=[{id:'q1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-1),createdAt:'1'},{id:'q2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'q3',name:'Bo',type:'climb',hardestGrade:'V2',date:shift(-1),createdAt:'3'}];
   render();
   const leaderRows=document.querySelector('#leaderRows');
   assert.equal(document.querySelector('#youRank').textContent,'#1 of 2','the You rank names the roster field');
@@ -770,23 +770,23 @@ const domChecks = `(()=>{
   assert.ok(document.querySelector('#personPyramid').innerHTML.indexOf('V5')>=0,'the pyramid lists the hardest send');
   assert.ok(document.querySelector('#personRecords').innerHTML.length>0,'the card renders the personal records rows');
   const summaryBefore=personSummaryEl.innerHTML;
-  logs=logs.concat([{id:'q4',name:'Alex',type:'mobility',date:shift(-1),createdAt:'4'}]);
+  state.logs=state.logs.concat([{id:'q4',name:'Alex',type:'mobility',date:shift(-1),createdAt:'4'}]);
   render();
   assert.notEqual(personSummaryEl.innerHTML,summaryBefore,'an open card refreshes when a sync re-renders');
   openPersonCard('Nobody');
   assert.ok(personTitle.textContent.indexOf('Alex')>=0,'an unknown name leaves the open card untouched');
   closeModal('personModal');
   assert.equal(personModal.classList.contains('open'),false,'closing the dialog clears the open class');
-  me='Bo';recordingFor='Bo';render();
+  state.me='Bo';state.recordingFor='Bo';render();
   assert.equal(document.querySelector('#youRank').textContent,'#2 of 2','a roster member without logs remains in the ranked field');
 
   // Entry 68: Bounty Hunter reads its rolling claim count without repointing the cap, leaderboard,
   // or person-card fields that remain calendar-week views.
   const savedChallengeToday=challengeToday;
   challengeToday=()=> '2026-07-13';
-  me='Alex';recordingFor='Alex';endpoint='';leaderMetric='bounty';leaderScope='week';
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
-  logs=[
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.leaderMetric='bounty';state.leaderScope='week';
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.logs=[
     {id:'h1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'1'},
     {id:'h2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-07',createdAt:'2'},
     {id:'h3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-07',createdAt:'3'},
@@ -801,22 +801,22 @@ const domChecks = `(()=>{
   openPersonCard('Alex');
   assert.ok(personSummaryEl.innerHTML.indexOf('1 this week')>=0,'the person card bounty figure remains weekly');
   closeModal('personModal');
-  logs=[
+  state.logs=[
     {id:'recent-old',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
     {id:'recent-new',name:'Bo',type:'climb',date:'2026-07-13',createdAt:'2'},
   ];
-  leaderMetric='points';leaderScope='week';render();
+  state.leaderMetric='points';state.leaderScope='week';render();
   const recentRows=leaderRows.innerHTML;
   assert.ok(recentRows.indexOf('data-person="Bo"')<recentRows.indexOf('data-person="Alex"'),'the recent scope ranks points inside the last seven days above points eight days old');
 
   // Entry 87: the leader order answers the selected recent question, while person cards and the
   // You stat explicitly label their separately-derived all-time position.
-  logs=[
+  state.logs=[
     {id:'rank-old-1',name:'Bo',type:'climb',date:'2026-07-02',createdAt:'1'},
     {id:'rank-old-2',name:'Bo',type:'climb',date:'2026-07-03',createdAt:'2'},
     {id:'rank-recent',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'3'},
   ];
-  me='Alex';recordingFor='Alex';leaderMetric='points';leaderScope='week';render();
+  state.me='Alex';state.recordingFor='Alex';state.leaderMetric='points';state.leaderScope='week';render();
   assert.ok(leaderRows.innerHTML.indexOf('data-person="Alex"')<leaderRows.innerHTML.indexOf('data-person="Bo"'),'the selected recent metric numbers Alex first');
   openPersonCard('Alex');
   assert.ok(personSummaryEl.innerHTML.indexOf('<span>All-time rank</span>')>=0,'the person card labels its all-time rank');
@@ -827,12 +827,12 @@ const domChecks = `(()=>{
   // Entry 73: both trend consumers name the same adjacent seven-day comparison, and neither
   // renders an arrow while the earlier window still falls before the challenge.
   challengeToday=()=> '2026-07-15';
-  logs=[
+  state.logs=[
     {id:'trend-old',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
     {id:'trend-new',name:'Alex',type:'climb',date:'2026-07-15',createdAt:'2'},
     {id:'trend-more',name:'Alex',type:'exercise',date:'2026-07-15',createdAt:'3'},
   ];
-  leaderMetric='points';leaderScope='week';render();
+  state.leaderMetric='points';state.leaderScope='week';render();
   assert.ok(leaderRows.innerHTML.indexOf('aria-label="up vs last 7 days"')>=0,'the leaderboard arrow names its rolling window');
   openPersonCard('Alex');
   assert.ok(personSummaryEl.innerHTML.indexOf('Up vs last 7 days')>=0,'the person-card trend names its rolling window');
@@ -844,8 +844,8 @@ const domChecks = `(()=>{
   closeModal('personModal');
   challengeToday=()=> '2026-07-13';
 
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
-  logs=[
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
+  state.logs=[
     {id:'title1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
     {id:'title2',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'2'},
     {id:'title3',name:'Bo',type:'mobility',date:'2026-07-13',createdAt:'3'},
@@ -867,13 +867,13 @@ const domChecks = `(()=>{
   // Entry 90: segmented leaderboard controls use aria-pressed, not an unstyled active class.
   const segmentStates={};
   for(const id of ['#leaderPointsBtn','#leaderBountyBtn','#leaderWeekBtn','#leaderOverallBtn'])document.querySelector(id).setAttribute=(name,value)=>{if(name==='aria-pressed')segmentStates[id]=value};
-  leaderMetric='bounty';leaderScope='overall';render();
+  state.leaderMetric='bounty';state.leaderScope='overall';render();
   assert.deepEqual(segmentStates,{'#leaderPointsBtn':'false','#leaderBountyBtn':'true','#leaderWeekBtn':'false','#leaderOverallBtn':'true'},'toggling leaderboard metric and scope flips aria-pressed on the right buttons');
 
   // Entry 71: the rank column and Bounty Hunter mark carry the leaderboard without podium medals.
-  leaderMetric='points';leaderScope='week';
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
-  logs=[
+  state.leaderMetric='points';state.leaderScope='week';
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
+  state.logs=[
     {id:'m1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
     {id:'m2',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'2'},
     {id:'m3',name:'Bo',type:'exercise',date:'2026-07-13',createdAt:'3'},
@@ -898,7 +898,7 @@ const domChecks = `(()=>{
     assert.ok(span.indexOf('href="#g-bounty"')>=0,'and draws the bounty symbol INSIDE that same hidden span, rather than adding text beside it: '+span);
   });
 
-  leaderScope='overall';render();
+  state.leaderScope='overall';render();
   const overallMedalFree=leaderRows.innerHTML;
   assert.equal(overallMedalFree.indexOf('🥇'),-1,'the overall rows contain no gold medal');
   assert.equal(overallMedalFree.indexOf('🥈'),-1,'the overall rows contain no silver medal');
@@ -909,8 +909,8 @@ const domChecks = `(()=>{
   // Entry 79: a long unbroken name keeps every leaderboard value in its table row, including
   // the title and Bounty Hunter markers which both belong inside its second cell.
   const longestName='EthelstanhaughSupercalifragilisticexpialidocious';
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:longestName},{name:'Bo'}]};
-  logs=[
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:longestName},{name:'Bo'}]};
+  state.logs=[
     {id:'long1',name:longestName,type:'climb',date:'2026-07-13',createdAt:'1'},
     {id:'long2',name:longestName,type:'exercise',date:'2026-07-13',createdAt:'2'},
     {id:'long3',name:longestName,type:'mobility',date:'2026-07-13',createdAt:'3'},
@@ -921,15 +921,15 @@ const domChecks = `(()=>{
   assert.equal((longRow.match(/<td/g)||[]).length,4,'a long-name leaderboard row keeps all four cells');
   assert.ok(longCells[1].indexOf('class="hunter"')>=0&&longCells[1].indexOf('class="title-tag"')>=0,'the hunter and title tag stay inside the climber cell');
 
-  challengeToday=savedChallengeToday;leaderMetric='points';leaderScope='week';
+  challengeToday=savedChallengeToday;state.leaderMetric='points';state.leaderScope='week';
 
   // Entry 48: the Crew feed names a person on every row, and those names open the same card the
   // leaderboard rows open. The You feed lists only your own entries, so its names stay plain text.
   // The delegated handler cannot be fired here (harness.js trap), so this asserts the emitted hook
   // and then feeds the value it emitted straight into openPersonCard.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
-  logs=[{id:'f1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-2),createdAt:'1'},{id:'f2',name:'Bo',type:'exercise',date:shift(-1),createdAt:'2'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.logs=[{id:'f1',name:'Alex',type:'climb',hardestGrade:'V5',date:shift(-2),createdAt:'1'},{id:'f2',name:'Bo',type:'exercise',date:shift(-1),createdAt:'2'}];
   render();
   const feedCrew=document.querySelector('#activityList'),feedYou=document.querySelector('#personalActivity');
   assert.ok(feedCrew.innerHTML.indexOf('data-person="Bo"')>=0,'a Crew row carries the climber it names as a per-person hook');
@@ -966,9 +966,9 @@ const domChecks = `(()=>{
 
   // Entry 30: the You panel and the person card render the SAME row shape for the same person, and
   // the You-panel bars are no longer silent decoration — they announce themselves like the card's.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
   render();
   openPersonCard('Alex');
   const youBd=document.querySelector('#youBreakdown'),personBd=document.querySelector('#personBreakdown');
@@ -982,11 +982,11 @@ const domChecks = `(()=>{
   assert.equal(youPy.innerHTML,personPy.innerHTML,'the pyramid rows match too');
 
   // Entry 59: a card lists only the bounty claims belonging to the climber the viewer opened.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;claimedOpen=false;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Maya'}]};
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;state.claimedOpen=false;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'},{name:'Maya'}]};
   const alexBounty=dailyBounties(challengeToday())[0],boBounty=dailyBounties(challengeToday())[1];
   const personClaimNote='https://example.test/anotherlongunbrokennotethatmustwrapwithoutmovingthepointscolumn';
-  logs=[{id:'b1',name:'Alex',type:'bounty',bountyId:alexBounty.id,bountyTitle:alexBounty.title,date:shift(-1),createdAt:'1'},{id:'b2',name:'Bo',type:'bounty',bountyId:boBounty.id,bountyTitle:boBounty.title,note:personClaimNote,date:shift(-1),createdAt:'2'}];
+  state.logs=[{id:'b1',name:'Alex',type:'bounty',bountyId:alexBounty.id,bountyTitle:alexBounty.title,date:shift(-1),createdAt:'1'},{id:'b2',name:'Bo',type:'bounty',bountyId:boBounty.id,bountyTitle:boBounty.title,note:personClaimNote,date:shift(-1),createdAt:'2'}];
   render();
   openPersonCard('Bo');
   const personClaimed=document.querySelector('#personClaimed'),personClaimedCap=document.querySelector('#personClaimedSummary');
@@ -1002,14 +1002,14 @@ const domChecks = `(()=>{
   assert.ok(personClaimed.innerHTML.indexOf('No bounty claims yet.')>=0,'a climber with no claims gets the plain empty state');
   assert.equal(personClaimedCap.textContent,'','and the empty state has no caption');
   openPersonCard('Alex');
-  claimedOpen=true;
+  state.claimedOpen=true;
   renderClaimed();
   assert.equal(document.querySelector('#claimedList').innerHTML,personClaimed.innerHTML,'the You panel and the person card share the same claimed row markup');
-  claimedOpen=false;
+  state.claimedOpen=false;
   renderClaimed();
   closeModal('personModal');
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
   render();
   openPersonCard('Alex');
 
@@ -1019,11 +1019,11 @@ const domChecks = `(()=>{
   assert.equal(pyramidCard.classList.contains('hide'),false,'the pyramid card is showing');
   assert.ok(pyramidCap.textContent.indexOf('V4')>=0,'and its caption names the hardest grade');
   assert.equal(youPy.innerHTML,personPy.innerHTML,'the caption addition leaves the pyramid rows themselves unchanged');
-  logs=[];
+  state.logs=[];
   render();
   assert.equal(pyramidCard.classList.contains('hide'),true,'no graded climbs hides the pyramid card');
   assert.equal(pyramidCap.textContent,'','and clears its caption');
-  logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
+  state.logs=[{id:'s1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-1),createdAt:'1'},{id:'s2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'}];
   render();
 
   const youRec=document.querySelector('#recordsList'),personRec=document.querySelector('#personRecords');
@@ -1032,8 +1032,8 @@ const domChecks = `(()=>{
 
   // Entry 21: a dead Save button explains itself, the in-flight flag survives a mid-save input
   // change, and the bounty hint carries the chosen bounty's description.
-  me='Alex';recordingFor='Alex';endpoint='';logs=[];
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.logs=[];
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   const typeRadio=document.querySelector('input[name="activityType"]:checked'),saveBtn=document.querySelector('#saveActivityBtn'),creditEl=document.querySelector('#creditPreview'),hintEl=document.querySelector('#bountyHint'),bountyEl=document.querySelector('#bountySelect');
   typeRadio.value='climb';
   dateBox.classList.remove('hide');
@@ -1044,10 +1044,10 @@ const domChecks = `(()=>{
   dateField.value=shift(-1);
   updateRecordPreview();
   assert.equal(saveBtn.disabled,false,'a date back inside the window re-enables Save');
-  saving=true;
+  state.saving=true;
   updateRecordPreview();
   assert.equal(saveBtn.disabled,true,'a save in flight keeps Save disabled even with a valid draft');
-  saving=false;
+  state.saving=false;
   updateRecordPreview();
   assert.equal(saveBtn.disabled,false,'clearing the in-flight flag re-enables Save');
   typeRadio.value='bounty';
@@ -1065,8 +1065,8 @@ const domChecks = `(()=>{
   // Entry 95: the date-aware picker marks claims for the person being recorded, without
   // changing its options or losing the caller's current selection on a repaint.
   const pickerBounties=dailyBounties(challengeToday()),claimedBounty=pickerBounties[0],otherBounty=pickerBounties[1];
-  logs=[{id:'select-alex',name:'Alex',type:'bounty',bountyId:claimedBounty.id,date:challengeToday(),createdAt:'1'}];
-  recordingFor='Alex';
+  state.logs=[{id:'select-alex',name:'Alex',type:'bounty',bountyId:claimedBounty.id,date:challengeToday(),createdAt:'1'}];
+  state.recordingFor='Alex';
   dateField.value=challengeToday();
   bountyEl.value=claimedBounty.id;
   populateBountySelect();
@@ -1076,32 +1076,32 @@ const domChecks = `(()=>{
   dateField.value=shift(-1);
   populateBountySelect();
   assert.equal(bountyEl.innerHTML.indexOf(' · claimed</option>'),-1,'moving to an unclaimed day removes the marker');
-  logs.push({id:'select-bo',name:'Bo',type:'bounty',bountyId:otherBounty.id,date:challengeToday(),createdAt:'2'});
-  config.crew.push({name:'Bo'});
-  recordingFor='Bo';
+  state.logs.push({id:'select-bo',name:'Bo',type:'bounty',bountyId:otherBounty.id,date:challengeToday(),createdAt:'2'});
+  state.config.crew.push({name:'Bo'});
+  state.recordingFor='Bo';
   dateField.value=challengeToday();
   bountyEl.value=otherBounty.id;
   populateBountySelect();
   assert.ok(bountyEl.innerHTML.indexOf(otherBounty.title+' · +'+otherBounty.points+' · claimed')>=0,'recording for another climber marks that climber’s claim');
   assert.equal(bountyEl.innerHTML.indexOf(claimedBounty.title+' · +'+claimedBounty.points+' · claimed'),-1,'the picker does not mark the current user’s claim for another climber');
-  logs=[];
-  recordingFor='Alex';
+  state.logs=[];
+  state.recordingFor='Alex';
   typeRadio.value='climb';
 
   // Entry 22: Share only offers itself once a profile is chosen.
   const shareBtnEl=document.querySelector('#shareBtn');
-  me='Alex';recordingFor='Alex';render();
+  state.me='Alex';state.recordingFor='Alex';render();
   assert.equal(shareBtnEl.classList.contains('hide'),false,'a chosen profile can share its progress');
   assert.equal(shareBtnEl.disabled,false,'a chosen profile leaves Share enabled');
-  me='';recordingFor='';render();
+  state.me='';state.recordingFor='';render();
   assert.equal(shareBtnEl.classList.contains('hide'),true,'no profile hides the Share button');
   assert.equal(shareBtnEl.disabled,true,'no profile disables the Share button');
 
   // Entry 47: the grade select starts where this climber left it, and never argues with a choice
   // already made in the open form.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
-  logs=[
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+  state.logs=[
     {id:'gd1',name:'Alex',type:'climb',hardestGrade:'V3',date:shift(-3),createdAt:'1'},
     {id:'gd2',name:'Alex',type:'climb',hardestGrade:'V6',date:shift(-1),createdAt:'1'},
     {id:'gd3',name:'Maya',type:'climb',hardestGrade:'V10',date:shift(-1),createdAt:'2'},
@@ -1116,43 +1116,43 @@ const domChecks = `(()=>{
   updateRecordPreview();
   assert.equal(gradeField.value,'V9','and survives being populated again');
   // The default is derived per populate, so it follows whoever the form is recording for.
-  recordingFor='Maya';
+  state.recordingFor='Maya';
   gradeField.value='';
   updateRecordPreview();
   assert.equal(gradeField.value,'V10','recording for someone else defaults to that person, not to the last default shown');
-  recordingFor='Alex';
+  state.recordingFor='Alex';
   gradeField.value='';
   render();
   assert.equal(gradeField.value,'V6','and switching back reads the first person again');
   // A default the form filled in on its own is not a choice, so switching targets while it is
   // still showing re-derives it instead of saving the previous person's grade for the new one.
-  recordingFor='Maya';
+  state.recordingFor='Maya';
   render();
   assert.equal(gradeField.value,'V10','switching targets replaces a still-untouched default with the new person grade');
   assert.equal(draftActivity().hardestGrade,'V10','and the entry that would be saved carries the new person grade');
-  recordingFor='Alex';
+  state.recordingFor='Alex';
   render();
   assert.equal(gradeField.value,'V6','switching back replaces it again');
   gradeField.value='V9';
-  recordingFor='Maya';
+  state.recordingFor='Maya';
   render();
   assert.equal(gradeField.value,'V9','a hand-picked grade still outranks the default across a target switch');
-  recordingFor='Alex';
+  state.recordingFor='Alex';
   // No climb history means no guess: the select is left on its placeholder.
-  logs=[{id:'gd4',name:'Alex',type:'exercise',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'gd4',name:'Alex',type:'exercise',date:shift(-1),createdAt:'1'}];
   gradeField.value='';
   render();
   assert.equal(gradeField.value,'','a climber with no climbs is left on the placeholder');
   // A stored grade the scoring config does not offer is not selectable, so it is not applied.
-  logs=[{id:'gd5',name:'Alex',type:'climb',hardestGrade:'5.12a',date:shift(-1),createdAt:'1'}];
+  state.logs=[{id:'gd5',name:'Alex',type:'climb',hardestGrade:'5.12a',date:shift(-1),createdAt:'1'}];
   gradeField.value='';
   render();
   assert.equal(gradeField.value,'','an unlistable stored grade never reaches the select');
   gradeField.value='';
   // A grade cleared on purpose stays cleared. Picking the placeholder is a choice like any other,
   // so the default stops re-applying and a climber with history can log a gradeless climb again.
-  recordingFor='Alex';
-  logs=[
+  state.recordingFor='Alex';
+  state.logs=[
     {id:'gd6',name:'Alex',type:'climb',hardestGrade:'V6',date:shift(-1),createdAt:'1'},
     {id:'gd7',name:'Maya',type:'climb',hardestGrade:'V10',date:shift(-1),createdAt:'2'},
   ];
@@ -1166,10 +1166,10 @@ const domChecks = `(()=>{
   updateRecordPreview();
   assert.equal(gradeField.value,'','and survives being populated again');
   assert.equal(draftActivity().hardestGrade,'','so the entry that would be saved carries no grade');
-  recordingFor='Maya';
+  state.recordingFor='Maya';
   render();
   assert.equal(gradeField.value,'','a deliberate clear outranks the default across a target switch');
-  recordingFor='Alex';
+  state.recordingFor='Alex';
   gradeField.value='V4';
   chooseGrade();
   assert.equal(gradeField.value,'V4','picking a grade after a clear takes effect');
@@ -1182,13 +1182,13 @@ const domChecks = `(()=>{
   // Clearing suppresses the default, which leaves the last one it applied on record. An explicit
   // pick that happens to match that stale value is still a pick, and must not be swapped for the
   // grade the current person would have defaulted to.
-  gradeChosen=false;
+  state.gradeChosen=false;
   gradeField.value='';
   updateRecordPreview();
   assert.equal(gradeField.value,'V6','Alex opens on the grade Alex logged last');
   gradeField.value='';
   chooseGrade();
-  recordingFor='Maya';
+  state.recordingFor='Maya';
   render();
   assert.equal(gradeField.value,'','the clear holds after switching the draft to Maya');
   gradeField.value='V6';
@@ -1196,14 +1196,14 @@ const domChecks = `(()=>{
   assert.equal(gradeField.value,'V6','explicitly picking the grade Alex had defaulted to is kept, not replaced by the Maya default');
   render();
   assert.equal(gradeField.value,'V6','and it survives a repaint');
-  recordingFor='Alex';
-  gradeChosen=false;gradeField.value='';
+  state.recordingFor='Alex';
+  state.gradeChosen=false;gradeField.value='';
 
   // Entry 52: a climb can carry a note too, so updateRecordPreview() stops hiding #noteFields for
   // climb and draftActivity() carries the typed note through on that branch.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
   const climbFieldsEl=document.querySelector('#climbFields'),noteFieldsEl=document.querySelector('#noteFields'),noteInput=document.querySelector('#activityNote');
   typeRadio.value='climb';
   noteInput.value='V4, first try on the slab';
@@ -1221,16 +1221,16 @@ const domChecks = `(()=>{
   noteInput.value='';
 
   // Entry 74: the person card uses exactly the same curve markup as the You card.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-10),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
-  logs=[{id:'pt3',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt4',name:'Alex',type:'climb',date:shift(-9),createdAt:'2'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-10),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.logs=[{id:'pt3',name:'Alex',type:'climb',date:shift(-1),createdAt:'1'},{id:'pt4',name:'Alex',type:'climb',date:shift(-9),createdAt:'2'}];
   render();
   openPersonCard('Alex');
   const personTrendEl=document.querySelector('#personTrend');
   assert.equal(personTrendEl.innerHTML,youTrendEl.innerHTML,'the card charts the same daily curve the You card shows for that same climber');
   assert.ok(personTrendEl.innerHTML.indexOf('<svg')>=0,'and draws the inline SVG curve');
   // Relocated from tests/static-check.mjs, where it read a line of renderPersonCard()'s source with
-  // no guard that the line was found — so an empty slice satisfied it. The element stub records
+  // no guard that the line was found — so an empty slice satisfied it. The real DOM records
   // attributes, so the claim is asserted directly: the role-less wrapper has no name, and the one
   // accessible name belongs to the SVG inside it.
   assert.equal(personTrendEl.getAttribute('aria-label'),null,'the role-less trend wrapper carries no aria-label of its own');
@@ -1242,7 +1242,7 @@ const domChecks = `(()=>{
   assert.ok(personSvgName,'and a NON-EMPTY accessible name sits on THAT element, not on the wrapper: '+personSvgTag);
   assert.equal(personSvgName,trendAria(personalWeeklyTrend('alex',challengeToday())),'naming the same curve the chart draws, so the label cannot drift from the data');
   assert.ok(document.querySelector('#personPyramid').getAttribute('aria-label')!==null,'while the pyramid, which is itself the graphic, does take one');
-  logs=[];
+  state.logs=[];
   render();
   openPersonCard('Bo');
   assert.ok(document.querySelector('#personTrend').innerHTML.indexOf('Current 0')>=0,'a climber with nothing logged gets an all-zero curve');
@@ -1250,9 +1250,9 @@ const domChecks = `(()=>{
 
   // Entry 54: the person card lists that climber's most recent entries as its final section, and
   // falls back to the hint used elsewhere in the card when they have logged nothing.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-10),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
-  logs=[{id:'pr1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-2),createdAt:'1'},{id:'pr2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'pr3',name:'Bo',type:'climb',hardestGrade:'V9',date:shift(-1),createdAt:'3'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-10),tripDate:shift(5),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.logs=[{id:'pr1',name:'Alex',type:'climb',hardestGrade:'V4',date:shift(-2),createdAt:'1'},{id:'pr2',name:'Alex',type:'exercise',date:shift(-1),createdAt:'2'},{id:'pr3',name:'Bo',type:'climb',hardestGrade:'V9',date:shift(-1),createdAt:'3'}];
   render();
   openPersonCard('Alex');
   const personRecentEl=document.querySelector('#personRecent');
@@ -1269,16 +1269,16 @@ const domChecks = `(()=>{
   assert.equal(personRecentEl.innerHTML.indexOf('data-del'),-1,'so it offers no delete control on a card the viewer may not own');
   assert.equal(personRecentEl.innerHTML.indexOf('data-person'),-1,'and no per-person hook back into the card already open');
   assert.equal(personRecentEl.innerHTML.indexOf('<button'),-1,'the card recent list renders no buttons at all');
-  logs=[];
+  state.logs=[];
   render();
   openPersonCard('Bo');
   assert.ok(document.querySelector('#personRecent').innerHTML.indexOf('class="hint"')>=0,'a climber with no entries gets the hint fallback instead of an empty list');
   closeModal('personModal');
 
   // Entry 82: an unbroken note keeps the points and delete controls in its feed row.
-  me='Alex';recordingFor='Alex';endpoint='';feedType='all';personalFeedLimit=5;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'wide-note',name:'Alex',type:'climb',hardestGrade:'V5',note:'UnbrokenNote'.repeat(80),date:shift(-1),createdAt:'1'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.feedType='all';state.personalFeedLimit=5;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'wide-note',name:'Alex',type:'climb',hardestGrade:'V5',note:'UnbrokenNote'.repeat(80),date:shift(-1),createdAt:'1'}];
   render();
   const wideFeed=document.querySelector('#personalActivity').innerHTML;
   assert.ok(wideFeed.indexOf('UnbrokenNote'.repeat(80))>=0,'the full long note remains present for wrapping instead of being truncated');
@@ -1287,8 +1287,8 @@ const domChecks = `(()=>{
 
   // Entry 83: changing only a note does not rewrite the unchanged point preview, and a repaint
   // does not rewrite unchanged sync diagnostics inside their polite live region.
-  me='Alex';recordingFor='Alex';endpoint='';syncState='local';syncDetail='';syncErrorCode='';lastSyncedAt=0;challengeTimeZone='';logs=[];
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.syncState='local';state.syncDetail='';state.syncErrorCode='';state.lastSyncedAt=0;state.challengeTimeZone='';state.logs=[];
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   typeRadio.value='climb';
   dateBox.classList.add('hide');
   updateRecordPreview();
@@ -1297,7 +1297,7 @@ const domChecks = `(()=>{
   document.querySelector('#activityNote').value='Different note, same points';
   updateRecordPreview();
   assert.equal(creditWrites,0,'changing only a note leaves the credit preview text node untouched');
-  endpoint='https://example.test/exec';syncState='error';syncDetail='Could not reach the Sheet';syncErrorCode='RTS-NETWORK';protocolVersion=12;
+  state.endpoint='https://example.test/exec';state.syncState='error';state.syncDetail='Could not reach the Sheet';state.syncErrorCode='RTS-NETWORK';state.protocolVersion=12;
   render();
   const detailEl=document.querySelector('#diagnosticDetail'),codeEl=document.querySelector('#diagnosticCode');
   let detailWrites=0,detailText=detailEl.textContent,codeWrites=0,codeText=codeEl.textContent;
@@ -1309,15 +1309,15 @@ const domChecks = `(()=>{
 
   // Entry 91: every other polite live-region write is equally quiet on an unchanged render, but
   // each region still changes when the state it reports does.
-  endpoint='';syncState='local';syncDetail='';syncErrorCode='';lastDeleted=null;configErrors={};logs=[];
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.endpoint='';state.syncState='local';state.syncDetail='';state.syncErrorCode='';state.lastDeleted=null;state.configErrors={};state.logs=[];
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   render();
   const watchText=el=>{let text=el.textContent,writes=0;Object.defineProperty(el,'textContent',{configurable:true,get(){return text},set(value){writes++;text=value}});return{writes:()=>writes,text:()=>text}};
   const remainingWatch=watchText(document.querySelector('#todayRemaining')),paceWatch=watchText(document.querySelector('#goalPace')),projectionWatch=watchText(document.querySelector('#goalProjection')),noticeWatch=watchText(document.querySelector('#configNotice')),undoWatch=watchText(document.querySelector('#undoText'));
   render();
   for(const region of [remainingWatch,paceWatch,projectionWatch,noticeWatch,undoWatch])assert.equal(region.writes(),0,'an unchanged render leaves every remaining polite region untouched');
-  logs=[{id:'live-change',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'}];
-  configErrors={groupGoal:'needs a whole number'};lastDeleted={label:'climb'};
+  state.logs=[{id:'live-change',name:'Alex',type:'climb',date:challengeToday(),createdAt:'1'}];
+  state.configErrors={groupGoal:'needs a whole number'};state.lastDeleted={label:'climb'};
   render();
   for(const region of [remainingWatch,paceWatch,projectionWatch,noticeWatch,undoWatch])assert.equal(region.writes(),1,'a genuine state change updates every remaining polite region');
 
@@ -1337,7 +1337,7 @@ const domChecks = `(()=>{
   assert.equal(youAriaWrites,0,'an unchanged day leaves its goal ring label untouched');
   typeRadio.value='exercise';
   updateRecordPreview();
-  logs=logs.concat([{id:'live-change-2',name:'Alex',type:'mobility',date:challengeToday(),createdAt:'2'}]);
+  state.logs=state.logs.concat([{id:'live-change-2',name:'Alex',type:'mobility',date:challengeToday(),createdAt:'2'}]);
   renderTodayStatus();
   assert.equal(recordMarkupWrites,1,'changing the activity type rebuilds the record meter');
   assert.equal(recordAriaWrites,1,'changing the activity type updates the record meter label');
@@ -1348,14 +1348,14 @@ const domChecks = `(()=>{
   // itself, so the wiring init() sets up can be exercised instead of inferred. Both halves of this
   // block were unassertable before: a listener bound by init() could not be fired, and an aria-*
   // attribute written from JS could not be read back.
-  me='Alex';recordingFor='Alex';endpoint='';lastDeleted=null;
-  config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
-  logs=[{id:'wire1',name:'Alex',type:'climb',hardestGrade:'V6',date:shift(-1),createdAt:'1'}];
+  state.me='Alex';state.recordingFor='Alex';state.endpoint='';state.lastDeleted=null;
+  state.config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
+  state.logs=[{id:'wire1',name:'Alex',type:'climb',hardestGrade:'V6',date:shift(-1),createdAt:'1'}];
   typeRadio.value='climb';
   // The grade select reaches chooseGrade() through the change listener init() bound, not through a
   // direct call, so a listener wired to the wrong function would now fail here.
   const wiredGrade=document.querySelector('#hardestGrade');
-  gradeChosen=false;
+  state.gradeChosen=false;
   wiredGrade.value='';
   updateRecordPreview();
   assert.equal(wiredGrade.value,'V6','the record form still opens on the grade this climber logged last');
@@ -1379,9 +1379,9 @@ const domChecks = `(()=>{
   assert.equal(wiredToggle.getAttribute('aria-expanded'),'false','and marks the toggle collapsed again');
   assert.equal(wiredToggle.textContent,'＋ Different day','and restores the opening label');
   assert.equal(wiredToggle.getAttribute('aria-controls'),null,'an attribute never written reads as absent, not as empty');
-  gradeChosen=false;wiredGrade.value='';
+  state.gradeChosen=false;wiredGrade.value='';
 
-  endpoint='';logs=[];me='';recordingFor='';
+  state.endpoint='';state.logs=[];state.me='';state.recordingFor='';
 })()`;
 
 test('the rendered page reflects the state the app is in', () => {
