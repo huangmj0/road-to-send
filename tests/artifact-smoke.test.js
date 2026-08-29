@@ -14,3 +14,18 @@ test('the committed artifact boots in a real DOM', () => {
   assert.notEqual(window.document.querySelector('#activityDate').value, '');
   assert.notEqual(window.document.querySelector('#leaderRows').innerHTML, '');
 });
+
+test('the committed artifact records a local activity through its form', async () => {
+  const now = new Date();
+  const day = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  const window = new Window({url: 'https://example.test/'});
+  window.localStorage.setItem('roadToSendConfigV9', JSON.stringify({startDate: day, tripDate: day, goal: 50, crew: [{name: 'Alex'}]}));
+  window.localStorage.setItem('roadToSendMe', 'Alex');
+  window.document.write(html.replace(/<script>[\s\S]*?<\/script>/, ''));
+  window.eval(script);
+  const form = window.document.querySelector('#recordForm');
+  form.dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(window.document.querySelector('#youTotal').textContent, '3');
+  assert.match(window.localStorage.getItem('roadToSendLogsV9'), /"type":"climb"/);
+});
