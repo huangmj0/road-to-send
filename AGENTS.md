@@ -9,16 +9,17 @@ shared Google Sheet and from their browsers' localStorage. `index.html` is the d
 This is an intentionally self-contained static application. The editable sources live in `src/`:
 `index.template.html` (markup), `styles.css`, `app.js` (browser code), `apps-script.js` (the Google
 Apps Script source shown during shared setup), plus the shared `scoring.json` and `schema.json`
-contracts. `scripts/build.mjs` inlines them into the generated `index.html` at the repository root —
+contracts. `scripts/build.mjs` bundles and minifies them with pinned esbuild into the generated `index.html` at the repository root —
 never edit `index.html` by hand; `scripts/check-generated.mjs` fails if the committed artifact is
 stale.
 
-`tests/` contains Node-based behavioral and contract tests. The client-state suites all eval the
-built script and split by harness so a change loads only the one it touches:
+`tests/` contains Node-based behavioral and contract tests. The client-state suites assemble the
+browser source with the same build-time constants and split by harness so a change loads only the one it touches:
 `client-state.state.test.js` covers pure scoring, date and text helpers with no DOM,
 `client-state.dom.test.js` runs `init()`/`render()` against a document stub, and
 `client-state.shared.test.js` covers shared mode behind a stubbed `fetch`; `harness.js` holds the
-script extraction and the element stub they share. Alongside them, `backend-script.test.js`
+source assembly and the element stub they share. Alongside them, `artifact-smoke.test.js` boots the
+committed page in happy-dom, `backend-script.test.js`
 validates the embedded Apps Script, `protocol-fixtures.test.js` checks wire-format fixtures against
 `src/schema.json`, `smoke.test.js` covers the shared workflow end to end, `static-check.mjs` checks
 syntax, accessibility, and required UI hooks, `docs-check.mjs` checks the documented invariants
@@ -63,8 +64,9 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
    `roadToSendShared:{activities|config|meta}:{endpoint}`. Read them; write only shapes existing code
    already reads. A new shape ships as a new key plus a migration that reads the old one — the V8→V9
    path is the worked example. Renaming a key instead makes a climber's history vanish on their next
-   load. `tests/docs-check.mjs` asserts every `roadToSend…` literal in `src/app.js` appears in this
-   list, so a new key means updating this section in the same commit.
+   load. `tests/docs-check.mjs` asserts every `roadToSend…` literal in the browser sources the build
+   bundles — every `src/*.js` except `src/apps-script.js` — appears in this list, so a new key means
+   updating this section in the same commit, and splitting a source file cannot narrow the check.
 3. **The browser/backend contract is coordinated.** `src/apps-script.js`, `src/schema.json` and
    `src/scoring.json` are shared with a backend each organizer redeploys by hand, so a change there
    bumps the API version. Whether the *previous* version stays in `SUPPORTED_API_VERSIONS` is a
@@ -107,7 +109,8 @@ codebase in its current shape.
 
 - **Dev tooling.** Bundlers, minifiers, linters, formatters, type checking, test runners, DOM
   implementations. A dev dependency the crew never downloads is not a runtime dependency — constraint
-  6 still governs anything that ships.
+  6 still governs anything that ships. The build now runs on a pinned esbuild: change it only to an
+  exact version, with the lockfile updated in the same commit, so the artifact stays reproducible.
 - **The layout of `src/`.** One file or thirty, modules or globals, whatever the build can collapse
   into the artifact constraint 7 describes.
 - **Compact source style.** It exists because the build has no minifier. Given one, write source a
@@ -134,9 +137,10 @@ adds a nudge, a reminder, or a prompt to participate.**
 ## Coding style & naming conventions
 
 Use two-space indentation in HTML and test files. Match the compact style already in `src/styles.css`,
-`src/app.js` and `src/apps-script.js` when editing them in place — it is what the build currently
-relies on for size, not a house preference, and a change that introduces a minifier is free to
-abandon it wholesale. Prefer `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for
+`src/app.js`, `src/app-core.js` and `src/apps-script.js` when editing them in place — it is local
+consistency, not a house preference. The build now minifies the bundled browser sources through
+esbuild, so new code there may be written for a person to read and left for the build to compact;
+`src/styles.css` and `src/apps-script.js` are still inlined as written. Prefer `camelCase` for functions and variables, `UPPER_SNAKE_CASE` for
 scoring/configuration constants, and kebab-case for CSS classes and HTML filenames. Keep DOM IDs
 descriptive and unique. Anything that ships to the browser uses browser APIs only; build and test
 code may take dev dependencies.

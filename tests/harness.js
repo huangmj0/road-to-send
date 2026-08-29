@@ -1,26 +1,43 @@
-// Shared plumbing for the client-state suites: the inline script pulled out of the built
-// index.html, and the element stub the DOM-backed harnesses run against.
+// Shared plumbing for the client-state suites: the source module assembled with its build-time
+// constants, a happy-dom page tree for DOM behavior, and a small legacy element stub used only
+// by the shared-mode and temporary fingerprint harnesses.
 //
 // The stub stores attributes and dispatches listeners registered on the element itself, so an
 // aria-* attribute written from JS is readable with `getAttribute()` and a handler bound in
 // `init()` can be fired with `el.dispatchEvent({type: 'change'})`.
 //
-// TRAP — what the stub still does not do, and its gaps do not fail loudly, they answer wrongly
-// and quietly:
+// TRAP — makeElement() remains intentionally flat for the suites that only need isolated
+// controls. Its gaps do not fail loudly, they answer wrongly and quietly:
 //
 //   * Elements have NO tree: no parent, no children, no `closest()`, and `querySelectorAll()`
 //     always returns `[]`. A delegated handler — one bound to a container that reads
 //     `event.target.closest(...)` — therefore still cannot be fired. Expose every new delegated
-//     interaction as a named top-level function in `src/app.js` and call that function directly.
+//     interaction cannot be exercised through this helper.
 //   * With no tree there is no bubbling: `dispatchEvent()` runs the listeners on that one element
 //     and stops. It does not build the event either — pass the object the handler expects, at
 //     minimum `{type}`, plus whatever fields the handler reads (`preventDefault`, `key`, …).
 //   * `document.querySelector()` in these suites returns one cached stub per selector string, so
 //     two different selectors naming the same real element are two different stubs here.
 const fs = require('node:fs');
+const {Window} = require('happy-dom');
 
 const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
-const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const read = path => fs.readFileSync(new URL(path, `file://${__filename}`), 'utf8').trimEnd();
+const scoring = JSON.stringify(JSON.parse(read('../src/scoring.json')));
+const apiVersion = String(JSON.parse(read('../src/schema.json')).properties.version.const);
+const appsScript = read('../src/apps-script.js')
+  .replaceAll('__SCORING_CONFIG__', scoring)
+  .replaceAll('__API_VERSION__', apiVersion);
+const source = (read('../src/app-core.js') + '\n' + read('../src/app.js'))
+  .replaceAll('__SCORING_CONFIG__', scoring)
+  .replaceAll('__API_VERSION__', apiVersion)
+  .replace('const SCRIPT=__APPS_SCRIPT__;', `const SCRIPT=${JSON.stringify(appsScript)};`);
+
+function createDom() {
+  const window = new Window({url: 'https://example.test/'});
+  window.document.write(html.replace(/<script>[\s\S]*?<\/script>/, ''));
+  return window;
+}
 
 function makeElement() {
   const classes = new Set();
@@ -59,4 +76,4 @@ function makeElement() {
   return element;
 }
 
-module.exports = {source, makeElement};
+module.exports = {source, makeElement, createDom};

@@ -54,7 +54,7 @@ const checks = `(()=>{
   assert.deepEqual(sanitizeActivities(localRow)[0],localRow[0],'the local path leaves a stored row untouched, because persistLocal writes it straight back to the frozen roadToSendLogsV9 key');
   assert.equal(normalizeActivities([{id:0,name:'Alex',type:'climb',date:'2026-07-13'}])[0].id,'0','a zero id is a real id and survives coercion');
 
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   assert.equal(computeCredits(normalizeActivities([{id:'t1',name:'Alex',type:'climb',date:'2026-07-13T07:30:00.000Z',createdAt:'1'}])).info.get('t1').credit,3,'a date with a time component earns credit instead of reading as outside the challenge');
 
   assert.equal(windowStart('2026-07-13'),'2026-07-07','seven days are inclusive');
@@ -107,8 +107,8 @@ const checks = `(()=>{
   assert.equal(scored.dayTotal.get('alex|2026-07-15'),0,'a weekly-capped bounty contributes zero to dayTotal');
 
   // totalsModel exposes an all-time bounty count per climber, spanning weeks, for the Bounties leaderboard view.
-  const savedLogs=logs;
-  logs=[
+  const savedLogs=state.logs;
+  state.logs=[
     {id:'t1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
     {id:'t2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-20',createdAt:'2'},
     {id:'t3',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
@@ -116,14 +116,14 @@ const checks = `(()=>{
   const tm=totalsModel(),tmAlex=tm.sorted.find(r=>r.name==='Alex'),tmBob=tm.sorted.find(r=>r.name==='Bob');
   assert.equal(tmAlex.bountiesTotal,2,'all-time bounty tally spans weeks');
   assert.equal(tmBob.bountiesTotal,1,'each climber gets their own all-time bounty count');
-  logs=savedLogs;
+  state.logs=savedLogs;
 
   // Entry 68: Bounty Hunter is a trailing seven-day title, while its existing consumers retain
   // their calendar-week counts. Capped claims still compete for the title.
   const savedToday=challengeToday;
   challengeToday=()=> '2026-07-13';
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bob'},{name:'Cara'}]};
-  logs=[
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bob'},{name:'Cara'}]};
+  state.logs=[
     {id:'r0',name:'Cara',type:'bounty',bountyId:'send-it',date:'2026-07-06',createdAt:'1'},
     {id:'a1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'1'},
     {id:'a2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-07',createdAt:'2'},
@@ -138,15 +138,15 @@ const checks = `(()=>{
   assert.equal(recentAlex.recentBounties,4,'the six-day-old first window day counts');
   assert.equal(recentBob.recentBounties,4,'ties retain every holder');
   assert.equal(recentCara.recentBounties,0,'the seven-day-old claim is outside the inclusive window');
-  assert.equal(computeCredits(logs).info.get('a3').credit,0,'a capped claim still enters the rolling title count');
+  assert.equal(computeCredits(state.logs).info.get('a3').credit,0,'a capped claim still enters the rolling title count');
   assert.deepEqual(recentModel.hunters,['Alex','Bob'],'rolling leaders share Bounty Hunter');
   assert.equal(recentModel.huntCount,4,'the title count is the rolling claim count');
   assert.equal(recentAlex.bounties,1,'the existing bounty field remains a calendar-week count');
-  logs=[];
+  state.logs=[];
   const emptyRecent=totalsModel();
   assert.equal(emptyRecent.huntCount,0,'nobody holds the title without a rolling claim');
   assert.deepEqual(emptyRecent.hunters,[],'the empty rolling title has no holders');
-  logs=[
+  state.logs=[
     {id:'c1',name:'Alex',type:'climb',date:'2026-07-07',createdAt:'1'},
     {id:'c2',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'2'},
     {id:'c3',name:'Alex',type:'climb',date:'2026-07-11',createdAt:'3'},
@@ -164,15 +164,15 @@ const checks = `(()=>{
   assert.ok(titleRows.every(row=>!('glyph' in row)),'title rows carry no glyph');
   assert.deepEqual(crusher.holders,['Alex'],'the top category-day holder alone receives Crusher');
   assert.deepEqual(yogi.holders,['Cara'],'one credited mobility day wins Yogi without a minimum');
-  logs=[{id:'tie1',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'1'},{id:'tie2',name:'Bob',type:'exercise',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'tie1',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'1'},{id:'tie2',name:'Bob',type:'exercise',date:'2026-07-13',createdAt:'1'}];
   assert.deepEqual(crewTitles('2026-07-13').find(row=>row.id==='gym-rat').holders,['Alex','Bob'],'tied category leaders share a title');
-  logs=[];
+  state.logs=[];
   assert.ok(crewTitles('2026-07-13').every(row=>row.holders.length===0),'an empty roster leaves every category title unheld');
-  const titlesConfig=config;
-  config=Object.assign({},config,{crew:[]});
+  const titlesConfig=state.config;
+  state.config=Object.assign({},state.config,{crew:[]});
   assert.ok(crewTitles('2026-07-13').every(row=>row.holders.length===0),'an empty configured roster leaves every category title unheld');
-  config=titlesConfig;
-  logs=[
+  state.config=titlesConfig;
+  state.logs=[
     {id:'old1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
     {id:'old2',name:'Alex',type:'climb',date:'2026-07-03',createdAt:'1'},
     {id:'fire1',name:'Bob',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
@@ -181,12 +181,12 @@ const checks = `(()=>{
   const standingModel=totalsModel();
   assert.equal(standingModel.sorted.find(row=>row.name==='Bob').recent,3,'a bounty in the window is included in the rolling points field');
   challengeToday=savedToday;
-  logs=savedLogs;
+  state.logs=savedLogs;
 
   assert.equal(computeCredits([{id:'before',name:'Alex',type:'climb',date:'2026-06-30'}]).info.get('before').reason,'outside challenge');
 
   // categoryBreakdown sums CREDITED points per type from computeCredits().info, with the balanced-day bonus as its own row.
-  logs=[
+  state.logs=[
     {id:'k1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
     {id:'k2',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'2'},
     {id:'k3',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'3'},
@@ -203,7 +203,7 @@ const checks = `(()=>{
   assert.equal(bd.rows.reduce((sum,r)=>sum+r.points,0),bd.total,'rows plus balanced bonus sum to the total');
 
   // Bounties over the weekly cap contribute at most weeklyBountyCap to the bounty row.
-  logs=[
+  state.logs=[
     {id:'q1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
     {id:'q2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-14',createdAt:'1'},
     {id:'q3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-15',createdAt:'1'},
@@ -215,33 +215,33 @@ const checks = `(()=>{
   assert.equal(bd.rows.reduce((sum,r)=>sum+r.points,0),bd.total,'capped rows still sum to the total');
 
   // No credited points means an empty breakdown (the render layer shows a single empty state, not zero rows).
-  logs=[];
+  state.logs=[];
   bd=categoryBreakdown('alex');
   assert.equal(bd.total,0);
   assert.equal(bd.bonus,0);
 
   // bountyWeekProgress sums CREDITED bounty points for the week of the day passed in.
-  logs=[{id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
   assert.equal(bountyWeekProgress('alex','2026-07-15'),3,'under the cap reports the credited sum');
-  logs=[
+  state.logs=[
     {id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
     {id:'w2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-14',createdAt:'1'},
   ];
   assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'exactly at the cap reports the full cap');
-  logs=[
+  state.logs=[
     {id:'w1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
     {id:'w2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-14',createdAt:'1'},
     {id:'w3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-15',createdAt:'1'},
   ];
   assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'over-cap claims add nothing to the credited sum');
   assert.equal(bountyWeekProgress('alex','2026-07-20'),0,'a new week starts back at zero');
-  logs.push({id:'w4',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},{id:'w5',name:'Maya',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'});
+  state.logs.push({id:'w4',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},{id:'w5',name:'Maya',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'});
   assert.equal(bountyWeekProgress('alex','2026-07-15'),6,'non-bounty entries and other people are ignored');
-  logs=[];
+  state.logs=[];
 
   // Entry 46: claimedBounties lists one person's bounty claims, newest-first, resolving the title
   // through the same bountyTitle -> bountyById -> 'Bounty' chain activityMarkup() uses.
-  logs=[
+  state.logs=[
     {id:'c1',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'},
     {id:'c2',name:'Alex',type:'bounty',bountyId:'outdoor-send',bountyTitle:'Outdoor Send',note:'cold rock',date:'2026-07-15',createdAt:'1'},
     {id:'c3',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-16',createdAt:'1'},
@@ -258,23 +258,23 @@ const checks = `(()=>{
   assert.equal(claims.filter(r=>r.label==='V4').length,0,'climb entries never appear among the claims');
 
   // Same-day claims fall back to createdAt, the tiebreak activityMarkup() uses.
-  logs=[
+  state.logs=[
     {id:'t1',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Earlier',date:'2026-07-15',createdAt:'1'},
     {id:'t2',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Later',date:'2026-07-15',createdAt:'2'},
   ];
   assert.equal(claimedBounties('alex')[0].label,'Later','a later createdAt sorts first within one day');
 
   // The title resolves from bountyId when bountyTitle is absent, and falls back for an unknown id.
-  logs=[{id:'c5',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'c5',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
   assert.equal(claimedBounties('alex')[0].label,bountyById('send-it').title,'a missing bountyTitle resolves through bountyById');
-  logs=[{id:'c6',name:'Alex',type:'bounty',bountyId:'not-a-real-bounty',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'c6',name:'Alex',type:'bounty',bountyId:'not-a-real-bounty',date:'2026-07-13',createdAt:'1'}];
   assert.equal(claimedBounties('alex')[0].label,'Bounty','an unknown bountyId falls back to a plain label rather than throwing');
-  logs=[{id:'c7',name:'Alex',type:'bounty',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'c7',name:'Alex',type:'bounty',date:'2026-07-13',createdAt:'1'}];
   assert.equal(claimedBounties('alex')[0].label,'Bounty','a claim with no id at all still lists');
 
   // Entry 50: claimedBounties also reports what each claim scored, read out of computeCredits()
   // rather than re-derived, so a claim past the weekly cap shows its reduced or zero credit.
-  logs=[
+  state.logs=[
     {id:'p1',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'},
     {id:'p2',name:'Alex',type:'bounty',bountyId:'outdoor-send',bountyTitle:'Outdoor Send',date:'2026-07-14',createdAt:'1'},
     {id:'p3',name:'Alex',type:'bounty',bountyId:'century-club',bountyTitle:'Century Club',date:'2026-07-15',createdAt:'1'},
@@ -288,22 +288,22 @@ const checks = `(()=>{
   assert.equal(byLabel('Century Club').credit,0,'a claim past the weekly cap credits nothing');
 
   // A claim outside the challenge window credits zero; base is still the bounty's face value.
-  logs=[{id:'p4',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-06-01',createdAt:'1'}];
+  state.logs=[{id:'p4',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-06-01',createdAt:'1'}];
   let outside=claimedBounties('alex')[0];
   assert.equal(outside.base,3,'base is unaffected by being outside the window');
   assert.equal(outside.credit,0,'a claim outside the challenge window credits nothing');
 
   // Nobody, and no claims, both come back empty rather than undefined.
-  logs=[{id:'c8',name:'Maya',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'c8',name:'Maya',type:'bounty',bountyId:'send-it',bountyTitle:'Send It',date:'2026-07-13',createdAt:'1'}];
   // deepEqual against a literal is avoided here on purpose: length is enough and cannot trip the
   // cross-realm array comparison this vm harness is prone to.
   assert.equal(claimedBounties('alex').length,0,'a person with no claims of their own gets an empty list');
   assert.equal(claimedBounties('').length,0,'a blank name matches nobody, not the crew');
-  logs=[];
+  state.logs=[];
   assert.equal(claimedBounties('alex').length,0,'an empty log yields no claims');
 
   // Entry 61: today's claim state names only bounties this person actually logged today.
-  logs=[
+  state.logs=[
     {id:'today1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'},
     {id:'today2',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'2'},
     {id:'other',name:'Maya',type:'bounty',bountyId:'outdoor-send',date:'2026-07-13',createdAt:'1'},
@@ -315,7 +315,7 @@ const checks = `(()=>{
   assert.equal(todayClaims.has('outdoor-send'),false,'another person’s claim is excluded');
   assert.equal(todayClaims.has('century-club'),false,'the person’s claim on another day is excluded');
   assert.equal(todayClaims.size,1,'two claims of one bounty on the same day stay one id');
-  logs=[];
+  state.logs=[];
 
   // Entry 58: the claimed-list caption counts claims and sums credited points, not face value.
   assert.equal(claimedCaption([]),'','an empty claimed list has no caption');
@@ -326,7 +326,7 @@ const checks = `(()=>{
   // Entry 54: personRecent lists one person's most recent log entries across every type, newest
   // first with the same date/createdAt tiebreak claimedBounties() uses, resolving a bounty title
   // through the same bountyTitle -> bountyById -> 'Bounty' chain.
-  logs=[
+  state.logs=[
     {id:'r1',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-10',createdAt:'1'},
     {id:'r2',name:'Alex',type:'exercise',date:'2026-07-11',createdAt:'1'},
     {id:'r3',name:'Alex',type:'mobility',date:'2026-07-12',createdAt:'1'},
@@ -344,34 +344,34 @@ const checks = `(()=>{
   assert.deepEqual(limited.map(r=>r.label),['Climbing','Send It'],'limit keeps only the newest rows');
 
   // The title resolves from bountyId when bountyTitle is absent, and falls back for a missing id.
-  logs=[{id:'r7',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'r7',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
   assert.equal(personRecent('alex')[0].label,bountyById('send-it').title,'a missing bountyTitle resolves through bountyById');
-  logs=[{id:'r8',name:'Alex',type:'bounty',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'r8',name:'Alex',type:'bounty',date:'2026-07-13',createdAt:'1'}];
   assert.equal(personRecent('alex')[0].label,'Bounty','a claim with no id at all still lists');
 
   // Same-day entries fall back to createdAt, newest first, exactly as claimedBounties() does.
-  logs=[
+  state.logs=[
     {id:'r9',name:'Alex',type:'climb',hardestGrade:'V1',date:'2026-07-13',createdAt:'1'},
     {id:'r10',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-13',createdAt:'2'},
   ];
   assert.equal(personRecent('alex')[0].label,'Climbing · V2','a later createdAt sorts first within one day');
 
   // Nobody, a blank name, and an empty log all come back empty rather than undefined.
-  logs=[{id:'r11',name:'Maya',type:'climb',hardestGrade:'V9',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'r11',name:'Maya',type:'climb',hardestGrade:'V9',date:'2026-07-13',createdAt:'1'}];
   assert.equal(personRecent('alex').length,0,'a person with no entries of their own gets an empty list');
   assert.equal(personRecent('').length,0,'a blank name matches nobody, not the crew');
-  logs=[];
+  state.logs=[];
   assert.equal(personRecent('alex').length,0,'an empty log yields no rows');
 
   // gradePyramid counts ALL of the person's graded climb logs, hardest-first by GRADES index.
-  logs=[
+  state.logs=[
     {id:'g1',name:'Alex',type:'climb',hardestGrade:'V9',date:'2026-07-13',createdAt:'1'},
     {id:'g2',name:'Alex',type:'climb',hardestGrade:'V10',date:'2026-07-14',createdAt:'1'},
     {id:'g3',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-14',createdAt:'2'},
   ];
   let pyramid=gradePyramid('alex');
   assert.deepEqual(pyramid.map(r=>r.grade),['V10','V9','V2'],'V10 sorts above V9 by GRADES index, not string comparison');
-  logs=[
+  state.logs=[
     {id:'g1',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-13',createdAt:'1'},
     {id:'g2',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-13',createdAt:'2'},
     {id:'g3',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-06-01',createdAt:'1'},
@@ -384,13 +384,13 @@ const checks = `(()=>{
   ];
   pyramid=gradePyramid('alex');
   assert.deepEqual(pyramid,[{grade:'V5',count:3},{grade:'V4',count:1}],'zero-credit same-day duplicates and outside-window sends count; blank or unknown grades, other types, and other people are ignored');
-  logs=[];
+  state.logs=[];
   assert.deepEqual(gradePyramid('alex'),[],'no graded climbs yields an empty pyramid');
 
   // personalRecords: hardest grade compares by GRADES INDEX (never string), hardest this week filters by weekKey(today),
   // best day/week come from computeCredits maxima; today is an ARGUMENT, never the clock.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
-  logs=[
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.logs=[
     {id:'pr1',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-06',createdAt:'1'},
     {id:'pr2',name:'Alex',type:'climb',hardestGrade:'V10',date:'2026-07-13',createdAt:'2'},
     {id:'pr3',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'3'},
@@ -406,7 +406,7 @@ const checks = `(()=>{
   rec=personalRecords('alex','2026-07-08');
   assert.equal(rec.hardest,'V10','hardest ever ignores the week filter');
   assert.equal(rec.hardestWeek,'V2','hardest this week follows weekKey(today) — the week of 07-08 (Mon 07-06) holds only V2');
-  logs=[{id:'ng1',name:'Maya',type:'exercise',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'ng1',name:'Maya',type:'exercise',date:'2026-07-13',createdAt:'1'}];
   rec=personalRecords('maya','2026-07-15');
   assert.equal(rec.hasLog,true);
   assert.equal(rec.graded,false,'no graded climbs suppresses the grade rows');
@@ -414,12 +414,12 @@ const checks = `(()=>{
   assert.equal(rec.hardestWeek,'');
   assert.equal(rec.bestDay,2,'best day still reports once the person has any log');
   assert.equal(rec.bestWeek,2,'best week still reports once the person has any log');
-  logs=[{id:'u1',name:'Uno',type:'climb',hardestGrade:'5.12a',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'u1',name:'Uno',type:'climb',hardestGrade:'5.12a',date:'2026-07-13',createdAt:'1'}];
   rec=personalRecords('uno','2026-07-15');
   assert.equal(rec.graded,false,'an unknown grade string is not a graded climb');
   assert.equal(rec.hardest,'','blank or unknown grades never surface as a record');
   assert.equal(rec.bestDay,3,'the climb still credits points without a valid grade');
-  logs=[];
+  state.logs=[];
   rec=personalRecords('alex','2026-07-15');
   assert.equal(rec.hasLog,false,'no logs hides the whole card');
   assert.equal(rec.graded,false);
@@ -427,22 +427,22 @@ const checks = `(()=>{
   assert.equal(rec.bestWeek,0);
 
   // streakInfo counts consecutive days with >=1 credited point in dayTotal; today is an ARGUMENT, never the clock.
-  logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:1,best:1},'a single active day is a one-day streak');
-  logs=[
+  state.logs=[
     {id:'s1',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'1'},
     {id:'s2',name:'Alex',type:'climb',date:'2026-07-11',createdAt:'1'},
     {id:'s3',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
   ];
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:1,best:2},'a gap resets the current streak while best remembers the longer run');
-  logs=[
+  state.logs=[
     {id:'s1',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'1'},
     {id:'s2',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
   ];
   assert.deepEqual(streakInfo('alex','2026-07-14'),{current:2,best:2},'a zero-point today keeps yesterday-anchored streaks alive until the day ends');
-  logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'1'}];
+  state.logs=[{id:'s1',name:'Alex',type:'climb',date:'2026-07-10',createdAt:'1'}];
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:0,best:1},'empty today AND yesterday means no current streak');
-  logs=[
+  state.logs=[
     {id:'s1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
     {id:'s2',name:'Alex',type:'exercise',date:'2026-07-06',createdAt:'1'},
     {id:'s3',name:'Alex',type:'mobility',date:'2026-07-07',createdAt:'1'},
@@ -450,13 +450,13 @@ const checks = `(()=>{
     {id:'s5',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'},
   ];
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:2,best:3},'best streak takes the longer of two separate runs');
-  logs=[
+  state.logs=[
     {id:'s1',name:'Alex',type:'climb',date:'2026-06-30',createdAt:'1'},
     {id:'s2',name:'Alex',type:'climb',date:'2026-07-01',createdAt:'1'},
     {id:'s3',name:'Maya',type:'climb',date:'2026-06-29',createdAt:'1'},
   ];
   assert.deepEqual(streakInfo('alex','2026-07-01'),{current:1,best:1},'days before the challenge start and other people never count');
-  logs=[];
+  state.logs=[];
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:0,best:0},'no activity means no streaks');
 
   // heatLevel buckets intensity relative to DAILY_MAX: 0 / 1-2 / 3-5 / 6-7 / max.
@@ -470,11 +470,11 @@ const checks = `(()=>{
   assert.equal(heatLevel(8),4,'a full balanced day hits the hottest bucket');
 
   // heatmapDays enumerates config.startDate through min(tripDate, today); today is an ARGUMENT, never the clock.
-  config={startDate:'2026-07-13',tripDate:'2026-07-13',goal:500,crew:[]};
-  logs=[{id:'h1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
+  state.config={startDate:'2026-07-13',tripDate:'2026-07-13',goal:500,crew:[]};
+  state.logs=[{id:'h1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
   assert.deepEqual(heatmapDays('alex','2026-07-13'),[{date:'2026-07-13',points:3}],'a one-day window yields exactly one cell');
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
-  logs=[
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.logs=[
     {id:'h1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
     {id:'h2',name:'Alex',type:'exercise',date:'2026-07-10',createdAt:'1'},
     {id:'h3',name:'Maya',type:'climb',date:'2026-07-03',createdAt:'1'},
@@ -489,20 +489,20 @@ const checks = `(()=>{
   assert.equal(heatmapDays('alex','2026-08-15').length,31,'after the trip the span caps at the trip date');
   assert.deepEqual(heatmapDays('alex','2026-06-30'),[],'before the start there is nothing to draw');
   assert.deepEqual(heatmapDays('alex','garbage'),[],'an unparseable today yields no cells');
-  config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
   assert.deepEqual(heatmapDays('alex','2026-07-15'),[],'a missing start date yields no cells');
-  config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
+  state.config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
   assert.deepEqual(heatmapDays('alex','2026-07-15'),[],'an inverted window yields no cells');
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
-  logs=[];
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.logs=[];
 
   // Entry 86: bounty credit belongs in daily totals but deliberately leaves the category meter empty.
-  logs=[
+  state.logs=[
     {id:'b1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-12',createdAt:'1'},
     {id:'b2',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-12',createdAt:'2'},
     {id:'b3',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'3'},
   ];
-  const bountyCredits=computeCredits(logs),bountyDay=bountyCredits.dayTotal.get('alex|2026-07-12')||0,bountyHeat=heatmapDays('alex','2026-07-13').find(x=>x.date==='2026-07-12');
+  const bountyCredits=computeCredits(state.logs),bountyDay=bountyCredits.dayTotal.get('alex|2026-07-12')||0,bountyHeat=heatmapDays('alex','2026-07-13').find(x=>x.date==='2026-07-12');
   assert.equal(bountyCredits.dayMeter.get('alex|2026-07-12')||0,0,'bounties do not fill the category meter');
   assert.equal(bountyDay,6,'the bounty-only day retains its credited points');
   assert.equal(bountyHeat.points,bountyDay,'the heatmap reads the uncapped daily total');
@@ -510,14 +510,14 @@ const checks = `(()=>{
   assert.ok(heatmapCaption([bountyHeat]).indexOf('1 active day')>=0,'the bounty-only day counts as active in the caption');
   assert.deepEqual(streakInfo('alex','2026-07-13'),{current:2,best:2},'a bounty-only day continues the streak');
   assert.equal(personalRecords('alex','2026-07-13').bestDay,bountyDay,'best day includes bounty-only credit');
-  me='Alex';
+  state.me='Alex';
   assert.equal(weekReviewModel('2026-07-15').mine.activeDays,1,'Week in Review counts the previous week bounty-only day as active');
-  me='';
+  state.me='';
 
   // Entry 74: every challenge day gets a rolling seven-day point, including quiet days.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   const curveBounty=SCORING.bounties[0];
-  logs=[
+  state.logs=[
     {id:'m1',name:'Alex',type:'climb',date:'2026-07-01',createdAt:'1'},
     {id:'m2',name:'Alex',type:'exercise',date:'2026-07-03',createdAt:'2'},
     {id:'m3',name:'Alex',type:'bounty',bountyId:curveBounty.id,date:'2026-07-05',createdAt:'3'},
@@ -539,7 +539,7 @@ const checks = `(()=>{
   assert.equal(personalWeeklyTrend('alex','2026-07-05')[4].points,8,'the personal wrapper stays scoped to that climber');
   // Entry 96: a one-pass bucket and sliding window preserve the former per-day map scan exactly,
   // including the partial first week, a day-one crew point, and a person with only one logged day.
-  logs=[
+  state.logs=[
     {id:'full-a1',name:'Alex',type:'climb',date:'2026-07-01',createdAt:'1'},
     {id:'full-a2',name:'Alex',type:'exercise',date:'2026-07-03',createdAt:'2'},
     {id:'full-a3',name:'Alex',type:'mobility',date:'2026-07-08',createdAt:'3'},
@@ -547,18 +547,18 @@ const checks = `(()=>{
     {id:'full-a5',name:'Alex',type:'climb',date:'2026-07-31',createdAt:'5'},
     {id:'full-m1',name:'Maya',type:'climb',date:'2026-07-01',createdAt:'6'},
   ];
-  const previousCurve=(name,today)=>{const key=String(name||'').toLowerCase(),model=computeCredits(logs),last=today<config.tripDate?today:config.tripDate,rows=[];let day=config.startDate;while(day<=last){let points=0,start=windowStart(day);model.dayTotal.forEach((value,dayKey)=>{const cut=dayKey.lastIndexOf('|'),rowName=dayKey.slice(0,cut),date=dayKey.slice(cut+1);if(date>=start&&date<=day&&(!key||rowName===key))points+=value});rows.push({date:day,label:fmtDay(day),points});const next=parseDateOnly(day);next.setDate(next.getDate()+1);day=localDate(next)}return rows};
+  const previousCurve=(name,today)=>{const key=String(name||'').toLowerCase(),model=computeCredits(state.logs),last=today<state.config.tripDate?today:state.config.tripDate,rows=[];let day=state.config.startDate;while(day<=last){let points=0,start=windowStart(day);model.dayTotal.forEach((value,dayKey)=>{const cut=dayKey.lastIndexOf('|'),rowName=dayKey.slice(0,cut),date=dayKey.slice(cut+1);if(date>=start&&date<=day&&(!key||rowName===key))points+=value});rows.push({date:day,label:fmtDay(day),points});const next=parseDateOnly(day);next.setDate(next.getDate()+1);day=localDate(next)}return rows};
   assert.deepEqual(momentumCurve('alex','2026-07-31'),previousCurve('alex','2026-07-31'),'the full personal challenge curve matches the former map scan');
   assert.deepEqual(momentumCurve('','2026-07-31'),previousCurve('','2026-07-31'),'the full crew curve keeps the day-one and single-log crew points');
-  logs=[{id:'pipe1',name:'Alex|Jr',type:'climb',date:'2026-07-01',createdAt:'1'}];
+  state.logs=[{id:'pipe1',name:'Alex|Jr',type:'climb',date:'2026-07-01',createdAt:'1'}];
   assert.equal(weeklyTrend('2026-07-01')[0].points,3,'a crew name containing a pipe still aggregates into its curve');
   assert.equal(personalWeeklyTrend('alex|jr','2026-07-01')[0].points,3,'a personal curve keeps credited points for a name containing a pipe');
-  config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.config={startDate:'',tripDate:'2026-07-31',goal:500,crew:[]};
   assert.deepEqual(momentumCurve('alex','2026-07-15'),[],'a missing start date yields no curve');
-  config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
+  state.config={startDate:'2026-07-31',tripDate:'2026-07-01',goal:500,crew:[]};
   assert.deepEqual(momentumCurve('alex','2026-07-15'),[],'an inverted challenge yields no curve');
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
-  logs=[];
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.logs=[];
 
   // Entry 36: the captions state the per-datum facts that only ever lived in a title= attribute --
   // invisible on touch. They are additive: both graphics keep their own container aria-label.
@@ -603,7 +603,7 @@ const checks = `(()=>{
 
   // Entry 41: dailyBounties() hashes the date, so every future day's picks are already computable.
   // Someone planning a Thursday session can now see what Thursday offers.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   const week=upcomingBounties('2026-07-10');
   assert.equal(week.length,7,'a mid-challenge day previews the next seven days');
   assert.equal(week[0].date,'2026-07-11','starting with tomorrow, not today');
@@ -650,9 +650,9 @@ const checks = `(()=>{
 
   // weekTrend compares adjacent seven-day dayTotal windows, including bounty credit, and stays quiet
   // until the earlier window reaches the challenge.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   const trendBounty=SCORING.bounties[0];
-  logs=[
+  state.logs=[
     {id:'a1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'},
     {id:'a2',name:'Alex',type:'climb',date:'2026-07-15',createdAt:'2'},
     {id:'u1',name:'Up',type:'climb',date:'2026-07-02',createdAt:'3'},
@@ -672,7 +672,7 @@ const checks = `(()=>{
   assert.equal(weekTrend('alex','2026-07-07'),null,'the first challenge week is suppressed while the earlier window is before the start');
 
   // weeksUntilDone counts inclusive days from today through tripDate, rounded up to whole weeks; today is an ARGUMENT.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   assert.deepEqual(weeksUntilDone('2026-07-15'),{days:17,weeks:3},'mid-challenge counts inclusive days and rounds up');
   assert.deepEqual(weeksUntilDone('2026-07-28'),{days:4,weeks:1},'the closing days collapse to a single final week');
   assert.deepEqual(weeksUntilDone('2026-07-31'),{days:1,weeks:1},'the final day still reads as one week left');
@@ -680,8 +680,8 @@ const checks = `(()=>{
   assert.equal(weeksUntilDone('garbage'),null,'an unparseable today yields no countdown');
 
   // weekReviewModel summarizes the PREVIOUS week: crew top-3 by points, bounty hunter by bounty count, and the viewer's own recap.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bob'},{name:'Cara'}]};
-  logs=[
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Bob'},{name:'Cara'}]};
+  state.logs=[
     {id:'x1',name:'Alex',type:'climb',hardestGrade:'V3',date:'2026-07-07',createdAt:'1'}, // prev wk
     {id:'x2',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-08',createdAt:'2'},
     {id:'x3',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-09',createdAt:'3'}, // Alex prev wk: 9 pts, 3 days, hardest V5
@@ -693,7 +693,7 @@ const checks = `(()=>{
     {id:'z1',name:'Cara',type:'mobility',date:'2026-07-07',createdAt:'9'},
     {id:'z2',name:'Cara',type:'bounty',bountyId:'send-it',date:'2026-07-07',createdAt:'10'}, // Cara prev wk: 4, 1 bounty
   ];
-  me='Alex';
+  state.me='Alex';
   const wr=weekReviewModel('2026-07-15');
   assert.equal(wr.prevWk,'2026-07-06','the review targets the Monday-aligned previous week');
   assert.deepEqual(wr.leaders.map(x=>x.name+':'+x.points),['Bob:11','Alex:9','Cara:4'],'top-3 point earners are ranked by previous-week points');
@@ -705,7 +705,7 @@ const checks = `(()=>{
   assert.deepEqual(wr.weeksLeft,{days:17,weeks:3},'the review carries the countdown');
 
   // A brand-new viewer with no history still gets the crew highlights and a zeroed personal recap.
-  me='Ghost';
+  state.me='Ghost';
   const wrNew=weekReviewModel('2026-07-15');
   assert.equal(wrNew.mine.points,0,'a viewer with no previous-week activity recaps zero points');
   assert.equal(wrNew.mine.hardest,'','no climbs means no hardest grade');
@@ -715,7 +715,7 @@ const checks = `(()=>{
   const wrFirst=weekReviewModel('2026-07-02');
   assert.deepEqual(wrFirst.leaders,[],'the first week shows no previous leaders');
   assert.deepEqual(wrFirst.hunters,[],'the first week shows no previous bounty hunter');
-  me='';
+  state.me='';
 
   assert.equal(weekKey('2026-07-13'),'2026-07-13');
   assert.equal(weekKey('2026-07-19'),'2026-07-13');
@@ -734,14 +734,14 @@ const checks = `(()=>{
   // Local upgrade: v8 config migrates (pull mode dropped); logs start fresh; identity persists.
   localStorage.setItem('roadToSendConfigV8',JSON.stringify({startDate:'2026-07-01',tripDate:'2026-07-31',goal:600,crew:[{name:'Alex',pullMode:'super-hard'}]}));
   localStorage.setItem('roadToSendMe','Alex');
-  endpoint='';logs=[];config=defaultConfig();me='';recordingFor='';
+  state.endpoint='';state.logs=[];state.config=defaultConfig();state.me='';state.recordingFor='';
   loadInitialState();
-  assert.equal(config.goal,600,'v8 local config migrates to v9');
-  assert.equal(config.crew[0].name,'Alex');
-  assert.equal(config.crew[0].pullMode,undefined,'pull mode is stripped on migration');
-  assert.equal(me,'Alex','remembered identity is restored');
-  recordingFor='Maya';
-  assert.equal(me,'Alex','temporary proxy target does not replace device owner');
+  assert.equal(state.config.goal,600,'v8 local config migrates to v9');
+  assert.equal(state.config.crew[0].name,'Alex');
+  assert.equal(state.config.crew[0].pullMode,undefined,'pull mode is stripped on migration');
+  assert.equal(state.me,'Alex','remembered identity is restored');
+  state.recordingFor='Maya';
+  assert.equal(state.me,'Alex','temporary proxy target does not replace device owner');
 
   // Entry 27: writeStore is the one place storage is written, and it reports rather than throws.
   assert.equal(writeStore('roadToSendMe','Alex'),true,'a normal write reports success');
@@ -788,14 +788,14 @@ const checks = `(()=>{
   assert.equal(projectedTotal(50,projSettings,'garbage'),null,'an unparseable today hides the projection');
 
   // earnedThrough sums group points dated on or before today, so future-dated entries never inflate the pace/projection rate.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
-  logs=[
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.logs=[
     {id:'e1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
     {id:'e2',name:'Alex',type:'exercise',date:'2026-07-20',createdAt:'1'},
   ];
   assert.equal(earnedThrough('2026-07-10'),3,'a future-dated entry is excluded from the through-today total');
   assert.equal(earnedThrough('2026-07-25'),5,'once its date has arrived the entry counts toward the rate');
-  logs=[
+  state.logs=[
     {id:'cap1',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-06',createdAt:'1'},
     {id:'cap2',name:'Alex',type:'bounty',bountyId:'outdoor-send',date:'2026-07-07',createdAt:'2'},
     {id:'cap3',name:'Alex',type:'bounty',bountyId:'century-club',date:'2026-07-08',createdAt:'3'},
@@ -808,50 +808,50 @@ const checks = `(()=>{
   // Entry 25: computeCredits memoizes the live (logs, config) pair only. Every way that pair can
   // change is checked here with a case whose stale answer would be a DIFFERENT number, so a
   // broken invalidation fails loudly instead of merely being slow.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
-  logs=[{id:'m1',name:'Mem',type:'climb',date:'2026-07-02',createdAt:'1'}];
-  assert.equal(computeCredits(logs).totals.get('mem'),3,'the first scan scores the live log');
-  assert.equal(computeCredits(logs).totals.get('mem'),3,'a repeat call with nothing changed agrees with itself');
-  logs=logs.concat([{id:'m2',name:'Mem',type:'exercise',date:'2026-07-02',createdAt:'2'}]);
-  assert.equal(computeCredits(logs).totals.get('mem'),5,'a replaced logs reference rescans');
-  logs.push({id:'m3',name:'Mem',type:'mobility',date:'2026-07-02',createdAt:'3'});
-  assert.equal(computeCredits(logs).totals.get('mem'),8,'an in-place push changes the length, so the len guard rescans');
-  logs.splice(2,1);
-  assert.equal(computeCredits(logs).totals.get('mem'),5,'an in-place splice changes the length, so the len guard rescans');
-  config={startDate:'2026-08-01',tripDate:'2026-08-31',goal:500,crew:[]};
-  assert.equal(computeCredits(logs).totals.get('mem'),undefined,'a replaced config rescans, so an out-of-window log scores nothing');
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
-  assert.equal(computeCredits(logs).totals.get('mem'),5,'putting the window back rescans again');
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.logs=[{id:'m1',name:'Mem',type:'climb',date:'2026-07-02',createdAt:'1'}];
+  assert.equal(computeCredits(state.logs).totals.get('mem'),3,'the first scan scores the live log');
+  assert.equal(computeCredits(state.logs).totals.get('mem'),3,'a repeat call with nothing changed agrees with itself');
+  state.logs=state.logs.concat([{id:'m2',name:'Mem',type:'exercise',date:'2026-07-02',createdAt:'2'}]);
+  assert.equal(computeCredits(state.logs).totals.get('mem'),5,'a replaced logs reference rescans');
+  state.logs.push({id:'m3',name:'Mem',type:'mobility',date:'2026-07-02',createdAt:'3'});
+  assert.equal(computeCredits(state.logs).totals.get('mem'),8,'an in-place push changes the length, so the len guard rescans');
+  state.logs.splice(2,1);
+  assert.equal(computeCredits(state.logs).totals.get('mem'),5,'an in-place splice changes the length, so the len guard rescans');
+  state.config={startDate:'2026-08-01',tripDate:'2026-08-31',goal:500,crew:[]};
+  assert.equal(computeCredits(state.logs).totals.get('mem'),undefined,'a replaced config rescans, so an out-of-window log scores nothing');
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  assert.equal(computeCredits(state.logs).totals.get('mem'),5,'putting the window back rescans again');
   // A derived array never touches the memo: it neither reads a wrong answer nor evicts the live one.
-  const memoLive=computeCredits(logs);
-  assert.equal(computeCredits([...logs,{id:'m4',name:'Mem',type:'mobility',date:'2026-07-02',createdAt:'4'}]).totals.get('mem'),8,'a derived array is scored on its own terms');
-  assert.equal(computeCredits(logs),memoLive,'and leaves the live memo in place');
-  assert.equal(computeCredits(logs,{startDate:'2026-08-01',tripDate:'2026-08-31',goal:500,crew:[]}).totals.get('mem'),undefined,'explicit settings bypass the memo');
-  assert.equal(computeCredits(logs),memoLive,'and leave the live memo in place too');
-  logs=[
+  const memoLive=computeCredits(state.logs);
+  assert.equal(computeCredits([...state.logs,{id:'m4',name:'Mem',type:'mobility',date:'2026-07-02',createdAt:'4'}]).totals.get('mem'),8,'a derived array is scored on its own terms');
+  assert.equal(computeCredits(state.logs),memoLive,'and leaves the live memo in place');
+  assert.equal(computeCredits(state.logs,{startDate:'2026-08-01',tripDate:'2026-08-31',goal:500,crew:[]}).totals.get('mem'),undefined,'explicit settings bypass the memo');
+  assert.equal(computeCredits(state.logs),memoLive,'and leave the live memo in place too');
+  state.logs=[
     {id:'e1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'},
     {id:'e2',name:'Alex',type:'exercise',date:'2026-07-20',createdAt:'1'},
   ];
 
   // challengeToday only trusts serverDate while the sync that produced it is from the current local day.
-  endpoint='https://sheet.example.test/exec';challengeTimeZone='Not/AZone';serverDate='2000-01-01';
-  lastSyncedAt=Date.now();
+  state.endpoint='https://sheet.example.test/exec';state.challengeTimeZone='Not/AZone';state.serverDate='2000-01-01';
+  state.lastSyncedAt=Date.now();
   assert.equal(challengeToday(),'2000-01-01','a same-day sync may fall back to serverDate');
-  lastSyncedAt=Date.now()-2*86400000;
+  state.lastSyncedAt=Date.now()-2*86400000;
   assert.equal(challengeToday(),localDate(),'a stale serverDate is ignored');
-  lastSyncedAt=0;
+  state.lastSyncedAt=0;
   assert.equal(challengeToday(),localDate(),'never synced falls back to the local date');
-  challengeTimeZone='America/Los_Angeles';
+  state.challengeTimeZone='America/Los_Angeles';
   assert.equal(challengeToday(),dateInTimeZone(new Date(),'America/Los_Angeles'),'a valid challenge timezone always wins');
-  endpoint='';challengeTimeZone='';serverDate='';lastSyncedAt=0;
+  state.endpoint='';state.challengeTimeZone='';state.serverDate='';state.lastSyncedAt=0;
 
   // Entry 17: todayProgress reports which categories are already logged and whether the balanced-day bonus is still live.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
   const climb17={id:'p1',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'};
   const climbAgain17={id:'p2',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'2'};
   const exercise17={id:'p3',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'3'};
   const mobility17={id:'p4',name:'Alex',type:'mobility',date:'2026-07-13',createdAt:'4'};
-  logs=[];
+  state.logs=[];
   let prog=todayProgress('alex','2026-07-13');
   assert.equal(prog.inWindow,true,'a day inside the challenge window is in play');
   assert.equal(prog.loggedCount,0,'nothing is logged on a clean day');
@@ -866,7 +866,7 @@ const checks = `(()=>{
   assert.equal(prog.potential,DAILY_MAX,'a clean day can still reach the daily max');
 
   // Two of three categories, with a duplicate climb that must not double-count.
-  logs=[climb17,climbAgain17,exercise17];
+  state.logs=[climb17,climbAgain17,exercise17];
   prog=todayProgress('alex','2026-07-13');
   assert.equal(prog.points,SCORING.categories.climb+SCORING.categories.exercise,'a duplicate same-day climb adds nothing');
   assert.equal(prog.loggedCount,2,'the duplicate still reads as a single logged category');
@@ -879,7 +879,7 @@ const checks = `(()=>{
   assert.equal(prog.potential,DAILY_MAX,'the daily max is still on the table');
 
   // All three categories: the day is complete and the bonus is banked, not reachable.
-  logs=[climb17,climbAgain17,exercise17,mobility17];
+  state.logs=[climb17,climbAgain17,exercise17,mobility17];
   prog=todayProgress('alex','2026-07-13');
   assert.equal(prog.points,DAILY_MAX,'all three categories plus the bonus top the day out');
   assert.equal(prog.loggedCount,CATEGORIES.length);
@@ -889,14 +889,14 @@ const checks = `(()=>{
   assert.equal(prog.potential,DAILY_MAX);
 
   // Bounties never touch the daily meter, so a bounty-only day leaves every category open.
-  logs=[{id:'pb',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'pb',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-13',createdAt:'1'}];
   prog=todayProgress('alex','2026-07-13');
   assert.equal(prog.points,0,'a bounty adds no daily-meter points');
   assert.equal(prog.loggedCount,0,'a bounty logs no category');
   assert.equal(prog.rows.every(r=>r.logged===false),true,'all three category rows stay open on a bounty-only day');
 
   // Outside the challenge window nothing is in play.
-  logs=[climb17,exercise17,mobility17];
+  state.logs=[climb17,exercise17,mobility17];
   prog=todayProgress('alex','2026-08-15');
   assert.equal(prog.inWindow,false,'a day past the window is out of play');
   assert.equal(prog.points,0,'an out-of-window day scores nothing');
@@ -905,7 +905,7 @@ const checks = `(()=>{
 
   // The segmented meter always has one pip per daily point, and its filled pips equal the points earned.
   for(const set of [[],[climb17],[climb17,exercise17],[mobility17],[climb17,exercise17,mobility17],[climb17,climbAgain17]]){
-    logs=set;
+    state.logs=set;
     const p=todayProgress('alex','2026-07-13'),segs=meterSegments(p);
     assert.equal(segs.length,DAILY_MAX,'the segmented meter carries DAILY_MAX pips');
     assert.equal(segs.filter(s=>s.cls.indexOf('filled')>=0).length,p.points,'filled pips always equal the points earned');
@@ -915,24 +915,24 @@ const checks = `(()=>{
   assert.equal(segments17.filter(s=>s.cls.indexOf('seg-bonus')>=0).length,SCORING.balancedDayBonus,'the bonus owns the last pips');
 
   // todayPillState replaces the binary Ready/Balanced day pill with five honest states.
-  logs=[];
+  state.logs=[];
   assert.equal(todayPillState(todayProgress('alex','2026-07-13')).text,'Ready','an untouched day inside the window reads Ready');
   assert.equal(todayPillState(todayProgress('alex','2026-07-13')).cls,'','an untouched day carries no max class');
-  logs=[climb17];
+  state.logs=[climb17];
   assert.equal(todayPillState(todayProgress('alex','2026-07-13')).text,'2 more for +'+SCORING.balancedDayBonus,'one category logged counts down two');
-  logs=[climb17,exercise17];
+  state.logs=[climb17,exercise17];
   assert.equal(todayPillState(todayProgress('alex','2026-07-13')).text,'1 more for +'+SCORING.balancedDayBonus,'two categories logged counts down one');
-  logs=[climb17,exercise17,mobility17];
+  state.logs=[climb17,exercise17,mobility17];
   const balanced17=todayPillState(todayProgress('alex','2026-07-13'));
   assert.equal(balanced17.text,'Balanced day','a balanced day still reads Balanced day');
   assert.equal(balanced17.cls,'max','a day at the daily max keeps the max pill class');
-  logs=[];
+  state.logs=[];
   assert.equal(todayPillState(todayProgress('alex','2026-06-15')).text,'Not started','before the window the pill reads Not started');
   assert.equal(todayPillState(todayProgress('alex','2026-08-15')).text,'Complete','after the window the pill reads Complete');
-  logs=[];
+  state.logs=[];
 
   // Entry 18: challengeProgress gives the You tab its date context and never re-derives what weeksUntilDone already knows.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   let cp=challengeProgress('2026-07-01');
   assert.equal(cp.state,'active','a day inside the window is active');
   assert.equal(cp.day,1,'the first day of the window is day 1');
@@ -955,22 +955,22 @@ const checks = `(()=>{
   for(const d of ['2026-07-01','2026-07-09','2026-07-20','2026-07-31','2026-06-30'])assert.equal(challengeProgress(d).daysLeft,weeksUntilDone(d).days,'daysLeft never drifts from weeksUntilDone on '+d);
 
   // Entry 18: personalPaceInfo splits the crew goal into a personal share and reuses paceInfo unchanged.
-  logs=[];
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'}]};
+  state.logs=[];
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'}]};
   assert.equal(personalPaceInfo('alex','2026-07-15').share,100,'a solo crew owns the whole goal');
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
   assert.equal(personalPaceInfo('alex','2026-07-15').share,34,'a three-person crew rounds the share up');
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'},{name:'Di'}]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'},{name:'Di'}]};
   assert.equal(personalPaceInfo('alex','2026-07-15').share,25,'a four-person crew splits the goal evenly');
-  logs=[{id:'pp1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'}];
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:8,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'},{name:'Di'}]};
+  state.logs=[{id:'pp1',name:'Alex',type:'climb',date:'2026-07-02',createdAt:'1'}];
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:8,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'},{name:'Di'}]};
   let pp=personalPaceInfo('alex','2026-07-15');
   assert.equal(pp.share,2,'the share is the crew goal split and rounded up');
   assert.equal(pp.total,SCORING.categories.climb,'the total is the person credited score');
   assert.equal(pp.pace.state,'met','passing your share of the goal reads as met');
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:0,crew:[{name:'Alex'}]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:0,crew:[{name:'Alex'}]};
   assert.equal(personalPaceInfo('alex','2026-07-15').pace,null,'a zero goal has no pace');
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'}]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:100,crew:[{name:'Alex'}]};
   assert.equal(personalPaceInfo('alex','2026-07-15',{startDate:'2026-07-31',tripDate:'2026-07-01',goal:100}).pace,null,'an inverted window has no pace');
   assert.equal(personalPaceInfo('alex','2026-06-15').pace.state,'before','today is honoured as an argument: a pre-window day reads before');
   assert.equal(personalPaceInfo('alex','2026-08-15').pace.state,'ended','today is honoured as an argument: a post-window day reads ended');
@@ -987,9 +987,9 @@ const checks = `(()=>{
 
   // Entry 20: the per-person card composes the existing per-person helpers and adds no scoring math.
   const monday=weekKey(challengeToday()),onDay=n=>{const d=parseDateOnly(monday);d.setDate(d.getDate()+n);return localDate(d)};
-  config={startDate:onDay(-14),tripDate:onDay(14),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.config={startDate:onDay(-14),tripDate:onDay(14),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
   const firstBounty=SCORING.bounties[0],bp=firstBounty.points;
-  logs=[
+  state.logs=[
     {id:'ps1',name:'Alex',type:'climb',hardestGrade:'V5',date:onDay(0),createdAt:'1'},
     {id:'ps2',name:'Alex',type:'exercise',date:onDay(0),createdAt:'2'},
     {id:'ps3',name:'Alex',type:'mobility',date:onDay(0),createdAt:'3'},
@@ -1048,10 +1048,10 @@ const checks = `(()=>{
   // Entry 22: the shared summary composes existing helpers and never leaks the crew's Sheet endpoint.
   location.href='https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you';
   assert.equal(publicUrl(),'https://example.test/app/','publicUrl drops both the hash and the sheet query param');
-  endpoint='https://sheet.example.test/exec';
+  state.endpoint='https://sheet.example.test/exec';
   const shareMonday=weekKey(challengeToday()),shareDay=n=>{const d=parseDateOnly(shareMonday);d.setDate(d.getDate()+n);return localDate(d)};
-  config={startDate:shareDay(-7),tripDate:shareDay(7),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
-  logs=[
+  state.config={startDate:shareDay(-7),tripDate:shareDay(7),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+  state.logs=[
     {id:'sh1',name:'Alex',type:'climb',hardestGrade:'V6',date:shareDay(0),createdAt:'1'},
     {id:'sh2',name:'Alex',type:'exercise',date:shareDay(0),createdAt:'2'},
     {id:'sh3',name:'Alex',type:'mobility',date:shareDay(0),createdAt:'3'},
@@ -1077,12 +1077,12 @@ const checks = `(()=>{
   // Entry 42: activityMarkup() branches three ways on type. The bounty and fall-through branches
   // appended x.note; the climb branch rendered the grade and dropped it, so a note written against
   // a climb was stored, synced and exported but never shown back.
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
   const climbRow=(extra)=>{
     const base={id:'c1',name:'Alex',type:'climb',date:'2026-07-05',createdAt:'1'};
     for(const k in extra)base[k]=extra[k];
-    logs=[base];
-    return activityMarkup(logs,10,false);
+    state.logs=[base];
+    return activityMarkup(state.logs,10,false);
   };
   const noted=climbRow({hardestGrade:'V4',note:'crimpy'});
   assert.ok(noted.indexOf('crimpy')>=0,'a note written on a climb reaches the feed row');
@@ -1122,7 +1122,7 @@ const checks = `(()=>{
   assert.ok(chips.slice(1).every(c=>c.label===CAT_LABELS[c.type]&&c.icon===TYPE_ICONS[c.type]),'each chip face is read from the scoring config');
 
   // Entry 47: the last grade a person logged, ordered the way the feed orders everything else.
-  logs=[
+  state.logs=[
     {id:'lg1',name:'Alex',type:'climb',hardestGrade:'V2',date:'2026-07-10',createdAt:'1'},
     {id:'lg2',name:'Alex',type:'climb',hardestGrade:'V5',date:'2026-07-12',createdAt:'1'},
     {id:'lg3',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-12',createdAt:'2'},
@@ -1133,33 +1133,33 @@ const checks = `(()=>{
   assert.equal(lastLoggedGrade('maya'),'V9','each climber reads their own last climb');
   assert.equal(lastLoggedGrade('nobody'),'','a person with no climbs has no default');
   // A later non-climb entry must neither become the answer nor blank it out.
-  logs=logs.concat([
+  state.logs=state.logs.concat([
     {id:'lg5',name:'Alex',type:'exercise',date:'2026-07-25',createdAt:'1'},
     {id:'lg6',name:'Alex',type:'mobility',date:'2026-07-26',createdAt:'1'},
     {id:'lg7',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-27',createdAt:'1'},
   ]);
   assert.equal(lastLoggedGrade('alex'),'V4','exercise, mobility and bounty entries are ignored');
   // Another person climbing later changes nothing about this one.
-  logs=logs.concat([{id:'lg8',name:'Maya',type:'climb',hardestGrade:'V11',date:'2026-07-30',createdAt:'1'}]);
+  state.logs=state.logs.concat([{id:'lg8',name:'Maya',type:'climb',hardestGrade:'V11',date:'2026-07-30',createdAt:'1'}]);
   assert.equal(lastLoggedGrade('alex'),'V4','another climber, however recent, never leaks into this default');
   assert.equal(lastLoggedGrade('maya'),'V11','while their own default does move');
   // Only a grade the scoring config offers can be preselected.
-  logs=[{id:'lg9',name:'Alex',type:'climb',hardestGrade:'5.12a',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'lg9',name:'Alex',type:'climb',hardestGrade:'5.12a',date:'2026-07-13',createdAt:'1'}];
   assert.equal(lastLoggedGrade('alex'),'','a grade absent from SCORING.grades yields no default');
-  logs=[{id:'lg10',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
+  state.logs=[{id:'lg10',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'1'}];
   assert.equal(lastLoggedGrade('alex'),'','a climb logged without a grade yields no default');
   // The name is matched the way nameKey() matches it everywhere else, and a blank name matches nobody.
-  logs=[{id:'lg11',name:'  Alex  ',type:'climb',hardestGrade:'V3',date:'2026-07-13',createdAt:'1'},{id:'lg12',name:'',type:'climb',hardestGrade:'V7',date:'2026-07-14',createdAt:'1'}];
+  state.logs=[{id:'lg11',name:'  Alex  ',type:'climb',hardestGrade:'V3',date:'2026-07-13',createdAt:'1'},{id:'lg12',name:'',type:'climb',hardestGrade:'V7',date:'2026-07-14',createdAt:'1'}];
   assert.equal(lastLoggedGrade('alex'),'V3','a padded stored name still resolves through nameKey()');
   assert.equal(lastLoggedGrade(''),'','a blank name matches nobody, not the nameless entry');
   // Reading the log must not reorder it: the helper sorts a copy.
-  logs=[
+  state.logs=[
     {id:'lg13',name:'Alex',type:'climb',hardestGrade:'V1',date:'2026-07-10',createdAt:'1'},
     {id:'lg14',name:'Alex',type:'climb',hardestGrade:'V6',date:'2026-07-11',createdAt:'1'},
   ];
   assert.equal(lastLoggedGrade('alex'),'V6','the newer of two climbs is the default');
-  assert.equal(logs.map(x=>x.id).join(','),'lg13,lg14','and logs is left in the order it arrived');
-  logs=[];
+  assert.equal(state.logs.map(x=>x.id).join(','),'lg13,lg14','and logs is left in the order it arrived');
+  state.logs=[];
   assert.equal(lastLoggedGrade('alex'),'','an empty log has no default either');
 
   // Entry 49: feedEmptyCopy() names the filter that emptied a feed instead of always claiming
@@ -1173,13 +1173,13 @@ const checks = `(()=>{
     assert.equal(feedEmptyCopy(t),'No '+CAT_LABELS[t]+' entries in this view.','the '+t+' filter names its own label');
     assert.notEqual(feedEmptyCopy(t),'No '+t+' entries in this view.','the label comes from CAT_LABELS, not the raw type spelled out');
   }
-  config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
-  logs=[];
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  state.logs=[];
   const stillEmpty=activityMarkup([],5,false);
   assert.equal(stillEmpty,'<p class="hint">No activity yet.</p>','activityMarkup([],5,false) still opens and closes the hint paragraph');
 
-  endpoint='';
-  logs=[];
+  state.endpoint='';
+  state.logs=[];
 })()`;
 
 test('scoring, totals, pace and share text behave as the app expects', () => {

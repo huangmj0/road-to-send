@@ -74,7 +74,18 @@ import { readFileSync } from 'node:fs';
 // 187000 buys back roughly 4900 — the working room the entry-66 and Crag notes settled on. Per the
 // rule above the next budget entry re-measures rather than assuming, and a pass that lands under its
 // projection lowers the cap again.
-const BUDGET = 187000;
+//
+// The flat-state migration adds a temporary state object and compatibility accessors:
+// measured 182091 -> 184556 bytes (+2465), which stays under the 187000 cap with 2444 to
+// spare, so BUDGET is not re-baselined here. The scaffolding is removed later in this stack
+// and the esbuild closure then lowers the cap outright, per the rule above that a pass
+// landing under its projection lowers the cap again.
+//
+// Re-baselined 187000 -> 160000 by the esbuild closure: the hand-assembled script is replaced
+// by the pinned bundler, measured 184556 -> 153168 bytes (-31388). The cap leaves 6832 bytes for
+// the remaining source-split and test-seam work while banking the bulk of the build saving.
+// Per the rule above this is the pass landing under its projection and lowering the cap.
+const BUDGET = 160000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);

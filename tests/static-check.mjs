@@ -19,10 +19,11 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
-const script=html.match(/<script>([\s\S]*)<\/script>/)?.[1];
+const artifactScript=html.match(/<script>([\s\S]*)<\/script>/)?.[1];
+const script=readFileSync(new URL('../src/app-core.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../src/app.js',import.meta.url),'utf8');
 const scoring=JSON.parse(readFileSync(new URL('../src/scoring.json',import.meta.url),'utf8'));
-assert.ok(script,'index.html contains an inline application script');
-assert.doesNotThrow(()=>new Function(script),'application JavaScript parses');
+assert.ok(artifactScript,'index.html contains an inline application script');
+assert.doesNotThrow(()=>new Function(artifactScript),'application JavaScript parses');
 const ids=[...html.matchAll(/\sid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,'HTML ids are unique');
 for(const id of ['hardestGrade','bountySelect','activityNote','activityDate','identityMember','newParticipantName','proxyMember','endpoint','challengeStart','tripDate','groupGoalInput'])assert.match(html,new RegExp(`<label[^>]+for="${id}"`),`${id} has an associated label`);
@@ -67,8 +68,8 @@ assert.ok(scoring.bounties.every(b=>typeof b.id==='string'&&b.id&&typeof b.title
 assert.equal(new Set(scoring.bounties.map(b=>b.id)).size,scoring.bounties.length,'bounty ids are unique across the catalog');
 for(const cat of Object.keys(scoring.categories))assert.ok(scoring.bounties.some(b=>b.category===cat),`the ${cat} bounty pool is not empty`);
 assert.deepEqual(scoring.grades,['V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12','V13','V14','V15','V16','V17']);
-const sharedConfig=(script.match(/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/g)||[]).length;
-assert.ok(sharedConfig>=2,'browser and Apps Script both read the shared scoring config');
+assert.match(script,/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/,'browser reads the shared scoring config');
+assert.match(artifactScript,/const SCRIPT=`const SCORING=/,'Apps Script reads the shared scoring config');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
 // Saving… was already the label on two buttons (#saveActivityBtn and #saveSetupBtn) before this
 // entry, so the preview branch is the third occurrence — a >=2 guard could never have failed.
@@ -137,8 +138,8 @@ assert.match(html,/id="crewFeedFilter"[^>]*class="[^"]*feed-filter/,'the Crew ch
 assert.match(html,/id="crewLocalHint"[\s\S]*id="crewFeedFilter"[\s\S]*id="activityList"/,'the Crew filter chips sit between the local-mode hint and the feed they filter');
 assert.match(script,/renderFeedChips\('#crewFeedFilter',crewFeedType\)/,'the Crew chip row is painted from the Crew feed\'s own filter');
 assert.match(script,/renderFeedChips\('#feedFilter',feedType\)/,'and the You chip row from the You feed\'s own filter');
-assert.match(script,/crewFeedType=next;else feedType=next;resetFeedLimits\(\)/,'the two feeds filter independently and either change resets the show-more count');
-assert.match(script,/filterByType\(logs,crewFeedType\)/,'the Crew feed reuses filterByType() rather than a second narrowing helper');
+assert.match(script,/state\.crewFeedType=next;else state\.feedType=next;resetFeedLimits\(\)/,'the two feeds filter independently and either change resets the show-more count');
+assert.match(script,/filterByType\(state\.logs,crewFeedType\)/,'the Crew feed reuses filterByType() rather than a second narrowing helper');
 assert.equal((script.match(/function filterByType\(/g)||[]).length,1,'filterByType() is defined exactly once');
 assert.match(html,/id="personalShowMore"[^>]*type="button"/,'the You feed can show more');
 assert.match(html,/id="crewShowMore"[^>]*type="button"/,'the crew feed can show more');
@@ -174,14 +175,14 @@ assert.match(script,/function renderClaimed\(/,'a render function owns the claim
 assert.match(script,/function shareProgress\(/,'the Share button goes through the system share sheet first');
 assert.match(script,/function writeStore\(/,'the shared storage helper exists');
 assert.equal((script.match(/localStorage\.setItem/g)||[]).length,1,'storage writes funnel through one helper');
-assert.ok((script.match(/pendingDelete=null/g)||[]).length>=3,'a dismissed confirm clears the pending delete, on top of the declaration and the confirmed path');
+assert.ok((script.match(/state\.pendingDelete=null/g)||[]).length>=2,'a dismissed confirm clears the pending delete on the confirmed and dismissed paths');
 assert.match(script,/function computeCreditsRaw\(/,'the raw scorer is separable from the memo that fronts it');
 assert.doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|fill|copyWithin)\(/,'logs is replaced, never mutated in place');
 // Retired with Lever 1 (optimistic write): the "Saved to the Sheet, but refresh failed. Do not
 // retry" outcome no longer exists. A shared save is confirmed by the write response and the returned
 // record is added to the feed at once, with loadRemote() reconciling in the background — so there is
 // no blocking reload left to fail on the success path. This asserts that replacement invariant.
-assert.match(script,/logs=logs\.concat\(\[\{id:saved\.id/,'a shared save adds the record the write returned straight to the feed');
+assert.match(script,/state\.logs=state\.logs\.concat\(\[\{id:saved\.id/,'a shared save adds the record the write returned straight to the feed');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');
 assert.match(html,/id="bountyHint"/,'the Record tab has a slot for the chosen bounty description');

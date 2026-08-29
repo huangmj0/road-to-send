@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync} from 'node:fs';
+import {readFileSync,readdirSync,existsSync} from 'node:fs';
 import {buildHtml} from '../scripts/build.mjs';
 
 // TRAP: this suite asserts documented invariants, not behaviour. Everything here holds a
@@ -9,17 +9,26 @@ import {buildHtml} from '../scripts/build.mjs';
 
 const at=name=>new URL('../'+name,import.meta.url);
 const agentsDoc=readFileSync(at('AGENTS.md'),'utf8');
-const app=readFileSync(at('src/app.js'),'utf8');
+// Every browser source the build bundles, not just src/app.js: the split moved keys into
+// src/app-core.js, and a check that reads one file would stop seeing them. Derived from the
+// directory so a further split cannot narrow this again. src/apps-script.js is excluded --
+// it is the backend, and its roadToSendSchema is a Script Property, not a localStorage key.
+const browserSources=readdirSync(at('src'))
+  .filter(name=>name.endsWith('.js')&&name!=='apps-script.js')
+  .sort();
+const app=browserSources.map(name=>readFileSync(at('src/'+name),'utf8')).join('\n');
 
-// The localStorage keys are frozen: every roadToSend… literal in src/app.js must be listed in
-// the frozen-key constraint in AGENTS.md, so a new key cannot land without the doc saying so.
+// The localStorage keys are frozen: every roadToSend… literal in the bundled browser sources must
+// be listed in the frozen-key constraint in AGENTS.md, so a new key cannot land without the doc
+// saying so.
 // The list is prose and wraps across lines, so match the whole numbered item rather than one
 // line of it — a wrap must not be able to hide a key that was never actually listed.
 const frozen=/^\d+\. \*\*localStorage keys are frozen:\*\*[\s\S]*?(?=\n\d+\. \*\*|\n\n)/m.exec(agentsDoc)?.[0];
 assert.ok(frozen,'AGENTS.md carries a numbered constraint listing the frozen localStorage keys');
 const keys=[...new Set(app.match(/roadToSend[A-Za-z0-9_]*/g)||[])].sort();
-assert.ok(keys.length>=5,'src/app.js reads the roadToSend localStorage keys');
-for(const key of keys)assert.ok(frozen.includes(key),`${key} is used in src/app.js but missing from the frozen-key list in AGENTS.md`);
+assert.ok(browserSources.length>=1,'src/ holds the bundled browser sources');
+assert.ok(keys.length>=7,'the browser sources read the roadToSend localStorage keys');
+for(const key of keys)assert.ok(frozen.includes(key),`${key} is used in the browser sources but missing from the frozen-key list in AGENTS.md`);
 
 // Both agent surfaces orient a session and point at the authoritative guide rather than
 // restating it — two full copies of the rules is how they drift apart.
