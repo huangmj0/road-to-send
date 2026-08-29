@@ -7,6 +7,11 @@
 // TRAP — ADD assertions here; never relax, retarget or delete one:
 //   * Several assertions pin DOM *source order*, so moving an element in
 //     src/index.template.html breaks a check that names neither element helpfully.
+//   * One assertion pair still slices a single LINE out of the script — populateBountySelectSource.
+//     A line-based slice answers '' when the shape it assumes stops holding, and a NEGATIVE
+//     assertion against '' passes while proving nothing, so each such slice keeps an `assert.ok`
+//     immediately after it. Add the guard with the slice, in the same edit, or use the rendered
+//     surface in tests/client-state.dom.test.js instead — which is the better home either way.
 //   * Several match exact compact CSS text — `.trend-scroll{overflow-x:auto}`,
 //     `@media(prefers-color-scheme:dark)` with no space. Reformatting src/styles.css breaks
 //     them, again with an unhelpful message.
@@ -50,9 +55,7 @@ assert.match(script,/This cannot be undone\./,'the shared delete warning is sele
 assert.match(script,/function requestDelete\(/,'deleting an entry goes through the confirm request helper');
 assert.match(html,/aria-label="Close person details"/);
 assert.match(script,/function closeIfScrim\(/,'clicking the backdrop closes the dialog it belongs to');
-assert.match(script,/data-person="/,'leaderboard rows expose the climber name as a per-person hook');
 assert.match(script,/function openPersonCard\(/,'tapping a climber opens the per-person card');
-assert.match(script,/<button class="climber" type="button"[^>]*data-person=/,'the climber name is a real button, not a clickable row');
 assert.doesNotMatch(script,/<tr[^>]*tabindex=/,'leaderboard rows stay plain rows without a fake tab stop');
 assert.doesNotMatch(script,/[^.\w]confirm\(/,'destructive actions use the in-app dialog, never a native window.confirm');
 assert.doesNotMatch(script,/deploy v11/,'the outdated-script message derives its version from SUPPORTED_API_VERSIONS instead of a hard-coded literal');
@@ -123,7 +126,6 @@ assert.equal((script.match(/class="pyramid-row"/g)||[]).length,1,'the pyramid ro
 assert.equal((script.match(/class="records-row"/g)||[]).length,2,'the You panel and the person card share one records row');
 assert.match(html,/id="feedFilter"[^>]*role="group"[^>]*aria-label=/,'the You feed category filter is a named group');
 assert.match(html,/data-panel="you"[\s\S]*id="youEmptyState"[\s\S]*id="feedFilter"[\s\S]*id="personalActivity"/,'the filter chips sit between the You empty state and the feed they filter');
-assert.match(script,/<button class="cat-chip" type="button" data-feed-type="[^"]*" aria-pressed=/,'each feed filter chip is a real button carrying aria-pressed');
 assert.match(script,/function filterByType\(/,'a pure helper narrows the feed by category');
 assert.match(script,/function setFeedType\(/,'a named handler changes the filter so the delegated chip listener has something to call');
 assert.match(script,/feedType=next;resetFeedLimits\(\)/,'changing the filter resets the show-more count');
@@ -141,17 +143,10 @@ assert.equal((script.match(/function filterByType\(/g)||[]).length,1,'filterByTy
 assert.match(html,/id="personalShowMore"[^>]*type="button"/,'the You feed can show more');
 assert.match(html,/id="crewShowMore"[^>]*type="button"/,'the crew feed can show more');
 assert.match(script,/function showMoreFeed\(/,'one pager serves both feeds');
-// The clamp lives in showMoreFeed(), never inline at the call site, so the read-only assertion
-// below keeps matching a plain `,false)` argument rather than a nested Math.min(...).
-assert.match(script,/#activityList'\)\.innerHTML=activityMarkup\([^)]*,false\)/,'the crew feed is read-only');
-// Entry 48: the Crew feed's names open the same per-person card the leaderboard rows open. app.js
-// is one top-level function per line, so the feed-row assertions below are scoped to
-// activityMarkup's own line — a `data-person=` anywhere else in the script must not satisfy them.
-const feedRowSource=script.split('\n').find(line=>line.startsWith('function activityMarkup('))||'';
-assert.ok(feedRowSource,'the activity feed markup helper is a top-level function');
-assert.match(feedRowSource,/data-person="/,'the crew feed rows expose the climber name as the same per-person hook the leaderboard uses');
-assert.match(feedRowSource,/<button class="climber" type="button" data-person=/,'the crew feed name reuses the leaderboard climber button rather than a second control');
-assert.match(feedRowSource,/<strong>\$\{nm\}<\/strong>/,'the You feed keeps a plain name, so only the crew feed becomes tappable');
+// Entry 48: the Crew feed's read-only shape and its per-person name hooks are asserted against the
+// RENDERED feeds in tests/client-state.dom.test.js — the innerHTML of #activityList and
+// #personalActivity after render(), which proves the markup the app emits rather than the line of
+// app.js that emits it. What stays here is the delegated handler, which no element stub can fire.
 assert.match(script,/querySelector\('#crew'\)\.addEventListener\('click',event=>\{const button=event\.target\.closest\('\[data-person\]'\)/,'a single delegated handler on the Crew panel covers both the leaderboard and the feed');
 assert.equal((script.match(/closest\('\[data-person\]'\)/g)||[]).length,1,'and there is exactly one such handler, not a second one added for the feed');
 assert.match(html,/id="undoBar"[^>]*role="status"[^>]*aria-live="polite"/,'the undo bar announces itself politely');
@@ -195,7 +190,6 @@ assert.match(html,/data-panel="you"[\s\S]*id="bountyCapHint"[\s\S]*id="todayBoun
 assert.match(html,/data-panel="you"[\s\S]*today-card[\s\S]*id="bountyCapHint"[\s\S]*id="todayBounties"[\s\S]*class="stat-grid"/,'the bounty card sits directly under the today card, above the stat grid, on the You panel');
 assert.match(html,/data-panel="you"[\s\S]*id="todayBounties"[\s\S]*id="personalActivity"[\s\S]*class="stat-grid"/,'the recent activity feed sits above the analytics stat grid on the You panel');
 assert.match(script,/function claimBounty\(/,'a claim handler exists so bounty rows are actionable');
-assert.match(script,/<button class="bounty[^"]*" type="button"[^>]*data-claim-bounty=[^>]*aria-label="Claim /,'bounty rows render as labelled one-tap claim buttons');
 assert.match(script,/function claimedTodayIds\(/,'a pure helper identifies bounties claimed today');
 const populateBountySelectSource=script.split('\n').find(line=>line.startsWith('function populateBountySelect('))||'';
 assert.ok(populateBountySelectSource,'the Record bounty picker has its own named population helper');
@@ -205,14 +199,13 @@ assert.doesNotMatch(html,/\.title-grid\{|\.title-tile\{/,'the retired title tile
 assert.match(script,/function categoryDays\(/,'credited category-day counting is a pure helper');
 assert.match(script,/function crewTitles\(/,'the title rows are derived by a pure helper');
 const titlesConstant=script.match(/const TITLE_CATEGORIES=\[.*?\];/)?.[0]||'';
+assert.ok(titlesConstant,'the title catalogue is a single-line constant, so the negative assertion below has something to read');
 assert.doesNotMatch(titlesConstant,/🧗|💪|🧘|glyph/,'category titles carry no glyph and do not reuse the activity icons');
 assert.match(titlesConstant,/id:'crusher'/,'the climbing title is named Crusher');
 assert.doesNotMatch(html,/id="leaderChampions"/,'the redundant champions panel is gone from the template');
 assert.doesNotMatch(html,/\.champions\{|\.champ-line\{|\.champ-scope\{/,'the retired champions and title-tile scope labels have no CSS rules');
 assert.match(html,/\.title-tag\{/,'the folded-in leaderboard title tag is styled');
-assert.match(script,/class="title-tag"/,'a leaderboard row can render a title tag beside the climber name');
 assert.match(script,/model\.hunters\.forEach\(name=>titleMap\.set\(name,\(titleMap\.get\(name\)\|\|\[\]\)\.concat\('Bounty Hunter'\)\)\)/,'Bounty Hunter joins the runtime title map without becoming a category');
-assert.match(script,/<span class="hunter" aria-hidden="true">\$\{glyph\('bounty'\)\}<\/span>/,'the decorative hunter glyph remains beside its visible label');
 assert.doesNotMatch(script,/title="Bounty Hunter/,'the hunter no longer relies on a title tooltip');
 assert.match(stylesheet,/\.text-btn\{display:inline-flex;align-items:center;min-height:44px\}/,'text buttons meet the minimum touch target from their base class');
 assert.match(stylesheet,/\.sync\{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px\}/,'the sync control meets the minimum touch target from its base class');
@@ -286,8 +279,6 @@ assert.match(script,/function pyramidLabel\(/,'a pure helper owns the pyramid te
 assert.equal((script.match(/Grade pyramid: /g)||[]).length,1,'the pyramid label text has one owner');
 // Entry 54: the person card lists that climber's most recent entries as the final section.
 assert.match(html,/id="personPyramid"[^>]*><\/div><h3 class="person-head">Recent activity<\/h3><div id="personRecent" class="records"><\/div><\/div><\/div>/,'the person card recent-activity section is the last one in the dialog, right after the grade pyramid');
-const personCardSource=script.split('\n').find(line=>line.startsWith('function renderPersonCard('))||'';
-assert.equal(personCardSource.indexOf('activityMarkup('),-1,'renderPersonCard renders recent activity without reusing the dead-button activityMarkup() helper');
 assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=[^>]*>Recent<\/button>/,'the Recent toggle keeps its id and is a real button with aria-pressed');
 assert.doesNotMatch(html,/>Weekly</,'the leaderboard template no longer labels its recent scope Weekly');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
@@ -321,11 +312,13 @@ assert.match(stylesheet,/\.activity>div\{min-width:0;overflow-wrap:anywhere\}/,'
 assert.match(stylesheet,/@media\(max-width:430px\)\{\.activity\{grid-template-columns:38px minmax\(0,1fr\) auto auto\}\}/,'phone feed rows retain the shrinkable note track');
 assert.match(stylesheet,/\.dialog h2\{min-width:0;overflow-wrap:anywhere\}/,'dialog headings can shrink and break long names');
 assert.match(stylesheet,/\.setup-copy pre\{overflow-wrap:anywhere\}/,'setup code breaks an unspaced run without losing its scroll container');
-// Entry 83: polite status regions keep their semantics but only receive changed text, and the
-// person-card wrapper does not duplicate the chart SVG's accessible name.
+// Entry 83: polite status regions keep their semantics but only receive changed text. The
+// companion claim — that the person-card trend wrapper does not duplicate the chart SVG's
+// accessible name — is asserted on the rendered #personTrend element in
+// tests/client-state.dom.test.js, which reads the attribute itself rather than the line of app.js
+// that would have written it.
 assert.match(html,/class="preview"[^>]+role="status"[^>]+aria-live="polite"/,'record preview remains a polite live region');
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'sync diagnostics remain a polite live region');
-assert.doesNotMatch(personCardSource,/trendEl\.setAttribute\('aria-label'/,'the role-less person trend wrapper receives no dead aria-label');
 // Entry 84: updating numeric figures does not shift their width, and the stat grid owns its row gap.
 assert.match(stylesheet,/\.stat strong,\.pts,#leaderTable td:nth-child\(3\),#leaderTable td:nth-child\(4\)\{font-variant-numeric:tabular-nums\}/,'stat, feed and leaderboard values use tabular figures');
 assert.match(stylesheet,/\.stat-grid \.card\{margin-bottom:0\}/,'stat-grid cards do not add a second vertical gap');
@@ -348,7 +341,6 @@ assert.match(stylesheet,/\.today-card:before\{[^}]*transform:translateX\(120%\)/
 assert.match(stylesheet,/@keyframes sheen\{from\{transform:translateX\(-120%\)\}\}/,'the sheen animates up to that resting position rather than away from it');
 assert.match(stylesheet,/@keyframes grow\{from\{width:0\}\}/,'bars grow up to the width their own inline style already sets');
 assert.match(stylesheet,/\.trend-line\{stroke-dasharray:1;animation:ring-ink/,'the trend line rests fully drawn and reuses the ring stroke keyframe');
-assert.match(script,/<path class="trend-line" d="\$\{line\}" pathLength="1"/,'the trend path declares a unit length, so one dash value draws any line');
 // White on the low-light clay measures 4.43:1 — under the 4.5:1 text floor — so the raised Record
 // pill is the one control that changes fill in the dark, taking the lighter clay and dark ink.
 assert.match(stylesheet,/@media\(prefers-color-scheme:dark\)\{#navRecord\{background:var\(--orange\);color:#211d12\}\}/,'the night Record pill swaps to a fill its label can sit on');

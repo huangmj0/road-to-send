@@ -8,6 +8,21 @@
 //   * The element stub in harness.js stores attributes and fires listeners bound to the element
 //     itself, but elements have no tree, so a DELEGATED handler still cannot be fired. Read the
 //     trap note at the top of tests/harness.js before adding assertions here.
+//   * An assertion over rendered innerHTML is easy to write so that it proves LESS than its message
+//     says, and it then passes forever without saying so. Four rounds of review on one PR found
+//     four variants of exactly that. Before adding one, walk the list:
+//       - a NEGATIVE check (indexOf(...)===-1, doesNotMatch) needs a positive assertion nearby
+//         proving the thing it reads is non-empty; '' satisfies every negative;
+//       - a COUNT of one thing against a count of another balances when a value moves between
+//         elements — inspect the items, do not tally them;
+//       - two indexOf() checks over one blob prove each string is present SOMEWHERE, not that they
+//         are on the same element — slice the element with openTag() and assert against that;
+//       - one matching element proves nothing about its siblings — use openTags() and loop, with a
+//         count so an empty match set fails too;
+//       - an attribute's PRESENCE is not its value: 'aria-label="' matches aria-label="" — read it
+//         with attrOf() and reject '' as well as null.
+//     Then break the rendered output ONE WAY AT A TIME and confirm the suite fails by message —
+//     including a break that damages one row while leaving its neighbour intact.
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {test} = require('node:test');
@@ -43,6 +58,20 @@ const domContext = {
 const domChecks = `(()=>{
   const todayStart=parseDateOnly(challengeToday());
   const shift=n=>{const d=new Date(todayStart);d.setDate(d.getDate()+n);return localDate(d)};
+  // Two indexOf() checks over one blob prove each string is present SOMEWHERE, never that they are
+  // on the same element — a regression can move an attribute onto a sibling and keep both green.
+  // openTag() returns one element's opening tag so a co-location claim can be asserted as one.
+  // src/app.js escapes '>' in every interpolated value, so the first '>' always ends the tag.
+  const openTag=(html,mark)=>{const at=html.indexOf(mark);return at<0?'':html.slice(at,html.indexOf('>',at)+1)};
+  // ...and the collection form. Checking ONE matching element proves nothing about the rest: a
+  // regression can break the first row while a later row keeps the assertion green. Every claim
+  // about what a renderer emits per row is asserted over all of them, with a count so an empty
+  // match set cannot pass either.
+  // Presence is not a value: indexOf('aria-label="') is satisfied by aria-label="", and an empty
+  // accessible name is exactly as broken as a missing one. attrOf() answers null when the attribute
+  // is absent and '' when it is empty, so an assertion can tell those apart and reject both.
+  const attrOf=(tag,name)=>{const mark=' '+name+'="',at=tag.indexOf(mark);return at<0?null:tag.slice(at+mark.length,tag.indexOf('"',at+mark.length))};
+  const openTags=(html,mark)=>{const out=[];let at=html.indexOf(mark);while(at>=0){out.push(html.slice(at,html.indexOf('>',at)+1));at=html.indexOf(mark,at+1)}return out};
   config={startDate:shift(-5),tripDate:shift(5),goal:500,crew:[{name:'Alex'}]};
   const dateField=document.querySelector('#activityDate'),dateBox=document.querySelector('#dateFields'),label=document.querySelector('#bountySelectLabel');
 
@@ -180,6 +209,17 @@ const domChecks = `(()=>{
   assert.ok(todayBounties.innerHTML.includes('data-claim-bounty="'+claimId+'"')&&todayBounties.innerHTML.includes('claimed today'),'the claimed row carries its claim state');
   assert.equal((todayBounties.innerHTML.match(/claimed today/g)||[]).length,2,'only the claimed row names the state in its text and label');
   assert.ok(todayBounties.innerHTML.includes('data-claim-bounty')&&todayBounties.innerHTML.includes('aria-label="Claim '),'claimed rows remain labelled claim buttons');
+  // Relocated from tests/static-check.mjs, which matched the button markup in the SOURCE of
+  // renderBounties(). Asserted here against what #todayBounties actually holds after render().
+  assert.ok(todayBounties.innerHTML.indexOf('<button class="bounty done" type="button" data-claim-bounty=')>=0,'the claimed row keeps the button element while marking itself done');
+  const bountyTags=openTags(todayBounties.innerHTML,'<button class="bounty');
+  assert.equal(bountyTags.length,dailyBounties(challengeToday()).length,'every offered bounty renders one such button, so the loop below sees them all');
+  bountyTags.forEach(tag=>{
+    assert.ok(tag.indexOf('type="button"')>=0,'every bounty row is a real button, not a tappable div: '+tag);
+    assert.ok(attrOf(tag,'data-claim-bounty'),'every bounty row carries its own non-empty claim hook: '+tag);
+    assert.ok(tag.indexOf('aria-label="Claim ')>=0,'and its own claim label: '+tag);
+  });
+  assert.equal((todayBounties.innerHTML.match(/data-claim-bounty=/g)||[]).length,bountyTags.length,'and no claim hook is emitted outside those buttons');
   const bountyRadio=document.querySelector('input[name="activityType"][value="bounty"]');
   const claimSelect=document.querySelector('#bountySelect'),claimDateBox=document.querySelector('#dateFields');
   bountyRadio.checked=false;claimSelect.value='';claimDateBox.classList.remove('hide');
@@ -400,6 +440,13 @@ const domChecks = `(()=>{
   const curveSvg=youCurve.slice(0,youCurve.indexOf('</svg>')+6);
   assert.ok(youCurve.indexOf('<div class="trend-labels">')>curveSvg.length-1,'the value labels sit outside the stretched SVG');
   assert.equal(curveSvg.indexOf('<text'),-1,'the SVG contains no distortable text marks');
+  // Relocated from tests/static-check.mjs, which matched the template literal inside trendSvg().
+  // pathLength is what lets one stroke-dasharray value draw a curve of any length, so assert it on
+  // the curve that was drawn.
+  const trendLineTag=openTag(curveSvg,'<path class="trend-line"');
+  assert.ok(trendLineTag,'the drawn curve carries the trend line path');
+  assert.ok(trendLineTag.indexOf(' pathLength="1"')>=0,'and THAT path declares the unit length, so one dash value draws any line: '+trendLineTag);
+
   assert.equal((curveSvg.match(/<title>/g)||[]).length,personalWeeklyTrend('alex',challengeToday()).length,'each curve day keeps one hover title');
   assert.ok(youTrendCap.textContent.indexOf('Peak ')===0,'and trendCaption writes the caption underneath it');
   render();
@@ -610,6 +657,20 @@ const domChecks = `(()=>{
   const filterFeed=document.querySelector('#personalActivity'),filterChips=document.querySelector('#feedFilter');
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,4,'the You feed opens showing every category');
   assert.equal(filterChips.innerHTML.indexOf('data-feed-type="all" aria-pressed="true"')>=0,true,'All is the pressed chip by default');
+  // Relocated from tests/static-check.mjs, which matched renderFeedChips()'s source. The claim is
+  // about the chip row the app paints, so it is asserted on that row here — and per BUTTON, not by
+  // counting. A count of cat-chips against a count of aria-pressed balances just as well when one
+  // chip loses the attribute and some other element in the row gains it, which is the same shape of
+  // hole this PR exists to close. The named-category checks below cover all/climb/mobility, so a
+  // regression confined to Exercise is exactly what only this loop would catch.
+  const chipTags=filterChips.innerHTML.split('<button ').slice(1).map(part=>part.slice(0,part.indexOf('>')));
+  assert.equal(chipTags.length,feedChips().length,'the chip row emits one button per offered filter, so the loop below has every chip to inspect');
+  chipTags.forEach(tag=>{
+    assert.ok(tag.indexOf('class="cat-chip"')>=0,'every button in the chip row is a cat-chip: '+tag);
+    assert.ok(tag.indexOf('type="button"')>=0,'every chip is a real button: '+tag);
+    assert.ok(attrOf(tag,'data-feed-type'),'every chip carries its own non-empty category: '+tag);
+    assert.ok(['true','false'].indexOf(attrOf(tag,'aria-pressed'))>=0,'every chip declares its own pressed state as a real boolean: '+tag);
+  });
   setFeedType('climb');
   assert.equal(feedType,'climb','the choice lives in module state, not read back out of the DOM');
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,2,'selecting a category narrows the feed to that category');
@@ -841,6 +902,15 @@ const domChecks = `(()=>{
   assert.ok(weeklyMedalFree.indexOf('>#1</td>')<weeklyMedalFree.indexOf('>#2</td>')&&weeklyMedalFree.indexOf('>#2</td>')<weeklyMedalFree.indexOf('>#3</td>'),'the weekly rank column remains in order');
   assert.ok(weeklyMedalFree.indexOf('class="me"')>=0,'the signed-in climber remains highlighted');
   assert.ok(weeklyMedalFree.indexOf('class="hunter"')>=0,'the Bounty Hunter glyph remains beside its holder');
+  // Relocated from tests/static-check.mjs, which matched the exact interpolation in render()'s
+  // source. What matters is the emitted markup: a decorative glyph, hidden from the accessible
+  // name, sitting beside the visible title rather than adding a second text label.
+  const hunterSpans=weeklyMedalFree.split('<span class="hunter"').slice(1).map(part=>'<span class="hunter"'+part.slice(0,part.indexOf('</span>')+7));
+  assert.ok(hunterSpans.length,'the leaderboard carries a hunter mark');
+  hunterSpans.forEach(span=>{
+    assert.ok(span.indexOf('aria-hidden="true"')>=0,'every hunter mark is hidden from the row accessible name: '+span);
+    assert.ok(span.indexOf('href="#g-bounty"')>=0,'and draws the bounty symbol INSIDE that same hidden span, rather than adding text beside it: '+span);
+  });
 
   leaderScope='overall';render();
   const overallMedalFree=leaderRows.innerHTML;
@@ -878,8 +948,24 @@ const domChecks = `(()=>{
   const feedCrew=document.querySelector('#activityList'),feedYou=document.querySelector('#personalActivity');
   assert.ok(feedCrew.innerHTML.indexOf('data-person="Bo"')>=0,'a Crew row carries the climber it names as a per-person hook');
   assert.ok(feedCrew.innerHTML.indexOf('data-person="Alex"')>=0,'every Crew row carries one, not just the newest');
-  assert.ok(feedCrew.innerHTML.indexOf('<button class="climber" type="button" data-person=')>=0,'the Crew name reuses the leaderboard climber button rather than a new control');
-  assert.ok(feedCrew.innerHTML.indexOf('aria-haspopup="dialog"')>=0,'and announces that it opens a dialog');
+  // Relocated from tests/static-check.mjs, which matched the button markup once in the whole script
+  // and so could not tell the feed's emitter from the leaderboard's. Both surfaces are read here,
+  // so "the Crew feed reuses the leaderboard button" is proved rather than assumed — and read over
+  // EVERY row, because one good button elsewhere in the same blob would otherwise cover a row that
+  // regressed to a plain element still carrying the hook.
+  const climberCheck=(html,where)=>{
+    const tags=openTags(html,'<button class="climber"');
+    assert.ok(tags.length,where+' names its climbers with the climber button');
+    tags.forEach(tag=>{
+      assert.ok(tag.indexOf('type="button"')>=0,where+' climber name is a real button: '+tag);
+      assert.ok(attrOf(tag,'data-person'),where+' climber button carries a non-empty per-person hook: '+tag);
+      assert.ok(tag.indexOf('aria-haspopup="dialog"')>=0,where+' climber button announces that it opens a dialog: '+tag);
+    });
+    assert.equal((html.match(/data-person=/g)||[]).length,tags.length,where+' emits no per-person hook outside those buttons');
+    return tags;
+  };
+  assert.equal(climberCheck(feedCrew.innerHTML,'the Crew feed').length,feedCrew.innerHTML.split('class="activity"').length-1,'one climber button per Crew row, not one row carrying the whole assertion');
+  assert.equal(climberCheck(leaderRows.innerHTML,'the leaderboard').length,leaderRows.innerHTML.split('<tr').length-1,'and one per leaderboard row');
   assert.ok(feedYou.innerHTML.length>0,'the You feed has rows of its own to compare against');
   assert.equal(feedYou.innerHTML.indexOf('data-person='),-1,'the You feed lists your own entries, so its names get no per-person hook');
   assert.ok(feedYou.innerHTML.indexOf('<strong>Alex</strong>')>=0,'the You feed keeps the plain name it always rendered');
@@ -1157,6 +1243,19 @@ const domChecks = `(()=>{
   const personTrendEl=document.querySelector('#personTrend');
   assert.equal(personTrendEl.innerHTML,youTrendEl.innerHTML,'the card charts the same daily curve the You card shows for that same climber');
   assert.ok(personTrendEl.innerHTML.indexOf('<svg')>=0,'and draws the inline SVG curve');
+  // Relocated from tests/static-check.mjs, where it read a line of renderPersonCard()'s source with
+  // no guard that the line was found — so an empty slice satisfied it. The element stub records
+  // attributes, so the claim is asserted directly: the role-less wrapper has no name, and the one
+  // accessible name belongs to the SVG inside it.
+  assert.equal(personTrendEl.getAttribute('aria-label'),null,'the role-less trend wrapper carries no aria-label of its own');
+  assert.equal(personTrendEl.getAttribute('role'),null,'and takes no role that would make one necessary');
+  const personSvgTag=openTag(personTrendEl.innerHTML,'<svg');
+  assert.ok(personSvgTag,'the wrapper holds the inline SVG');
+  assert.ok(personSvgTag.indexOf('role="img"')>=0,'which is the element taking the graphic role: '+personSvgTag);
+  const personSvgName=attrOf(personSvgTag,'aria-label');
+  assert.ok(personSvgName,'and a NON-EMPTY accessible name sits on THAT element, not on the wrapper: '+personSvgTag);
+  assert.equal(personSvgName,trendAria(personalWeeklyTrend('alex',challengeToday())),'naming the same curve the chart draws, so the label cannot drift from the data');
+  assert.ok(document.querySelector('#personPyramid').getAttribute('aria-label')!==null,'while the pyramid, which is itself the graphic, does take one');
   logs=[];
   render();
   openPersonCard('Bo');
@@ -1174,6 +1273,16 @@ const domChecks = `(()=>{
   assert.ok(personRecentEl.innerHTML.indexOf('records-row')>=0,'the section renders with the shared records-row markup');
   assert.ok(personRecentEl.innerHTML.indexOf(CAT_LABELS.exercise)>=0,'names that climber newest entry');
   assert.equal(personRecentEl.innerHTML.indexOf('V9'),-1,'and not a crewmate entry');
+  // Relocated from tests/static-check.mjs, where it asserted that renderPersonCard()'s SOURCE never
+  // called activityMarkup() — against an unguarded line slice that answered '' if the line moved,
+  // and an empty string contains no call, so it passed either way. The claim it stood for is about
+  // the rendered section: recent activity here is a plain records list, carrying none of the feed
+  // row's controls or hooks, because a card already open must not offer a way back into itself and
+  // a viewer looking at someone else must not be offered their delete button.
+  assert.equal(personRecentEl.innerHTML.indexOf('class="activity"'),-1,'the card recent list is not the feed row shape');
+  assert.equal(personRecentEl.innerHTML.indexOf('data-del'),-1,'so it offers no delete control on a card the viewer may not own');
+  assert.equal(personRecentEl.innerHTML.indexOf('data-person'),-1,'and no per-person hook back into the card already open');
+  assert.equal(personRecentEl.innerHTML.indexOf('<button'),-1,'the card recent list renders no buttons at all');
   logs=[];
   render();
   openPersonCard('Bo');
