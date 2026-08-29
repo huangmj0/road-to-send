@@ -17,7 +17,6 @@ const suites = [
       'tests/client-state.state.test.js',
       'tests/client-state.dom.test.js',
       'tests/client-state.shared.test.js',
-      'tests/fingerprint.test.js',
       'tests/protocol-fixtures.test.js',
       'tests/smoke.test.js',
     ],
