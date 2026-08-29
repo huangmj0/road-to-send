@@ -1,5 +1,5 @@
-// Shared plumbing for the client-state suites: the inline script pulled out of the built
-// index.html, a happy-dom page tree for DOM behavior, and a small legacy element stub used only
+// Shared plumbing for the client-state suites: the source module assembled with its build-time
+// constants, a happy-dom page tree for DOM behavior, and a small legacy element stub used only
 // by the shared-mode and temporary fingerprint harnesses.
 //
 // The stub stores attributes and dispatches listeners registered on the element itself, so an
@@ -22,7 +22,16 @@ const fs = require('node:fs');
 const {Window} = require('happy-dom');
 
 const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
-const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const read = path => fs.readFileSync(new URL(path, `file://${__filename}`), 'utf8').trimEnd();
+const scoring = JSON.stringify(JSON.parse(read('../src/scoring.json')));
+const apiVersion = String(JSON.parse(read('../src/schema.json')).properties.version.const);
+const appsScript = read('../src/apps-script.js')
+  .replaceAll('__SCORING_CONFIG__', scoring)
+  .replaceAll('__API_VERSION__', apiVersion);
+const source = read('../src/app.js')
+  .replaceAll('__SCORING_CONFIG__', scoring)
+  .replaceAll('__API_VERSION__', apiVersion)
+  .replace('const SCRIPT=__APPS_SCRIPT__;', `const SCRIPT=${JSON.stringify(appsScript)};`);
 
 function createDom() {
   const window = new Window({url: 'https://example.test/'});
