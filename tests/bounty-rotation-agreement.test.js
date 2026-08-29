@@ -1,4 +1,12 @@
-// TRAP: The browser rotation comes from generated index.html while the backend rotation is assembled from editable sources. Run the generated-artifact check before trusting this comparison, or the harness may compare mismatched surfaces.
+// TRAP: Both rotations are read from editable sources, never from the shipped artifact — the
+// browser side through harness.js (src/app-core.js and src/app.js concatenated), the backend side
+// straight from src/apps-script.js. That is load-bearing, not incidental. `vm.runInContext` can
+// only reach `dailyBounties` because those sources are unbundled top-level declarations; the build
+// emits a minified IIFE, which exports nothing onto the context. Point the browser side at
+// index.html and `dailyBounties` becomes undefined — the harness throws instead of reporting a
+// rotation mismatch, so the failure would not mean what it says. What this file proves is that the
+// two *sources* agree; agreement between the deployed page and the backend rides on the build,
+// which check:generated and the artifact smoke suite cover instead.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
