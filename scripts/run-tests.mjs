@@ -14,6 +14,7 @@ const suites = [
       '--test',
       'tests/backend-script.test.js',
       'tests/artifact-smoke.test.js',
+      'tests/bounty-rotation-agreement.test.js',
       'tests/client-state.state.test.js',
       'tests/client-state.dom.test.js',
       'tests/client-state.shared.test.js',
