@@ -2,17 +2,20 @@
 // export, dialog focus and the share sheet. Unlike the other two client-state suites these are
 // real async test() blocks, each building its own context.
 //
-// TRAP — the element stub in harness.js stores attributes and fires listeners bound to the element
-// itself, but elements have no tree, so a delegated handler still cannot be fired. Read the trap
-// note at the top of tests/harness.js before adding assertions here. Assertions inside a `checks` template literal may contain no backtick and no `${`.
+// TRAP — each case uses a fresh happy-dom page so mutations cannot leak between asynchronous
+// cases. Assertions inside a `checks` template literal may contain no backtick and no `${`.
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {test} = require('node:test');
-const {source, makeElement} = require('./harness.js');
+const {source, createDom} = require('./harness.js');
+
+function sharedDom() {
+  const window = createDom();
+  return {window, document: window.document, fire: type => window.document.dispatchEvent(new window.Event(type, {bubbles: true}))};
+}
 
 test('background sync respects the open date picker and refreshes stale caches', async () => {
-  const elements = new Map();
-  const listeners = new Map();
+  const dom = sharedDom();
   const store = new Map();
   store.set('roadToSendEndpoint', 'https://sheet.example.test/exec');
   store.set('roadToSendMe', 'Alex');
@@ -23,15 +26,9 @@ test('background sync respects the open date picker and refreshes stale caches',
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/', hash: ''},
     history: {replaceState() {}},
-    window: {scrollTo() {}},
-    document: {
-      visibilityState: 'visible', activeElement: null,
-      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-      querySelectorAll: () => [],
-      addEventListener: (type, handler) => listeners.set(type, handler),
-      removeEventListener() {}, createElement: () => makeElement(),
-    },
-    fireDocumentEvent: type => {const handler = listeners.get(type); if (handler) handler({})},
+    window: dom.window,
+    document: dom.document,
+    fireDocumentEvent: dom.fire,
     countGets: () => gets,
     setPayloadVersion: v => {payload.version = v},
     setNumericActivity: activity => {payload.activities = [activity]},
@@ -95,21 +92,14 @@ test('background sync respects the open date picker and refreshes stale caches',
 // would quietly go stale the next time the protocol version bumps. It now derives the version
 // from SUPPORTED_API_VERSIONS, the same expression saveSetup() and exportData() already use.
 test('testConnection names the expected protocol version instead of a stale literal', async () => {
-  const elements = new Map();
-  const listeners = new Map();
+  const dom = sharedDom();
   const store = new Map();
   const testContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/', hash: ''},
     history: {replaceState() {}},
-    window: {scrollTo() {}},
-    document: {
-      visibilityState: 'visible', activeElement: null,
-      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-      querySelectorAll: () => [],
-      addEventListener: (type, handler) => listeners.set(type, handler),
-      removeEventListener() {}, createElement: () => makeElement(),
-    },
+    window: dom.window,
+    document: dom.document,
     fetch: async () => ({ok: true, json: async () => ({version: 99, features: [], activities: [], config: null, configErrors: []})}),
     localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
     setTimeout() {}, clearTimeout() {},
@@ -128,27 +118,20 @@ test('testConnection names the expected protocol version instead of a stale lite
 // clipboard write used to land in the catch and paint #setupErrors as if setup had failed —
 // even though the config was already on the Sheet and the endpoint had persisted.
 test('a denied clipboard copy never reports shared setup as failed', async () => {
-  const elements = new Map();
-  const listeners = new Map();
+  const dom = sharedDom();
+  const queryAll = dom.document.querySelectorAll.bind(dom.document);
   const store = new Map();
   const posted = [];
   const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
   const crewConfig = {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]};
   const payload = {version: 12, features: [], activities: [], config: crewConfig, configErrors: [], serverDate: '', timeZone: ''};
-  const participantRow = {querySelector: () => ({value: 'Alex'})};
   const setupContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/', hash: ''},
     history: {replaceState() {}},
-    window: {scrollTo() {}},
+    window: dom.window,
     navigator: {clipboard: {writeText: () => Promise.reject(Error('denied'))}},
-    document: {
-      visibilityState: 'visible', activeElement: null,
-      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-      querySelectorAll: selector => selector === '.participant-row' ? [participantRow] : [],
-      addEventListener: (type, handler) => listeners.set(type, handler),
-      removeEventListener() {}, createElement: () => makeElement(),
-    },
+    document: dom.document,
     postedActions: () => posted.join(','),
     fetch: async (url, options = {}) => {
       if (options.method === 'POST') {posted.push(JSON.parse(options.body).action); return {ok: true, json: async () => ({ok: true, config: JSON.parse(JSON.stringify(crewConfig))})}}
@@ -162,6 +145,7 @@ test('a denied clipboard copy never reports shared setup as failed', async () =>
     document.querySelector('#challengeStart').value='${crewConfig.startDate}';
     document.querySelector('#tripDate').value='${crewConfig.tripDate}';
     document.querySelector('#groupGoalInput').value='500';
+    document.querySelector('#participantRows').innerHTML='<div class="participant-row"><input class="participant-name" value="Alex" /></div>';
     await saveSetup();
     assert.equal(endpoint,'https://sheet.example.test/exec','the endpoint persisted even though the clipboard refused');
     assert.equal(localStorage.getItem('roadToSendEndpoint'),'https://sheet.example.test/exec','the endpoint reached localStorage');
@@ -174,23 +158,16 @@ test('a denied clipboard copy never reports shared setup as failed', async () =>
 });
 
 test('copyText reports a successful clipboard write and keeps the crew link deliberate', async () => {
-  const elements = new Map();
-  const listeners = new Map();
+  const dom = sharedDom();
   const store = new Map();
   const written = [];
   const copyContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you', hash: ''},
     history: {replaceState() {}},
-    window: {scrollTo() {}},
+    window: dom.window,
     navigator: {clipboard: {writeText: value => {written.push(String(value)); return Promise.resolve()}}},
-    document: {
-      visibilityState: 'visible', activeElement: null,
-      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-      querySelectorAll: () => [],
-      addEventListener: (type, handler) => listeners.set(type, handler),
-      removeEventListener() {}, createElement: () => makeElement(),
-    },
+    document: dom.document,
     lastWritten: () => written[written.length - 1],
     fetch: async () => {throw Error('this harness makes no network calls')},
     localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
@@ -212,22 +189,15 @@ test('copyText reports a successful clipboard write and keeps the crew link deli
 });
 
 test('a full disk never reports a saved entry as failed, and never traps the identity dialog', async () => {
-  const elements = new Map();
-  const listeners = new Map();
+  const dom = sharedDom();
   const store = new Map();
   const today = new Date().toISOString().slice(0, 10);
   const storageContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/app/', hash: ''},
     history: {replaceState() {}},
-    window: {scrollTo() {}},
-    document: {
-      visibilityState: 'visible', activeElement: null,
-      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-      querySelectorAll: () => [],
-      addEventListener: (type, handler) => listeners.set(type, handler),
-      removeEventListener() {}, createElement: () => makeElement(),
-    },
+    window: dom.window,
+    document: dom.document,
     // Safari private mode and an exhausted quota both throw here. Reads still work, which is why
     // safeJson() was never the problem — every write in the app was the unguarded half.
     fetch: async () => {throw Error('this harness makes no network calls')},
@@ -238,13 +208,13 @@ test('a full disk never reports a saved entry as failed, and never traps the ide
     endpoint='';
     config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};
     logs=[];me='';recordingFor='';
+    document.querySelector('#identityMember').innerHTML='<option value="Alex">Alex</option>';
     document.querySelector('#identityMember').value='Alex';
     document.querySelector('#identityModal').classList.add('open');
     saveIdentity();
     assert.equal(me,'Alex','a failed write still records the identity in memory');
     assert.equal(document.querySelector('#identityModal').classList.contains('open'),false,'and the dialog closes instead of trapping the user behind an uncaught throw');
     document.querySelector('#activityDate').value='${today}';
-    document.querySelector('#recordFor').value='Alex';
     await submitActivity({preventDefault(){}});
     assert.equal(logs.length,1,'the entry is in the log either way, so it must not be reported as lost');
     assert.equal(document.querySelector('#toast').textContent,'Saved on this device only — storage is full.','the toast names the real failure instead of claiming the save failed');
@@ -258,8 +228,7 @@ test('a full disk never reports a saved entry as failed, and never traps the ide
 // background loadRemote(). Here that reconcile GET never resolves, proving the save does not wait
 // on it — the pre-optimistic code awaited loadRemote() and would hang forever on this stub.
 test('a shared save shows the entry from the write response without waiting on a reload', async () => {
-  const elements = new Map();
-  const listeners = new Map();
+  const dom = sharedDom();
   const store = new Map();
   let posted = 0;
   const today = new Date().toISOString().slice(0, 10);
@@ -269,14 +238,8 @@ test('a shared save shows the entry from the write response without waiting on a
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/app/', hash: ''},
     history: {replaceState() {}},
-    window: {scrollTo() {}},
-    document: {
-      visibilityState: 'visible', activeElement: null,
-      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-      querySelectorAll: () => [],
-      addEventListener: (type, handler) => listeners.set(type, handler),
-      removeEventListener() {}, createElement: () => makeElement(),
-    },
+    window: dom.window,
+    document: dom.document,
     postedCount: () => posted,
     fetch: async (url, options = {}) => {
       if (options.method === 'POST') {posted++; return {ok: true, json: async () => ({version: 12, ok: true, id: 'srv-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-01-01T00:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: ''})}}
@@ -302,11 +265,17 @@ test('a shared save shows the entry from the write response without waiting on a
 });
 
 test('a blocked export says so instead of failing silently', async () => {
-  // Neither Blob nor a throwing click() exists in any other harness, so both stubs are additive.
+  // The real document only needs an anchor-download seam layered over it.
   const makeExportContext = ({clickThrows = false, blobThrows = false} = {}) => {
-    const elements = new Map();
+    const dom = sharedDom();
     const revoked = [];
     const anchors = [];
+    const createElement = dom.document.createElement.bind(dom.document);
+    dom.document.createElement = tag => {
+      const el = createElement(tag);
+      if (tag === 'a') el.click = () => {if (clickThrows) throw Error('downloads are blocked'); anchors.push({href: el.href, download: el.download})};
+      return el;
+    };
     return {
       revoked, anchors,
       context: {
@@ -317,19 +286,9 @@ test('a blocked export says so instead of failing silently', async () => {
         URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
         location: {search: '', href: 'https://example.test/app/', hash: ''},
         history: {replaceState() {}},
-        window: {scrollTo() {}},
+        window: dom.window,
         Blob: function (parts) {if (blobThrows) throw Error('Blob is not available here'); this.parts = parts},
-        document: {
-          visibilityState: 'visible', activeElement: null,
-          querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-          querySelectorAll: () => [],
-          addEventListener() {}, removeEventListener() {},
-          createElement: () => {
-            const el = makeElement();
-            el.click = () => {if (clickThrows) throw Error('downloads are blocked'); anchors.push({href: el.href, download: el.download})};
-            return el;
-          },
-        },
+        document: dom.document,
         fetch: async () => {throw Error('this harness makes no network calls')},
         localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
         setTimeout() {}, clearTimeout() {},
@@ -358,36 +317,15 @@ test('a blocked export says so instead of failing silently', async () => {
 });
 
 test('opening a dialog moves focus into it, and only the backdrop closes it', async () => {
-  // The shared makeElement() stubs focus as a no-op and returns [] from querySelectorAll, so none of
-  // this is observable in the existing harnesses. A richer factory in a fresh context is additive.
-  const focused = [];
-  const elements = new Map();
-  const makeFocusable = name => {
-    const el = makeElement();
-    el.name = name;
-    el.focus = () => focused.push(name);
-    el.offsetParent = {};
-    return el;
-  };
-  const okBtn = makeFocusable('confirmOk');
-  const cancelBtn = makeFocusable('confirmCancel');
-  const confirmModal = makeElement();
-  confirmModal.querySelectorAll = () => [cancelBtn, okBtn];
-  elements.set('#confirmModal', confirmModal);
+  const dom = sharedDom();
   const focusContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/app/', hash: ''},
     history: {replaceState() {}},
-    window: {scrollTo() {}},
-    document: {
-      visibilityState: 'visible', activeElement: null,
-      querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-      querySelectorAll: () => [],
-      addEventListener() {}, removeEventListener() {}, createElement: () => makeElement(),
-    },
-    focusOrder: () => focused,
-    innerNode: () => okBtn,
-    theModal: () => confirmModal,
+    window: dom.window,
+    document: dom.document,
+    innerNode: () => dom.document.querySelector('#confirmOk'),
+    theModal: () => dom.document.querySelector('#confirmModal'),
     fetch: async () => {throw Error('this harness makes no network calls')},
     localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
     setTimeout() {}, clearTimeout() {},
@@ -395,7 +333,7 @@ test('opening a dialog moves focus into it, and only the backdrop closes it', as
   const focusChecks = `(()=>{
     openModal('confirmModal');
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the dialog opened');
-    assert.equal(focusOrder().join(','),'confirmCancel','focus lands on the dialog first focusable element, not on the destructive one');
+    assert.equal(document.activeElement.id,'confirmClose','focus lands on the dialog first focusable element, not on the destructive one');
     // A click inside the dialog is not a dismissal.
     closeIfScrim({target:innerNode()},'confirmModal');
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'a click on something inside the dialog leaves it open');
@@ -411,7 +349,7 @@ test('opening a dialog moves focus into it, and only the backdrop closes it', as
 test('the share sheet is tried first, and a dismissed one is not a failure', async () => {
   const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
   const makeShareContext = share => {
-    const elements = new Map();
+    const dom = sharedDom();
     const written = [];
     const shared = [];
     const navigator = {clipboard: {writeText: value => {written.push(String(value)); return Promise.resolve()}}};
@@ -422,14 +360,9 @@ test('the share sheet is tried first, and a dismissed one is not a failure', asy
         assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
         location: {search: '', href: 'https://example.test/app/?sheet=https%3A%2F%2Fsheet.example.test%2Fexec#you', hash: '#you'},
         history: {replaceState() {}},
-        window: {scrollTo() {}},
+        window: dom.window,
         navigator,
-        document: {
-          visibilityState: 'visible', activeElement: null,
-          querySelector: selector => {if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector)},
-          querySelectorAll: () => [],
-          addEventListener() {}, removeEventListener() {}, createElement: () => makeElement(),
-        },
+        document: dom.document,
         fetch: async () => {throw Error('this harness makes no network calls')},
         localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
         setTimeout() {}, clearTimeout() {},

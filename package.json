@@ -5,5 +5,8 @@
     "build": "node scripts/build.mjs",
     "check:generated": "node scripts/check-generated.mjs",
     "test": "node scripts/run-tests.mjs"
+  },
+  "devDependencies": {
+    "happy-dom": "20.11.15"
   }
 }

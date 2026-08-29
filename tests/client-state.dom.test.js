@@ -1,13 +1,9 @@
-// DOM-backed harness: a minimal document stub so init()/render() run and rendered output can be
-// asserted. Presence-and-order assertions about the markup itself belong in
-// tests/static-check.mjs, not here.
+// DOM-backed harness: happy-dom evaluates the built artifact against the actual page tree.
+// Presence-and-order assertions about the markup itself belong in tests/static-check.mjs, not here.
 //
 // TRAP — two of them:
 //   * The assertions below live inside a backtick template literal evaluated in a vm context.
 //     Added code may contain no backtick and no `${`. Build strings with `+`.
-//   * The element stub in harness.js stores attributes and fires listeners bound to the element
-//     itself, but elements have no tree, so a DELEGATED handler still cannot be fired. Read the
-//     trap note at the top of tests/harness.js before adding assertions here.
 //   * An assertion over rendered innerHTML is easy to write so that it proves LESS than its message
 //     says, and it then passes forever without saying so. Four rounds of review on one PR found
 //     four variants of exactly that. Before adding one, walk the list:
@@ -26,27 +22,18 @@
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {test} = require('node:test');
-const {source, makeElement} = require('./harness.js');
+const {source, createDom} = require('./harness.js');
 
-const domElements = new Map();
-const documentListeners = new Map();
 const domValues = new Map();
-const documentStub = {
-  visibilityState: 'visible',
-  activeElement: null,
-  querySelector: selector => {if (!domElements.has(selector)) domElements.set(selector, makeElement()); return domElements.get(selector)},
-  querySelectorAll: () => [],
-  addEventListener: (type, handler) => documentListeners.set(type, handler),
-  removeEventListener: () => {},
-  createElement: () => makeElement(),
-};
+const domWindow = createDom();
+const documentStub = domWindow.document;
 const domContext = {
-  assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Intl,
+  assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Intl, Event: domWindow.Event,
   location: {search: '', href: 'https://example.test/', hash: ''},
   history: {replaceState() {}},
-  window: {scrollTo() {}},
+  window: domWindow,
   document: documentStub,
-  fireDocumentEvent: type => {const handler = documentListeners.get(type); if (handler) handler({})},
+  fireDocumentEvent: type => documentStub.dispatchEvent(new domWindow.Event(type, {bubbles: true})),
   localStorage: {
     getItem: key => domValues.has(key) ? domValues.get(key) : null,
     setItem: (key, value) => domValues.set(key, String(value)),
@@ -141,7 +128,7 @@ const domChecks = `(()=>{
   endpoint='';
   logs=[{id:'spaced-name',name:' Alex',type:'climb',date:shift(-1),createdAt:'1'}];
   render();
-  assert.equal(document.querySelector('#youTotal').textContent,3,'the spaced row still contributes its existing points total');
+  assert.equal(document.querySelector('#youTotal').textContent,'3','the spaced row still contributes its existing points total');
   assert.equal(youEmpty.classList.contains('hide'),true,'a leading-space name does not trigger the false personal empty state');
   assert.ok(personalFeed.innerHTML.indexOf('spaced-name')>=0,'the leading-space row remains visible in the personal feed');
   logs=[{id:'numeric-name',name:7,type:'climb',date:shift(-1),createdAt:'1'}];
@@ -381,11 +368,10 @@ const domChecks = `(()=>{
   assert.equal(catRow.innerHTML.indexOf('role="listitem"><button'),catRow.innerHTML.indexOf('role="listitem"'),'the button is nested, so the listitem keeps its semantics and the button keeps its own');
   const chipRadio=document.querySelector('input[name="activityType"][value="exercise"]'),chipDateBox=document.querySelector('#dateFields');
   chipRadio.checked=false;chipDateBox.classList.remove('hide');
-  // showTab() moves panels through querySelectorAll, which this stub returns empty from, so the
-  // active panel is not observable here. lastDeleted is: showTab() clears it (entry 28), so a
-  // cleared undo offer is the proof that the jump to the Record tab actually happened.
+  // Dispatch through the real tree and its delegated today-card listener. lastDeleted is cleared
+  // by showTab(), so it also proves the jump to the Record tab happened.
   lastDeleted={entry:logs[0],index:0,label:'a climb'};
-  prefillCategory('exercise');
+  catRow.querySelector('[data-cat="exercise"]').click();
   assert.equal(chipRadio.checked,true,'tapping a chip preselects that category on the Record form');
   assert.equal(lastDeleted,null,'and it goes to the Record tab, the same jump claimBounty makes');
   assert.equal(chipDateBox.classList.contains('hide'),true,'the date fields are reset the way a bounty claim resets them');
@@ -1374,7 +1360,7 @@ const domChecks = `(()=>{
   updateRecordPreview();
   assert.equal(wiredGrade.value,'V6','the record form still opens on the grade this climber logged last');
   wiredGrade.value='';
-  wiredGrade.dispatchEvent({type:'change'});
+  wiredGrade.dispatchEvent(new Event('change',{bubbles:true}));
   assert.equal(wiredGrade.value,'','a change event on the grade select clears the grade through the wiring init() bound');
   render();
   assert.equal(wiredGrade.value,'','and the clear holds across a repaint');
@@ -1384,11 +1370,11 @@ const domChecks = `(()=>{
   const wiredToggle=document.querySelector('#dateToggle'),wiredBox=document.querySelector('#dateFields');
   wiredBox.classList.add('hide');
   wiredToggle.setAttribute('aria-expanded','false');
-  wiredToggle.dispatchEvent({type:'click'});
+  wiredToggle.dispatchEvent(new Event('click',{bubbles:true}));
   assert.equal(wiredBox.classList.contains('hide'),false,'clicking the date toggle opens the date picker');
   assert.equal(wiredToggle.getAttribute('aria-expanded'),'true','and marks the toggle expanded for a screen reader');
   assert.equal(wiredToggle.textContent,'－ Use today instead','and offers the way back');
-  wiredToggle.dispatchEvent({type:'click'});
+  wiredToggle.dispatchEvent(new Event('click',{bubbles:true}));
   assert.equal(wiredBox.classList.contains('hide'),true,'clicking it again closes the picker');
   assert.equal(wiredToggle.getAttribute('aria-expanded'),'false','and marks the toggle collapsed again');
   assert.equal(wiredToggle.textContent,'＋ Different day','and restores the opening label');
