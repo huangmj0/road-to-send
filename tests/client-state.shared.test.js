@@ -264,6 +264,42 @@ test('a shared save shows the entry from the write response without waiting on a
   await vm.runInNewContext(`${source}\n${savedChecks}`, savedContext, {filename: 'index.html'});
 });
 
+test('a successful shared delete disappears without waiting on a reload', async () => {
+  const dom = sharedDom();
+  const store = new Map();
+  const posted = [];
+  const today = new Date().toISOString().slice(0, 10);
+  const deleteContext = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''},
+    history: {replaceState() {}},
+    window: dom.window,
+    document: dom.document,
+    postedActions: () => posted,
+    fetch: async (url, options = {}) => {
+      if (options.method === 'POST') {posted.push(JSON.parse(options.body)); return {ok: true, json: async () => ({version: 12, ok: true, deleted: 'srv-delete-1'})}}
+      return new Promise(() => {});
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const deleteChecks = `(async()=>{
+    state.endpoint='https://sheet.example.test/exec';
+    state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};
+    state.logs=[{id:'srv-delete-1',name:'Alex',type:'exercise',date:'${today}',createdAt:'1'}];state.me='Alex';state.recordingFor='Alex';
+    render();
+    document.querySelector('#personalActivity [data-del]').dispatchEvent(new window.Event('click',{bubbles:true}));
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the rendered delete control opens confirmation');
+    document.querySelector('#confirmOk').dispatchEvent(new window.Event('click',{bubbles:true}));
+    await Promise.resolve();await Promise.resolve();
+    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1'}]),'confirmation posts the exact shared row id');
+    assert.equal(state.logs.length,0,'the accepted delete leaves memory immediately');
+    assert.equal(document.querySelector('#personalActivity [data-del]'),null,'the deleted row leaves the rendered feed without waiting on GET');
+    assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'the confirmation closes without waiting on GET');
+  })()`;
+  await vm.runInNewContext(`${source}\n${deleteChecks}`, deleteContext, {filename: 'index.html'});
+});
+
 test('a blocked export says so instead of failing silently', async () => {
   // The real document only needs an anchor-download seam layered over it.
   const makeExportContext = ({clickThrows = false, blobThrows = false} = {}) => {
