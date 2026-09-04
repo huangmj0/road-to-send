@@ -135,6 +135,13 @@ assert.match(script,/function filterByType\(/,'a pure helper narrows the feed by
 assert.match(script,/function setFeedType\(/,'a named handler changes the filter so the delegated chip listener has something to call');
 assert.match(script,/feedType=next;resetFeedLimits\(\)/,'changing the filter resets the show-more count');
 assert.match(html,/\.feed-filter \.cat-chip\[aria-pressed="true"\]\{/,'the pressed chip is styled in CSS, not by a JS-driven animation');
+// Entry 55 (#149): the filter row is a nowrap segmented control, not a wrapping chip row, so a
+// future 5th category cannot silently reintroduce the two-line layout this ticket fixes.
+assert.match(html,/\.feed-filter\{margin:0 0 14px;flex-wrap:nowrap;gap:4px\}/,'the feed filter row is pinned to a single line, not a wrapping chip row');
+assert.match(html,/\.feed-filter \.cat-chip\{cursor:pointer;flex:1 1 0;min-width:0;justify-content:center;/,'each feed filter button takes an equal share of the row instead of sizing to its own content');
+// The icon is decorative and now redundant with the avatar glyph in every feed row below, so the
+// feed filter renders label-only buttons — no <b> glyph markup scoped to .feed-filter survives.
+assert.doesNotMatch(stylesheet,/\.feed-filter \.cat-chip b/,'the feed filter no longer carries icon-only CSS now that its chips render label-only');
 // Entry 44: the Crew feed carries the same chip row. One container per feed, one module-level
 // filter per feed, and the chips themselves come from the one renderer asserted above.
 assert.match(html,/id="crewFeedFilter"[^>]*role="group"[^>]*aria-label="[^"]+"/,'the Crew feed category filter is a named group');

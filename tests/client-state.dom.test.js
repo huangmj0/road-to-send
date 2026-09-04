@@ -657,6 +657,15 @@ const domChecks = `(()=>{
     assert.ok(attrOf(tag,'data-feed-type'),'every chip carries its own non-empty category: '+tag);
     assert.ok(['true','false'].indexOf(attrOf(tag,'aria-pressed'))>=0,'every chip declares its own pressed state as a real boolean: '+tag);
   });
+  // Entry 55 (#149): the feed chips render label-only now. The category icon is decorative and
+  // every row in the feed below already carries the same icon in its avatar, so painting it again
+  // here would only cost the width the single-line segmented control needs to fit at 320px.
+  const chipBodies=filterChips.innerHTML.split('<button ').slice(1).map(part=>part.slice(part.indexOf('>')+1,part.indexOf('</button>')));
+  assert.equal(chipBodies.length,feedChips().length,'one body per offered filter, so the loop below has every chip to inspect');
+  chipBodies.forEach((body,i)=>{
+    assert.equal(body.indexOf('<b'),-1,'no feed chip carries an icon glyph any more: '+body);
+    assert.equal(body,feedChips()[i].label,'each feed chip renders its label and nothing else: '+body);
+  });
   setFeedType('climb');
   assert.equal(state.feedType,'climb','the choice lives in module state, not read back out of the DOM');
   assert.equal(filterFeed.innerHTML.split('class="activity"').length-1,2,'selecting a category narrows the feed to that category');
