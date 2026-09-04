@@ -357,4 +357,21 @@ assert.match(stylesheet,/\.trend-line\{stroke-dasharray:1;animation:ring-ink/,'t
 // pill is the one control that changes fill in the dark, taking the lighter clay and dark ink.
 assert.match(stylesheet,/@media\(prefers-color-scheme:dark\)\{#navRecord\{background:var\(--orange\);color:#211d12\}\}/,'the night Record pill swaps to a fill its label can sit on');
 assert.match(stylesheet,/#navRecord\{margin:-13px 12px 7px;[^}]*background:var\(--accent-solid\);color:#fff/,'the day Record pill rides above the bar in clay');
+// Card-header metadata (a bounty-cap message, a feed count, a static hint) now claims a full-width
+// row below the title instead of sharing the header row, so neither half squeezes into ragged
+// two-column wrapping on a phone. `.meta-below` forces that split; the three headers with a
+// non-metadata trailing element (the Today status pill, the crew percentage, the Leaderboard
+// toggles) are asserted to keep the base inline `.card-head` behaviour.
+assert.match(stylesheet,/\.card-head\.meta-below\{flex-wrap:wrap\}\.card-head\.meta-below>:last-child\{flex:0 0 100%\}/,'card-header metadata is forced onto its own full-width row');
+const metaBelowHeads=['#bountyCapHint','#feedCount'];
+for(const id of metaBelowHeads)assert.match(html,new RegExp(`<div class="card-head meta-below"><h2>[^<]*</h2><span id="${id.slice(1)}"`),`the ${id} card header uses the metadata-below layout`);
+for(const label of ['Grade pyramid','Personal records','Daily activity','Your daily momentum','Crew daily momentum'])assert.match(html,new RegExp(`<div class="card-head meta-below"><h2>${label}</h2><span class="hint">`),`the ${label} card header uses the metadata-below layout`);
+assert.equal((html.match(/class="card-head meta-below"/g)||[]).length,7,'exactly the seven metadata-bearing card headers move their metadata below the title');
+assert.match(html,/<div class="card-head"><h2 class="hero-title">Today<\/h2><span id="todayStatus"/,'unchanged: the Today hero keeps its status pill inline, not below');
+assert.match(html,/<div class="card-head"><div><span class="eyebrow">Group goal/,'unchanged: the crew goal card head keeps the group percentage inline, not below');
+assert.match(html,/<div class="card-head"><h2>Leaderboard<\/h2><div class="leader-toggles"/,'unchanged: the Leaderboard keeps its toggle cluster inline, not below');
+// The Challenge / Your share strip split into two forced-equal halves regardless of content, so a
+// long behind-pace sentence wrapped to three lines while the countdown beside it sat half empty.
+// Cells now size to their own content (auto flex-basis) so the longer message gets more room.
+assert.match(stylesheet,/\.meta-strip>div\{flex:auto;padding:11px 14px;min-width:0\}/,'meta-strip cells size to their own content instead of splitting evenly');
 console.log('Road to Send static accessibility and UX checks passed.');
