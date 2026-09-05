@@ -52,8 +52,8 @@ The live Google Sheet URL has been requested and is still needed. A clone has no
 
 A snapshot is time-bounded. Refresh it before the intended merge and rehearse preservation of later acknowledged writes; restoring an old snapshot by itself is not a no-data-loss rollback.
 
-## Ticket publication
+## Published tickets
 
-The configured tracker is GitHub. Once the breakdown is approved, publish one issue per ticket with ready-for-agent, in dependency order, and attach native blocking relationships using each blocker's database ID. Ticket 1 may need organizer input for account access; retain that explicit external gate. Do not modify or close a parent issue. No existing open issues or PRs were found during preparation.
+The configured tracker is GitHub. The approved breakdown is published as [#153](https://github.com/huangmj0/road-to-send/issues/153), [#154](https://github.com/huangmj0/road-to-send/issues/154), [#155](https://github.com/huangmj0/road-to-send/issues/155), [#156](https://github.com/huangmj0/road-to-send/issues/156), [#157](https://github.com/huangmj0/road-to-send/issues/157), [#158](https://github.com/huangmj0/road-to-send/issues/158), [#159](https://github.com/huangmj0/road-to-send/issues/159), [#160](https://github.com/huangmj0/road-to-send/issues/160), [#161](https://github.com/huangmj0/road-to-send/issues/161), [#162](https://github.com/huangmj0/road-to-send/issues/162), and [#163](https://github.com/huangmj0/road-to-send/issues/163). Each has the ready-for-agent label and native blocking relationships. Ticket 1 may need organizer input for account access; retain that explicit external gate. No parent issue was modified or closed.
 
 The full acceptance-criteria drafts are available locally as one file per ticket under .scratch/reliability-stack/issues. They intentionally contain no implementation file paths or code snippets. Publication is deferred solely for the review step required by the invoked to-tickets skill.
