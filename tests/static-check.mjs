@@ -97,6 +97,10 @@ const nonRootStyles=stylesheet.replace(/:root\{[^}]*\}/g,'');
 assert.doesNotMatch(nonRootStyles,/(?:^|[;{])color:var\(--orange\)/,'no non-root text rule paints with low-contrast orange');
 assert.match(stylesheet,/:root\{--font:'Inter',system-ui,sans-serif;--head:'Barlow Condensed',Arial Narrow,system-ui,sans-serif;/,'the shared body and display font stacks include fallbacks');
 for(const declaration of ['\\.icon-btn\\{[^}]*font:700 25px\\/1 var\\(--font\\)','\\.btn\\{[^}]*font:800 15px var\\(--font\\)','\\.text-btn\\{[^}]*font:800 14px var\\(--font\\)','\\.sync\\{[^}]*font:800 12px var\\(--font\\)','\\.bottom-nav button\\{[^}]*font:800 12px var\\(--font\\)','\\.seg-btn\\{[^}]*font:800 13px var\\(--font\\)','\\.review-section h3,\\.person-head\\{font:800 14px var\\(--font\\)'])assert.match(stylesheet,new RegExp(declaration),'each repaired control shorthand keeps its intended body stack');
+assert.doesNotMatch(stylesheet,/\.seg-toggle\{[^}]*overflow:hidden/,'the segmented toggle group no longer clips its buttons focus rings');
+assert.match(stylesheet,/\.seg-btn:first-child\{border-radius:10px 0 0 10px\}/,'the first segmented button rounds its own outer corners since the group no longer clips');
+assert.match(stylesheet,/\.seg-btn:last-child\{border-radius:0 10px 10px 0\}/,'the last segmented button rounds its own outer corners since the group no longer clips');
+assert.match(stylesheet,/\.seg-btn\+\.seg-btn\{border-left:1\.5px solid var\(--sand\)\}/,'the segmented group keeps its internal divider line between buttons');
 assert.doesNotMatch(stylesheet,/font:[^;}]*\s+inherit(?=[;}])/,'no multi-component font shorthand ends in invalid inherit');
 const displayUses=stylesheet.replace(/@import[^;]+;/,'').replace(/--head:'Barlow Condensed',Arial Narrow,system-ui,sans-serif/,'');
 assert.doesNotMatch(displayUses,/'Barlow Condensed'/,'display font uses share the fallback token');
@@ -131,6 +135,13 @@ assert.match(script,/function filterByType\(/,'a pure helper narrows the feed by
 assert.match(script,/function setFeedType\(/,'a named handler changes the filter so the delegated chip listener has something to call');
 assert.match(script,/feedType=next;resetFeedLimits\(\)/,'changing the filter resets the show-more count');
 assert.match(html,/\.feed-filter \.cat-chip\[aria-pressed="true"\]\{/,'the pressed chip is styled in CSS, not by a JS-driven animation');
+// Entry 55 (#149): the filter row is a nowrap segmented control, not a wrapping chip row, so a
+// future 5th category cannot silently reintroduce the two-line layout this ticket fixes.
+assert.match(html,/\.feed-filter\{margin:0 0 14px;flex-wrap:nowrap;gap:4px\}/,'the feed filter row is pinned to a single line, not a wrapping chip row');
+assert.match(html,/\.feed-filter \.cat-chip\{cursor:pointer;flex:1 1 0;min-width:0;justify-content:center;/,'each feed filter button takes an equal share of the row instead of sizing to its own content');
+// The icon is decorative and now redundant with the avatar glyph in every feed row below, so the
+// feed filter renders label-only buttons — no <b> glyph markup scoped to .feed-filter survives.
+assert.doesNotMatch(stylesheet,/\.feed-filter \.cat-chip b/,'the feed filter no longer carries icon-only CSS now that its chips render label-only');
 // Entry 44: the Crew feed carries the same chip row. One container per feed, one module-level
 // filter per feed, and the chips themselves come from the one renderer asserted above.
 assert.match(html,/id="crewFeedFilter"[^>]*role="group"[^>]*aria-label="[^"]+"/,'the Crew feed category filter is a named group');
@@ -346,4 +357,21 @@ assert.match(stylesheet,/\.trend-line\{stroke-dasharray:1;animation:ring-ink/,'t
 // pill is the one control that changes fill in the dark, taking the lighter clay and dark ink.
 assert.match(stylesheet,/@media\(prefers-color-scheme:dark\)\{#navRecord\{background:var\(--orange\);color:#211d12\}\}/,'the night Record pill swaps to a fill its label can sit on');
 assert.match(stylesheet,/#navRecord\{margin:-13px 12px 7px;[^}]*background:var\(--accent-solid\);color:#fff/,'the day Record pill rides above the bar in clay');
+// Card-header metadata (a bounty-cap message, a feed count, a static hint) now claims a full-width
+// row below the title instead of sharing the header row, so neither half squeezes into ragged
+// two-column wrapping on a phone. `.meta-below` forces that split; the three headers with a
+// non-metadata trailing element (the Today status pill, the crew percentage, the Leaderboard
+// toggles) are asserted to keep the base inline `.card-head` behaviour.
+assert.match(stylesheet,/\.card-head\.meta-below\{flex-wrap:wrap\}\.card-head\.meta-below>:last-child\{flex:0 0 100%\}/,'card-header metadata is forced onto its own full-width row');
+const metaBelowHeads=['#bountyCapHint','#feedCount'];
+for(const id of metaBelowHeads)assert.match(html,new RegExp(`<div class="card-head meta-below"><h2>[^<]*</h2><span id="${id.slice(1)}"`),`the ${id} card header uses the metadata-below layout`);
+for(const label of ['Grade pyramid','Personal records','Daily activity','Your daily momentum','Crew daily momentum'])assert.match(html,new RegExp(`<div class="card-head meta-below"><h2>${label}</h2><span class="hint">`),`the ${label} card header uses the metadata-below layout`);
+assert.equal((html.match(/class="card-head meta-below"/g)||[]).length,7,'exactly the seven metadata-bearing card headers move their metadata below the title');
+assert.match(html,/<div class="card-head"><h2 class="hero-title">Today<\/h2><span id="todayStatus"/,'unchanged: the Today hero keeps its status pill inline, not below');
+assert.match(html,/<div class="card-head"><div><span class="eyebrow">Group goal/,'unchanged: the crew goal card head keeps the group percentage inline, not below');
+assert.match(html,/<div class="card-head"><h2>Leaderboard<\/h2><div class="leader-toggles"/,'unchanged: the Leaderboard keeps its toggle cluster inline, not below');
+// The Challenge / Your share strip split into two forced-equal halves regardless of content, so a
+// long behind-pace sentence wrapped to three lines while the countdown beside it sat half empty.
+// Cells now size to their own content (auto flex-basis) so the longer message gets more room.
+assert.match(stylesheet,/\.meta-strip>div\{flex:auto;padding:11px 14px;min-width:0\}/,'meta-strip cells size to their own content instead of splitting evenly');
 console.log('Road to Send static accessibility and UX checks passed.');

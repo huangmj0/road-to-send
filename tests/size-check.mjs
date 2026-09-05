@@ -85,7 +85,15 @@ import { readFileSync } from 'node:fs';
 // by the pinned bundler, measured 184556 -> 153168 bytes (-31388). The cap leaves 6832 bytes for
 // the remaining source-split and test-seam work while banking the bulk of the build saving.
 // Per the rule above this is the pass landing under its projection and lowering the cap.
-const BUDGET = 160000;
+//
+// Re-baselined 160000 -> 159000 closing out the segmented-toggle/filter/card-header pass
+// (issues #148-#150): measured 153762 bytes, up only 594 from the 153168 the esbuild closure
+// left main at — the focus-ring fix and the single-row filter cost single-digit bytes each,
+// and this ticket's card-head subtitle row, meta-strip content-sizing and the #youRank CSS fix
+// add the rest. The 6832 bytes the esbuild closure reserved for this work went almost
+// entirely unused, so per the rule above (a pass landing under its projection lowers the cap
+// again) this brings BUDGET back down, leaving 5238 bytes of headroom for what comes next.
+const BUDGET = 159000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
