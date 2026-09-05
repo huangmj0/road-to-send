@@ -48,7 +48,9 @@ The root PR stays draft with auto-merge disabled. No merge to main until the exa
 
 ## Private database-copy gate
 
-The live Google Sheet URL has been requested and is still needed. A clone has not been created. The required outputs are (1) an untouched private recovery copy and (2) a different disposable copy for mutation rehearsals. Confirm copied script/provisioning properties separately rather than assuming a Sheet file copy carries them. Never point rehearsal writes at the live Sheet.
+On September 5, 2026, the organizer's supplied live Sheet was copied into two distinct private Sheets: an untouched recovery copy and a separate disposable rehearsal copy. Their titles and visible tab sets were verified against the source. No writes have been made to either copy. Do not place their URLs, source URL, crew data, or recovery evidence in this repository or GitHub.
+
+Confirm copied script/provisioning properties separately rather than assuming a Sheet file copy carries them. Never point rehearsal writes at the live Sheet or recovery copy.
 
 A snapshot is time-bounded. Refresh it before the intended merge and rehearse preservation of later acknowledged writes; restoring an old snapshot by itself is not a no-data-loss rollback.
 
