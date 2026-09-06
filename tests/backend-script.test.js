@@ -113,6 +113,7 @@ test('backend derives category and bounty points instead of trusting the request
 test('new activity names and notes round-trip as literal Sheet text', () => {
   const context = loadScript();
   const formulas = [];
+  const writes = [];
   const parseCell = value => {
     if (typeof value === 'string' && value.startsWith('=')) {formulas.push(value); return '#FORMULA!'}
     return value;
@@ -120,8 +121,8 @@ test('new activity names and notes round-trip as literal Sheet text', () => {
   const values = [Array.from(vm.runInContext('ACTIVITY_HEADERS', context))];
   const range = (row, col, rows = 1, cols = 1) => ({
     getValues: () => Array.from({length: rows}, (_, r) => Array.from({length: cols}, (_, c) => values[row - 1 + r]?.[col - 1 + c] ?? '')),
-    setValues: input => {input.forEach((inputRow, r) => inputRow.forEach((value, c) => {(values[row - 1 + r] ||= [])[col - 1 + c] = parseCell(value)})); return range(row, col, rows, cols)},
-    setRichTextValues: input => {input.forEach((inputRow, r) => inputRow.forEach((value, c) => {(values[row - 1 + r] ||= [])[col - 1 + c] = value.getText()})); return range(row, col, rows, cols)},
+    setValues: input => {writes.push('values'); input.forEach((inputRow, r) => inputRow.forEach((value, c) => {(values[row - 1 + r] ||= [])[col - 1 + c] = parseCell(value)})); return range(row, col, rows, cols)},
+    setRichTextValues: input => {writes.push('rich-text'); input.forEach((inputRow, r) => inputRow.forEach((value, c) => {(values[row - 1 + r] ||= [])[col - 1 + c] = value.getText()})); return range(row, col, rows, cols)},
   });
   const sheet = {
     getLastRow: () => values.length,
@@ -144,7 +145,27 @@ test('new activity names and notes round-trip as literal Sheet text', () => {
   for (const [name, note] of samples) context.appendActivity({id: 'id-' + values.length, name, type: 'exercise', category: 'exercise', points: 2, date: '2026-07-13', createdAt: '2026-07-13T12:00:00Z', note});
   const saved = context.rows();
   assert.deepEqual(Array.from(saved, row => [row.name, row.note]), samples, 'every supported prefix, Unicode string, markup-like value, and internal whitespace survives the Sheet boundary exactly');
+  assert.deepEqual(writes, samples.map(() => 'rich-text'), 'each activity is committed by one complete literal row write');
+  assert.deepEqual(Array.from(saved, row => row.points), samples.map(() => 2), 'numeric text in a new point cell is normalized back to the numeric API type');
   assert.deepEqual(formulas, [], 'no user-controlled name or note is ever submitted to the formula-parsing value API');
+});
+
+test('a failed activity row commit leaves no partial row', () => {
+  const context = loadScript();
+  const headers = Array.from(vm.runInContext('ACTIVITY_HEADERS', context));
+  const values = [headers];
+  const range = (row, col, rows = 1, cols = 1) => ({
+    getValues: () => Array.from({length: rows}, (_, r) => Array.from({length: cols}, (_, c) => values[row - 1 + r]?.[col - 1 + c] ?? '')),
+    setValues: input => {input.forEach((inputRow, r) => inputRow.forEach((value, c) => {(values[row - 1 + r] ||= [])[col - 1 + c] = value})); return range(row, col, rows, cols)},
+    setRichTextValues: () => {throw Error('Sheet write failed')},
+  });
+  const sheet = {getLastRow: () => values.length, getLastColumn: () => headers.length, getRange: range};
+  context.SpreadsheetApp = {
+    getActive: () => ({getSheetByName: () => sheet}),
+    newRichTextValue: () => {let text = ''; return {setText: value => {text = value; return {build: () => ({getText: () => text})}}}},
+  };
+  assert.throws(() => context.appendActivity({id: 'id-failed', name: '=Alex', type: 'exercise', category: 'exercise', points: 2, date: '2026-07-13', createdAt: '2026-07-13T12:00:00Z', note: '=1+1'}), /Sheet write failed/);
+  assert.deepEqual(values, [headers], 'the only row mutation is the failed whole-row commit');
 });
 
 test('a bounty claim must be one of that date rotating set', () => {

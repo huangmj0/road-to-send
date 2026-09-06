@@ -32,7 +32,7 @@ The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants`
 
 ### Literal Sheet text
 
-New participant names and activity names/notes are stored through Apps Script rich-text values, so leading formula characters remain literal. Leading apostrophes, Unicode, markup-like text, and internal whitespace are preserved. Existing outer-whitespace trimming, case-insensitive participant lookup, and the 30/120-character limits remain. Updating the script affects future writes only; it does not rewrite historic activity rows.
+Each new activity is stored as one complete row of Apps Script rich-text values, so a failed write cannot leave a partially filled row and leading formula characters remain literal. New points cells contain numeric text, normalized back to numbers in API responses. Participant names also use rich-text values. Leading apostrophes, Unicode, markup-like text, and internal whitespace are preserved. Existing outer-whitespace trimming, case-insensitive participant lookup, and the 30/120-character limits remain. Updating the script affects future writes only; it does not rewrite historic activity rows.
 
 ### Upgrading to API v13
 
