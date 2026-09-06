@@ -110,6 +110,43 @@ test('backend derives category and bounty points instead of trusting the request
   assert.throws(() => context.validateActivity({name: 'Maya', type: 'climb', hardestGrade: 'VB', date: '2026-07-13'}), error => error.code === 'invalid_activity');
 });
 
+test('new activity names and notes round-trip as literal Sheet text', () => {
+  const context = loadScript();
+  const formulas = [];
+  const parseCell = value => {
+    if (typeof value === 'string' && value.startsWith('=')) {formulas.push(value); return '#FORMULA!'}
+    return value;
+  };
+  const values = [Array.from(vm.runInContext('ACTIVITY_HEADERS', context))];
+  const range = (row, col, rows = 1, cols = 1) => ({
+    getValues: () => Array.from({length: rows}, (_, r) => Array.from({length: cols}, (_, c) => values[row - 1 + r]?.[col - 1 + c] ?? '')),
+    setValues: input => {input.forEach((inputRow, r) => inputRow.forEach((value, c) => {(values[row - 1 + r] ||= [])[col - 1 + c] = parseCell(value)})); return range(row, col, rows, cols)},
+    setRichTextValues: input => {input.forEach((inputRow, r) => inputRow.forEach((value, c) => {(values[row - 1 + r] ||= [])[col - 1 + c] = value.getText()})); return range(row, col, rows, cols)},
+  });
+  const sheet = {
+    getLastRow: () => values.length,
+    getLastColumn: () => values[0].length,
+    getRange: range,
+    getDataRange: () => range(1, 1, values.length, values[0].length),
+    appendRow: row => values.push(row.map(parseCell)),
+  };
+  context.SpreadsheetApp = {
+    getActive: () => ({getSheetByName: () => sheet}),
+    newRichTextValue: () => {let text = ''; return {setText: value => {text = value; return {build: () => ({getText: () => text})}}}},
+  };
+  const samples = [
+    ['=1+1', '=HYPERLINK("https://example.test","x")'],
+    ['+plus', '-minus'],
+    ['@handle', "'apostrophe"],
+    ['岩 🧗', '<b>& raw markup</b>'],
+    ['Alex Smith', 'two  internal  spaces'],
+  ];
+  for (const [name, note] of samples) context.appendActivity({id: 'id-' + values.length, name, type: 'exercise', category: 'exercise', points: 2, date: '2026-07-13', createdAt: '2026-07-13T12:00:00Z', note});
+  const saved = context.rows();
+  assert.deepEqual(Array.from(saved, row => [row.name, row.note]), samples, 'every supported prefix, Unicode string, markup-like value, and internal whitespace survives the Sheet boundary exactly');
+  assert.deepEqual(formulas, [], 'no user-controlled name or note is ever submitted to the formula-parsing value API');
+});
+
 test('a bounty claim must be one of that date rotating set', () => {
   const context = loadScript();
   context.participantRecords = () => [{name: 'Alex'}];
@@ -136,6 +173,29 @@ test('self-registration adds one name-only participant and rejects duplicate nam
   assert.equal(added.participant.name, 'Maya');
   assert.deepEqual(Array.from(added.config.crew, person => ({...person})), [{name: 'Alex'}, {name: 'Maya'}]);
   assert.throws(() => context.addParticipant('alex'), error => error.code === 'duplicate_participant');
+});
+
+test('setup writes formula-like participant names as literal text after existing trim normalization', () => {
+  const context = loadScript();
+  const formulas = [];
+  const literals = [];
+  const makeRange = () => ({
+    clearContent() {return this},
+    setValues(rows) {for (const row of rows) for (const value of row) if (typeof value === 'string' && value.startsWith('=')) formulas.push(value); return this},
+    setRichTextValues(rows) {literals.push(...rows.flat().map(value => value.getText())); return this},
+  });
+  const settings = {getLastRow: () => 0, getRange: makeRange};
+  const participants = {clearContents() {}, getRange: makeRange};
+  const activities = {};
+  context.SpreadsheetApp = {
+    getActive: () => ({getSheetByName: name => ({Settings: settings, Participants: participants, Activities: activities})[name]}),
+    newRichTextValue: () => {let text = ''; return {setText: value => {text = value; return {build: () => ({getText: () => text})}}}},
+  };
+  context.formatSheets = () => {};
+  const saved = context.writeConfig({startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: '  =Alex 🧗  '}]});
+  assert.equal(saved.crew[0].name, '=Alex 🧗', 'the preexisting outer trim remains the only name normalization');
+  assert.deepEqual(formulas, [], 'the normalized name never reaches formula-parsing setValues');
+  assert.deepEqual(literals, ['=Alex 🧗'], 'the normalized name is written through the literal text API');
 });
 
 test('challenge window remains inclusive', () => {

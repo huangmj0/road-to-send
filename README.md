@@ -30,6 +30,10 @@ GitHub Pages hosts the interface, while a Google Sheet stores shared settings an
 
 The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains a single `name` column; `Activities` contains raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time.
 
+### Literal Sheet text
+
+New participant names and activity names/notes are stored through Apps Script rich-text values, so leading formula characters remain literal. Leading apostrophes, Unicode, markup-like text, and internal whitespace are preserved. Existing outer-whitespace trimming, case-insensitive participant lookup, and the 30/120-character limits remain. Updating the script affects future writes only; it does not rewrite historic activity rows.
+
 ### Upgrading to API v13
 
 Paste the v13 script over the old Apps Script, run `configureSpreadsheet` once, and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.

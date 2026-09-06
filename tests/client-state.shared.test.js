@@ -371,6 +371,7 @@ test('a blocked export says so instead of failing silently', async () => {
     const dom = sharedDom();
     const revoked = [];
     const anchors = [];
+    const blobs = [];
     const createElement = dom.document.createElement.bind(dom.document);
     dom.document.createElement = tag => {
       const el = createElement(tag);
@@ -378,7 +379,7 @@ test('a blocked export says so instead of failing silently', async () => {
       return el;
     };
     return {
-      revoked, anchors,
+      revoked, anchors, blobs,
       context: {
         assert, console, URL: Object.assign(function () {}, URL, {
           createObjectURL: () => 'blob:road-to-send/1',
@@ -388,7 +389,7 @@ test('a blocked export says so instead of failing silently', async () => {
         location: {search: '', href: 'https://example.test/app/', hash: ''},
         history: {replaceState() {}},
         window: dom.window,
-        Blob: function (parts) {if (blobThrows) throw Error('Blob is not available here'); this.parts = parts},
+        Blob: function (parts) {if (blobThrows) throw Error('Blob is not available here'); this.parts = parts; blobs.push(String(parts[0]))},
         document: dom.document,
         fetch: async () => {throw Error('this harness makes no network calls')},
         localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
@@ -401,10 +402,12 @@ test('a blocked export says so instead of failing silently', async () => {
   const todayFilename = `road-to-send-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.json`;
 
   const good = makeExportContext();
-  await vm.runInNewContext(`${source}\nexportData();`, good.context, {filename: 'index.html'});
+  await vm.runInNewContext(`${source}\nstate.endpoint='https://sheet.example.test/exec';state.logs=[{id:'literal',name:'=Alex <crew>',type:'exercise',date:'2026-07-13',createdAt:'1',note:'岩 🧗 <b>& two  spaces'}];exportData();`, good.context, {filename: 'index.html'});
   assert.equal(good.context.document.querySelector('#toast').textContent, 'Export downloaded.', 'a working export reports success');
   assert.deepEqual(good.anchors, [{href: 'blob:road-to-send/1', download: todayFilename}], 'and the download really fired, named for challengeToday()');
   assert.deepEqual(good.revoked, ['blob:road-to-send/1'], 'the object URL is revoked on the success path');
+  const exported = JSON.parse(good.blobs[0]);
+  assert.deepEqual({name: exported.activities[0].name, note: exported.activities[0].note}, {name: '=Alex <crew>', note: '岩 🧗 <b>& two  spaces'}, 'shared-cache export preserves literal text exactly');
 
   const blockedClick = makeExportContext({clickThrows: true});
   await vm.runInNewContext(`${source}\nexportData();`, blockedClick.context, {filename: 'index.html'});

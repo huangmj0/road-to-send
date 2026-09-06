@@ -272,6 +272,10 @@ const checks = `(()=>{
   state.logs=[{id:'c7',name:'Alex',type:'bounty',date:'2026-07-13',createdAt:'1'}];
   assert.equal(claimedBounties('alex')[0].label,'Bounty','a claim with no id at all still lists');
 
+  const literalFeed=activityMarkup([{id:'literal',name:'=Alex <crew>',type:'exercise',date:'2026-07-13',createdAt:'1',note:'岩 🧗 <b>& two  spaces'}],5,false);
+  assert.ok(literalFeed.indexOf('=Alex &lt;crew&gt;')>=0,'a formula-like markup name reaches the feed as text');
+  assert.ok(literalFeed.indexOf('岩 🧗 &lt;b&gt;&amp; two  spaces')>=0,'Unicode, markup-like note text, and internal whitespace reach the feed intact and escaped');
+
   // Entry 50: claimedBounties also reports what each claim scored, read out of computeCredits()
   // rather than re-derived, so a claim past the weekly cap shows its reduced or zero credit.
   state.logs=[
