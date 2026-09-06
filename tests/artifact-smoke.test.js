@@ -67,3 +67,43 @@ test('the committed artifact renders a shared Sheet response', async () => {
   assert.equal(window.document.querySelector('#totalPoints').textContent, '2');
   assert.match(window.document.querySelector('#syncStatus').textContent, /^Live/);
 });
+
+test('the weekly recap opens only from its deliberate entry point', async () => {
+  const now = new Date();
+  const day = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  const config = {startDate: day, tripDate: day, goal: 50, crew: [{name: 'Alex'}]};
+  const window = new Window({url: 'https://example.test/'});
+  window.localStorage.setItem('roadToSendConfigV9', JSON.stringify(config));
+  window.document.write(html.replace(/<script>[\s\S]*?<\/script>/, ''));
+  window.eval(script);
+
+  const recap = window.document.querySelector('#weekReviewModal');
+  assert.equal(recap.classList.contains('open'), false, 'boot does not open the recap');
+  window.document.querySelector('#navCrew').click();
+  window.document.querySelector('#navYou').click();
+  assert.equal(recap.classList.contains('open'), false, 'navigation does not open the recap');
+
+  window.document.querySelector('#identityMember').value = 'Alex';
+  window.document.querySelector('#saveIdentity').click();
+  assert.equal(recap.classList.contains('open'), false, 'identity selection does not open the recap');
+  const openButton = window.document.querySelector('#weekReviewOpen');
+  assert.equal(openButton.hidden, false, 'a chosen climber can reach the recap');
+  openButton.focus();
+  openButton.click();
+  assert.equal(recap.classList.contains('open'), true, 'the recap opens after the explicit button click');
+  assert.equal(window.document.querySelector('#weekReviewCelebrate').classList.contains('hide'), true, 'a recap with no personal achievement has no absence callout');
+  assert.equal(window.document.querySelector('#weekReviewLeadersSection').classList.contains('hide'), true, 'a recap with no point earners has no participation prompt');
+  assert.equal(window.document.querySelector('#weekReviewHunterSection').classList.contains('hide'), true, 'a recap with no bounty claims has no crown prompt');
+  assert.doesNotMatch(recap.textContent, /log|make it count|weeks until|crown is up for grabs/i, 'the opened recap contains no participation or countdown pressure');
+  window.document.querySelector('#weekReviewClose').click();
+  assert.equal(window.document.activeElement, openButton, 'closing the recap returns focus to its entry point');
+
+  const shared = new Window({url: 'https://example.test/'});
+  shared.localStorage.setItem('roadToSendEndpoint', 'https://sheet.example.test/exec');
+  shared.localStorage.setItem('roadToSendMe', 'Alex');
+  shared.fetch = async () => ({ok: true, json: async () => ({version: 12, features: [], activities: [], config, configErrors: [], serverDate: day, timeZone: 'America/Los_Angeles'})});
+  shared.document.write(html.replace(/<script>[\s\S]*?<\/script>/, ''));
+  shared.eval(script);
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(shared.document.querySelector('#weekReviewModal').classList.contains('open'), false, 'shared sync does not open the recap');
+});

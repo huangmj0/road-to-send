@@ -37,9 +37,9 @@ assert.match(html,/id="navRecord"[^>]*>\s*<span aria-hidden="true"><svg class="g
 assert.match(html,/id="navCrew"[^>]*>\s*<span aria-hidden="true"><svg class="glyph"><use href="#g-crew"\/><\/svg><\/span>Crew<\/button>/,'the Crew navigation button keeps its visible label and hides its glyph');
 for(const tab of ['you','record','crew'])assert.match(html,new RegExp(`data-panel="${tab}"[^>]*aria-labelledby="nav${tab[0].toUpperCase()+tab.slice(1)}"`),`the ${tab} section remains labelled by its navigation button`);
 assert.doesNotMatch(html,/id="leaderPointsBtn"[^>]*class="[^"]*\bactive\b/,'the Points toggle carries no dead active class');
-assert.doesNotMatch(html,/id="leaderWeekBtn"[^>]*class="[^"]*\bactive\b/,'the Recent toggle carries no dead active class');
+assert.doesNotMatch(html,/id="leaderWeekBtn"[^>]*class="[^"]*\bactive\b/,'the Last 7 days toggle carries no dead active class');
 assert.match(html,/id="leaderPointsBtn"[^>]*aria-pressed=/,'the Points toggle keeps its pressed state');
-assert.match(html,/id="leaderWeekBtn"[^>]*aria-pressed=/,'the Recent toggle keeps its pressed state');
+assert.match(html,/id="leaderWeekBtn"[^>]*aria-pressed=/,'the Last 7 days toggle keeps its pressed state');
 assert.doesNotMatch(html,/review-dialog|trend-hover/,'the three dead class hooks are absent from the built page');
 assert.match(html,/id="recordMeter"[^>]+aria-label=/,'record preview meter is accessible');
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'persistent sync diagnostics are announced');
@@ -294,7 +294,8 @@ assert.match(script,/function pyramidLabel\(/,'a pure helper owns the pyramid te
 assert.equal((script.match(/Grade pyramid: /g)||[]).length,1,'the pyramid label text has one owner');
 // Entry 54: the person card lists that climber's most recent entries as the final section.
 assert.match(html,/id="personPyramid"[^>]*><\/div><h3 class="person-head">Recent activity<\/h3><div id="personRecent" class="records"><\/div><\/div><\/div>/,'the person card recent-activity section is the last one in the dialog, right after the grade pyramid');
-assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=[^>]*>Recent<\/button>/,'the Recent toggle keeps its id and is a real button with aria-pressed');
+assert.match(html,/id="leaderWeekBtn"[^>]*type="button"[^>]*aria-pressed=[^>]*>Last 7 days<\/button>/,'the Last 7 days toggle keeps its id and is a real button with aria-pressed');
+assert.match(html,/id="leaderCol3"[^>]*>Last 7 days<\/th>/,'the rolling leaderboard column names its exact range');
 assert.doesNotMatch(html,/>Weekly</,'the leaderboard template no longer labels its recent scope Weekly');
 assert.match(html,/id="leaderOverallBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Overall toggle is a real button with aria-pressed');
 assert.match(html,/id="leaderPointsBtn"[^>]*type="button"[^>]*aria-pressed=/,'the Points toggle is a real button with aria-pressed');

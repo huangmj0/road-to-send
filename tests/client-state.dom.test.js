@@ -804,7 +804,7 @@ const domChecks = `(()=>{
   ];
   render();
   const capHint=document.querySelector('#bountyCapHint'),rollingRows=document.querySelector('#leaderRows');
-  assert.ok(capHint.textContent.indexOf('3 / '+SCORING.weeklyBountyCap+' bounty points this week')>=0,'the cap hint keeps its calendar-week credit');
+  assert.ok(capHint.textContent.indexOf('3 / '+SCORING.weeklyBountyCap+' bounty points this week (Monday–Sunday)')>=0,'the cap hint distinguishes its calendar-week credit from the rolling leaderboard');
   const alexRow=rollingRows.innerHTML.slice(rollingRows.innerHTML.indexOf('data-person="Alex"'));
   assert.ok(alexRow.indexOf('<strong>4</strong>')>=0,'the recent Bounties leaderboard reads its rolling field');
   openPersonCard('Alex');
@@ -817,6 +817,8 @@ const domChecks = `(()=>{
   state.leaderMetric='points';state.leaderScope='week';render();
   const recentRows=leaderRows.innerHTML;
   assert.ok(recentRows.indexOf('data-person="Bo"')<recentRows.indexOf('data-person="Alex"'),'the recent scope ranks points inside the last seven days above points eight days old');
+  assert.equal(document.querySelector('#leaderWeekBtn').textContent,'Last 7 days','the rolling leaderboard control names its exact range');
+  assert.equal(document.querySelector('#leaderCol3').textContent,'Last 7 days','the rolling leaderboard column names its exact range');
 
   // Entry 87: the leader order answers the selected recent question, while person cards and the
   // You stat explicitly label their separately-derived all-time position.
