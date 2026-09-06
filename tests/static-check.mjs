@@ -151,7 +151,10 @@ assert.match(html,/id="crewLocalHint"[\s\S]*id="crewFeedFilter"[\s\S]*id="activi
 assert.match(script,/renderFeedChips\('#crewFeedFilter',crewFeedType\)/,'the Crew chip row is painted from the Crew feed\'s own filter');
 assert.match(script,/renderFeedChips\('#feedFilter',feedType\)/,'and the You chip row from the You feed\'s own filter');
 assert.match(script,/state\.crewFeedType=next;else state\.feedType=next;resetFeedLimits\(\)/,'the two feeds filter independently and either change resets the show-more count');
-assert.match(script,/filterByType\(state\.logs,crewFeedType\)/,'the Crew feed reuses filterByType() rather than a second narrowing helper');
+// Issue 162 replaces this assertion's former filterByType(state.logs, crewFeedType) scan. The
+// category-filter feature remains and is now pinned to the shared snapshot index that also supplies
+// personal history; the helper's pure behavior stays covered below and in the state suite.
+assert.match(script,/crewShown=historyEntries\(snapshot,'',crewFeedType\)/,'the Crew feed reads its category from the shared history snapshot');
 assert.equal((script.match(/function filterByType\(/g)||[]).length,1,'filterByType() is defined exactly once');
 assert.match(html,/id="personalShowMore"[^>]*type="button"/,'the You feed can show more');
 assert.match(html,/id="crewShowMore"[^>]*type="button"/,'the crew feed can show more');

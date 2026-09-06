@@ -57,6 +57,24 @@ const checks = `(()=>{
   state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[]};
   assert.equal(computeCredits(normalizeActivities([{id:'t1',name:'Alex',type:'climb',date:'2026-07-13T07:30:00.000Z',createdAt:'1'}])).info.get('t1').credit,3,'a date with a time component earns credit instead of reading as outside the challenge');
 
+  // Issue 162: history consumers share one scored, indexed snapshot. Rows retain their original
+  // source index for delete/focus behavior while every view receives the established newest-first
+  // date/createdAt ordering and exact credit from computeCredits().
+  state.logs=[
+    {id:'old',name:'Alex',type:'climb',date:'2026-07-12',createdAt:'9',hardestGrade:'V4'},
+    {id:'other',name:'Bob',type:'climb',date:'2026-07-13',createdAt:'3',hardestGrade:'V5'},
+    {id:'new',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'2'},
+    {id:'newer',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'4',hardestGrade:'V6'},
+  ];
+  state.historyMemo=null;state.creditMemo=null;
+  const history=historySnapshot();
+  assert.equal(history.credits,computeCredits(state.logs),'the snapshot reuses the scoring core result');
+  assert.deepEqual(historyEntries(history,'alex','all').map(row=>[row.entry.id,row.index,row.credit.credit]),[['newer',3,3],['new',2,2],['old',0,3]],'personal history keeps ordering, source indexes, and exact per-entry credits');
+  assert.deepEqual(historyEntries(history,'','climb').map(row=>row.entry.id),['newer','other','old'],'crew type history keeps newest-first ordering');
+  assert.equal(historySnapshot(),history,'unchanged state reuses the derived history snapshot');
+  state.logs=state.logs.concat([{id:'latest',name:'Alex',type:'mobility',date:'2026-07-14',createdAt:'1'}]);
+  assert.notEqual(historySnapshot(),history,'a replacement log array invalidates the snapshot');
+
   assert.equal(windowStart('2026-07-13'),'2026-07-07','seven days are inclusive');
   assert.equal(windowStart('2026-07-13',1),'2026-07-13','one-day windows begin today');
   assert.equal(windowStart(''),'','a blank day has no window');
