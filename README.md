@@ -22,32 +22,33 @@ GitHub Pages hosts the interface, while a Google Sheet stores shared settings an
 
 1. Create a Google Sheet and open **Extensions → Apps Script**.
 2. Open the app’s settings, expand **Apps Script source**, copy it, and replace the editor contents.
-3. Choose **Deploy → New deployment → Web app**. Execute as yourself and allow access to anyone with the link.
-4. Paste the `/exec` deployment URL into the app.
-5. Set the challenge dates and group goal. Participants can join from the identity prompt; organizers can also manage the roster in setup.
-6. Save setup and distribute the copied crew link.
+3. In the Apps Script editor, select `configureSpreadsheet` and choose **Run** once. Approve access when prompted. This records the bound Sheet ID for web-app executions, where active-document helpers can be unavailable.
+4. Choose **Deploy → New deployment → Web app**. Execute as yourself and allow access to anyone with the link.
+5. Paste the `/exec` deployment URL into the app.
+6. Set the challenge dates and group goal. Participants can join from the identity prompt; organizers can also manage the roster in setup.
+7. Save setup and distribute the copied crew link.
 
 The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains a single `name` column; `Activities` contains raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time.
 
-### Upgrading to API v12
+### Upgrading to API v13
 
-Paste the v12 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
+Paste the v13 script over the old Apps Script, run `configureSpreadsheet` once, and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
 
-- v12 changes only how the backend works, not the data or the wire format. The Apps Script used to re-provision and re-format every tab on **every** read and write; it now does that formatting once, when a Sheet is first set up, and skips it on every later call. Together with the client no longer reloading the whole `Activities` tab just to confirm one save, logging an activity is markedly faster. An already-set-up Sheet keeps every tab and its data and is never re-archived.
-- Because `src/apps-script.js` is part of the versioned browser/backend contract, the protocol version is bumped even though the JSON is unchanged. The rollout is graceful: the v12 client accepts both a redeployed v12 backend and a not-yet-redeployed v11 one, since their wire format is byte-for-byte identical — there is no outage window, so the site and the script can update in either order. Deploy the v12 script when convenient to pick up the speedup; until you do, clients keep working against v11.
+- v13 uses an explicit spreadsheet ID and a script-scoped mutation lock so web-app requests do not depend on document-context helpers that may return null. A copied Sheet whose current headers are complete is stamped as current without archiving its activities when copied properties are absent.
+- The rollout is compatible in either direction. Updated browsers explicitly request v13 and accept genuine v11/v12 replies from an older backend. The v13 backend returns the existing v12 envelope to an unnegotiated older browser and v13 only to a browser that requests it.
 - Upgrading from v10 or v9 keeps every tab and its data. Upgrading from v8 or earlier renames any existing `Activities` (and leftover `Benchmarks`) tab to a timestamped archive tab exactly once, then a fresh `Activities` tab is created. The redesigned scoring starts clean. Existing `Settings` remain; the `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
-- v11 is accepted only transitionally, to bridge the v12 rollout; v10 and earlier endpoints are still rejected by the new client, so genuinely incompatible writes cannot mix with API v12.
+- v11 and v12 remain accepted because their scoring and response data are compatible; v10 and earlier endpoints are rejected.
 
 Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
 
-## API v12
+## API v13
 
 Reads return:
 
 ```json
 {
-  "version": 12,
-  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1"],
+  "version": 13,
+  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1"],
   "activities": [],
   "config": {
     "startDate": "2026-07-16",
@@ -61,7 +62,7 @@ Reads return:
 }
 ```
 
-Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 12, ok, ... }` — the full saved activity record, which the app adds to the feed immediately and then reconciles with a background sync; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
+The browser sends `protocolVersion: 13` on reads and writes. Activity writes also send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 13, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
 
 A save is confirmed as soon as the Sheet accepts the write, so the only outcomes are **Activity saved** and **Save failed** (safe to retry). The Crew sync control refreshes the shared board on demand.
 

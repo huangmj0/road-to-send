@@ -23,11 +23,77 @@ function loadScript() {
   return context;
 }
 
-test('embedded v12 Apps Script is syntactically valid and exposes only simple capabilities', () => {
+test('embedded v13 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();
-  assert.equal(vm.runInContext('API_VERSION', context), 12);
+  assert.equal(vm.runInContext('API_VERSION', context), 13);
   assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1']);
   assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
+});
+
+test('web requests use a script lock and preserve negotiated or legacy envelopes on errors', () => {
+  const context = loadScript();
+  let waited = 0, released = 0, documentLockCalls = 0;
+  context.LockService = {
+    getScriptLock: () => ({waitLock: ms => { assert.equal(ms, 10000); waited += 1; }, releaseLock: () => { released += 1; }}),
+    getDocumentLock: () => { documentLockCalls += 1; return null; },
+  };
+  context.out = value => value;
+  context.setup = () => {};
+
+  const negotiated = context.doPost({postData: {contents: JSON.stringify({protocolVersion: 13, action: 'unknown'})}});
+  assert.equal(negotiated.version, 13);
+  assert.equal(negotiated.ok, false);
+  assert.equal(negotiated.error.code, 'unknown_action');
+  assert.ok(Array.from(negotiated.features).includes('protocol-negotiation-v1'));
+
+  const legacy = context.doPost({postData: {contents: JSON.stringify({action: 'unknown'})}});
+  assert.equal(legacy.version, 12, 'an already-open browser receives the old envelope');
+  assert.equal(Array.from(legacy.features).includes('protocol-negotiation-v1'), false);
+  assert.equal(waited, 2, 'each mutating request waits on the script-scoped lock');
+  assert.equal(released, 2, 'each acquired lock is released after an error');
+  assert.equal(documentLockCalls, 0, 'the null document lock is never requested in a web app');
+
+  const malformed = context.doPost({postData: {contents: '{'}});
+  assert.equal(malformed.version, 12);
+  assert.equal(malformed.error.code, 'invalid_json');
+  assert.equal(waited, 2, 'a rejected body does not acquire a mutation lock');
+
+  context.LockService.getScriptLock = () => null;
+  const unavailable = context.doPost({postData: {contents: JSON.stringify({protocolVersion: 13, action: 'unknown'})}});
+  assert.equal(unavailable.version, 13);
+  assert.equal(unavailable.error.code, 'runtime_lock');
+});
+
+test('GET negotiation is additive and failures use the selected envelope', () => {
+  const context = loadScript();
+  context.out = value => value;
+  context.setup = () => {};
+  context.readConfig = () => ({config: null, errors: []});
+  context.rows = () => [];
+  context.sheetToday = () => '2026-07-13';
+  context.sheetTimeZone = () => 'UTC';
+  assert.equal(context.doGet().version, 12);
+  assert.equal(context.doGet({parameter: {protocolVersion: '13'}}).version, 13);
+  assert.equal(context.negotiatedVersion(14), 12, 'a version newer than this deployment falls back to the legacy envelope');
+  context.setup = () => { context.apiError('runtime_configuration', 'not configured'); };
+  const failed = context.doGet({parameter: {protocolVersion: '13'}});
+  assert.equal(failed.version, 13);
+  assert.equal(failed.error.code, 'runtime_configuration');
+});
+
+test('web runtime opens the configured spreadsheet when active document helpers are null', () => {
+  const context = loadScript();
+  const book = {getSpreadsheetTimeZone: () => 'UTC'};
+  const store = {roadToSendSpreadsheetId: 'sheet-copy'};
+  context.PropertiesService = {getScriptProperties: () => ({getProperty: key => store[key] || null, setProperty: (key, value) => { store[key] = value; }})};
+  context.SpreadsheetApp = {getActive: () => null, openById: id => { assert.equal(id, 'sheet-copy'); return book; }};
+  assert.equal(context.spreadsheet(), book);
+  assert.equal(context.sheetTimeZone(), 'UTC');
+
+  delete store.roadToSendSpreadsheetId;
+  assert.throws(() => context.spreadsheet(), error => error.code === 'runtime_configuration');
+  context.PropertiesService = {getScriptProperties: () => null, getDocumentProperties: () => null};
+  assert.throws(() => context.runtimeProperties(), error => error.code === 'runtime_configuration');
 });
 
 test('backend derives category and bounty points instead of trusting the request', () => {
@@ -154,4 +220,18 @@ test('formatSheets runs once while provisioning, then every read and write skips
   context.setup();
   assert.equal(formats, 0, 'a doc already stamped at the current schema formats zero times');
   assert.equal(Object.keys(live.sheets).filter(name => name.startsWith('Activities Archive')).length, 0, 'and its live data is never archived');
+
+  // A copied Sheet can retain current tabs while document properties are unavailable in a web-app
+  // execution. Complete current headers are sufficient evidence to stamp, never archive, that copy.
+  const copied = makeBook();
+  copied.sheets.Activities = new Sheet(copied, 'Activities', [Array.from(vm.runInContext('ACTIVITY_HEADERS', context)), ['kept-id']]);
+  copied.sheets.Settings = new Sheet(copied, 'Settings', [['key', 'value']]);
+  copied.sheets.Participants = new Sheet(copied, 'Participants', [['name'], ['Alex']]);
+  const copiedStore = {roadToSendSpreadsheetId: 'copied-id'};
+  context.SpreadsheetApp = {getActive: () => null, openById: id => { assert.equal(id, 'copied-id'); return copied; }};
+  context.PropertiesService = {getScriptProperties: () => ({getProperty: key => copiedStore[key] || null, setProperty: (key, value) => { copiedStore[key] = value; }}), getDocumentProperties: () => null};
+  context.setup();
+  assert.equal(copiedStore.roadToSendSchema, '9');
+  assert.equal(copied.sheets.Activities.values[1][0], 'kept-id', 'current copied activity rows survive missing document properties');
+  assert.equal(Object.keys(copied.sheets).filter(name => name.indexOf(' Archive ') >= 0).length, 0, 'a current copied schema creates no archive tabs');
 });

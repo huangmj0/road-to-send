@@ -14,6 +14,22 @@ function sharedDom() {
   return {window, document: window.document, fire: type => window.document.dispatchEvent(new window.Event(type, {bubbles: true}))};
 }
 
+test('shared requests explicitly negotiate the current additive protocol', async () => {
+  const calls = [];
+  const context = {
+    console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/', hash: ''},
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+    fetch: async (url, options) => {calls.push({url, options}); return {ok: true};},
+    setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{await fetchShared('https://sheet.example.test/exec');await fetchShared('https://sheet.example.test/exec',{method:'POST',body:JSON.stringify({action:'delete',id:'a1'})})})()`, context, {filename: 'index.html'});
+  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '13');
+  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '13');
+  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 13);
+  assert.equal(JSON.parse(calls[1].options.body).id, 'a1', 'negotiation preserves the request payload');
+});
+
 test('background sync respects the open date picker and refreshes stale caches', async () => {
   const dom = sharedDom();
   const store = new Map();
@@ -292,7 +308,7 @@ test('a successful shared delete disappears without waiting on a reload', async 
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the rendered delete control opens confirmation');
     document.querySelector('#confirmOk').dispatchEvent(new window.Event('click',{bubbles:true}));
     await Promise.resolve();await Promise.resolve();
-    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1'}]),'confirmation posts the exact shared row id');
+    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:13}]),'confirmation posts the exact shared row id with protocol negotiation');
     assert.equal(state.logs.length,0,'the accepted delete leaves memory immediately');
     assert.equal(document.querySelector('#personalActivity [data-del]'),null,'the deleted row leaves the rendered feed without waiting on GET');
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'the confirmation closes without waiting on GET');
