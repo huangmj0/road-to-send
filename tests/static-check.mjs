@@ -185,6 +185,9 @@ assert.equal((script.match(/class="bounty-peek"/g)||[]).length,2,'renderBountyWe
 assert.match(script,/function renderClaimed\(/,'a render function owns the claimed list');
 assert.match(script,/function shareProgress\(/,'the Share button goes through the system share sheet first');
 assert.match(script,/function writeStore\(/,'the shared storage helper exists');
+assert.match(html,/id="storageRecovery"[^>]+role="alert"/,'local persistence failure has an announced recovery surface');
+assert.match(html,/id="retryStorage"[^>]+onclick="retryRecoveryDraft\(\)"/,'the recovery surface offers a deliberate retry');
+assert.match(html,/id="exportRecovery"[^>]+onclick="exportRecoveryDraft\(\)"/,'the recovery surface offers a deliberate export');
 assert.equal((script.match(/localStorage\.setItem/g)||[]).length,1,'storage writes funnel through one helper');
 assert.ok((script.match(/state\.pendingDelete=null/g)||[]).length>=2,'a dismissed confirm clears the pending delete on the confirmed and dismissed paths');
 assert.match(script,/function computeCreditsRaw\(/,'the raw scorer is separable from the memo that fronts it');

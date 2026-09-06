@@ -204,26 +204,33 @@ test('copyText reports a successful clipboard write and keeps the crew link deli
   await vm.runInNewContext(`${source}\n${copyChecks}`, copyContext, {filename: 'index.html'});
 });
 
-test('a full disk never reports a saved entry as failed, and never traps the identity dialog', async () => {
+test('a failed local write keeps a complete recovery draft that can be retried or exported', async () => {
   const dom = sharedDom();
   const store = new Map();
   const today = new Date().toISOString().slice(0, 10);
+  const existing = {id: 'local-existing', name: 'Alex', type: 'exercise', category: 'exercise', points: 2, date: today, createdAt: '1', note: 'Already durable'};
+  store.set('roadToSendLogsV9', JSON.stringify([existing]));
+  let logWrites = 0;
+  let downloaded = '';
   const storageContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/app/', hash: ''},
     history: {replaceState() {}},
     window: dom.window,
     document: dom.document,
-    // Safari private mode and an exhausted quota both throw here. Reads still work, which is why
-    // safeJson() was never the problem — every write in the app was the unguarded half.
+    // An exhausted quota throws on the first activity write while reads remain available, which
+    // exercises a partial config-success/activity-failure without hiding existing history.
     fetch: async () => {throw Error('this harness makes no network calls')},
-    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: () => {throw Error('QuotaExceededError')}, removeItem: key => store.delete(key)},
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => {if (key === 'roadToSendLogsV9' && logWrites++ === 0) throw Error('QuotaExceededError'); store.set(key, String(value))}, removeItem: key => store.delete(key)},
+    Blob: class {constructor(parts) {downloaded = String(parts[0])}},
+    getDownloaded: () => downloaded,
+    URL: Object.assign(URL, {createObjectURL: () => 'blob:recovery', revokeObjectURL() {}}),
     setTimeout() {}, clearTimeout() {},
   };
   const storageChecks = `(async()=>{
     state.endpoint='';
     state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};
-    state.logs=[];state.me='';state.recordingFor='';
+    state.logs=JSON.parse(localStorage.getItem('roadToSendLogsV9'));state.me='';state.recordingFor='';
     document.querySelector('#identityMember').innerHTML='<option value="Alex">Alex</option>';
     document.querySelector('#identityMember').value='Alex';
     document.querySelector('#identityModal').classList.add('open');
@@ -231,12 +238,54 @@ test('a full disk never reports a saved entry as failed, and never traps the ide
     assert.equal(state.me,'Alex','a failed write still records the identity in memory');
     assert.equal(document.querySelector('#identityModal').classList.contains('open'),false,'and the dialog closes instead of trapping the user behind an uncaught throw');
     document.querySelector('#activityDate').value='${today}';
+    document.querySelector('#hardestGrade').value='V6';
+    document.querySelector('#activityNote').value='Steep red problem';
     await submitActivity({preventDefault(){}});
-    assert.equal(state.logs.length,1,'the entry is in the log either way, so it must not be reported as lost');
-    assert.equal(document.querySelector('#toast').textContent,'Saved on this device only — storage is full.','the toast names the real failure instead of claiming the save failed');
+    assert.equal(state.logs.length,2,'the entry stays available in memory beside existing history');
+    assert.equal(JSON.parse(localStorage.getItem('roadToSendLogsV9')).length,1,'the partial write failure leaves existing durable history untouched');
+    assert.deepEqual({name:state.recoveryDraft.name,date:state.recoveryDraft.date,type:state.recoveryDraft.type,hardestGrade:state.recoveryDraft.hardestGrade,bountyId:state.recoveryDraft.bountyId||'',note:state.recoveryDraft.note},{name:'Alex',date:'${today}',type:'climb',hardestGrade:'V6',bountyId:'',note:'Steep red problem'},'the recovery draft retains every activity field, including the empty bounty choice for a climb');
+    assert.equal(document.querySelector('#storageRecovery').classList.contains('hide'),false,'the deliberate recovery controls are visible on the Record tab');
+    assert.equal(document.querySelector('#toast').textContent,'Activity kept as a recovery draft — it is not saved yet.','the app does not describe a memory-only entry as durable');
+    assert.equal(document.querySelector('#activityNote').value,'Steep red problem','the form remains intact after the failed save');
     assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save activity','and the button is handed back');
+    assert.equal(document.querySelector('#saveActivityBtn').disabled,true,'a second ordinary save cannot duplicate the memory-only draft');
+    exportRecoveryDraft();
+    const exported=JSON.parse(getDownloaded());
+    assert.deepEqual({name:exported.activity.name,date:exported.activity.date,hardestGrade:exported.activity.hardestGrade,note:exported.activity.note},{name:'Alex',date:'${today}',hardestGrade:'V6',note:'Steep red problem'},'export downloads the same complete recovery draft');
+    await retryRecoveryDraft();
+    assert.equal(state.recoveryDraft,null,'a successful retry clears the recovery state');
+    assert.equal(document.querySelector('#storageRecovery').classList.contains('hide'),true,'successful retry dismisses the recovery controls');
+    assert.equal(JSON.parse(localStorage.getItem('roadToSendLogsV9')).length,2,'the retry preserves existing history and durably adds the draft once');
+    assert.match(localStorage.getItem('roadToSendLogsV9'),/Steep red problem/,'the retry durably writes the activity');
+    assert.equal(document.querySelector('#toast').textContent,'Activity saved.','successful retry gives the normal durable confirmation');
   })()`;
   await vm.runInNewContext(`${source}\n${storageChecks}`, storageContext, {filename: 'index.html'});
+});
+
+test('blocked storage reads never turn unknown local history into an empty writable store', async () => {
+  const dom = sharedDom();
+  let readsBlocked = true;
+  const store = new Map([['roadToSendLogsV9', JSON.stringify([{id: 'local-existing', name: 'Alex', type: 'exercise', date: '2026-07-13', createdAt: '1'}])]]);
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    localStorage: {getItem: key => {if (readsBlocked) throw Error('SecurityError'); return store.has(key) ? store.get(key) : null}, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    unblockReads: () => {readsBlocked = false},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const checks = `(()=>{
+    assert.doesNotThrow(()=>loadInitialState(),'blocked reads fall back without crashing startup');
+    state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+    state.logs=[{id:'local-draft',name:'Alex',type:'climb',date:'2026-07-13',createdAt:'2'}];
+    assert.equal(persistLocal(),false,'a write is refused while existing history cannot be read');
+    unblockReads();
+    assert.equal(JSON.parse(localStorage.getItem('roadToSendLogsV9')).length,1,'the refused write did not replace unknown history');
+    assert.equal(persistLocal(),true,'the same write can be retried once reads recover');
+    const saved=JSON.parse(localStorage.getItem('roadToSendLogsV9'));
+    assert.equal(saved.length,2,'retry merges the draft with history that became readable');
+    assert.ok(saved.some(x=>x.id==='local-existing')&&saved.some(x=>x.id==='local-draft'),'both the old activity and draft survive');
+  })()`;
+  await vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
 });
 
 // Lever 1: a shared-mode save no longer blocks the confirmation on a full reload. The write

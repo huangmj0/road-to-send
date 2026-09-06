@@ -50,6 +50,7 @@ __INLINE_STYLES__
       <button id="dateToggle" class="text-btn date-toggle" type="button" aria-expanded="false">＋ Different day</button>
       <div id="dateFields" class="field hide"><label for="activityDate">Activity date</label><input id="activityDate" type="date" required /></div>
       <div class="preview" role="status" aria-live="polite"><div class="preview-copy"><span>This activity generates</span><strong><span id="rawPreview">3</span> points</strong><small id="creditPreview">Counts in full · +3 today</small></div><div id="recordMeter" class="point-meter compact" role="img" aria-label="3 of 8 points after this activity"></div></div>
+      <div id="storageRecovery" class="notice warn storage-recovery hide" role="alert"><strong>Activity not saved yet</strong><p>Browser storage is unavailable. Your draft is still open.</p><div class="inline"><button id="retryStorage" class="btn secondary" type="button" onclick="retryRecoveryDraft()">Retry save</button><button id="exportRecovery" class="text-btn" type="button" onclick="exportRecoveryDraft()">Export draft</button></div></div>
       <button id="saveActivityBtn" class="btn primary wide" type="submit">Save activity</button>
     </form>
   </section>
