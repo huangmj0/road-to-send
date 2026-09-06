@@ -12,6 +12,7 @@ This document contains no Sheet links, endpoints, participant records, or privat
 - Source/copy metadata and raw comparison evidence are retained privately outside the repository in the orchestrator's local evidence directory. Public PRs must report only gate outcomes.
 - A third, owner-only private Sheet was restored from the recovery copy and read back across all 13 tabs. Its cell contents and tab properties match the recovery snapshot exactly; the recovery copy was not changed. This verifies snapshot restoration, not replay of later writes.
 - The copied Apps Script project's container points to the disposable rehearsal Sheet, and its overview showed no previous executions. Its visible script-property list is empty; document properties and effective runtime routing still require verification.
+- The two observed post-snapshot activity rows were replayed into the separate restoration target with their original values, IDs, and timestamps. Full Activities readback then matched the captured source; all other tabs had already matched. Native Sheet inspection confirmed the restored rows. This proves the bounded replay exercise, not future-write capture or production cutover.
 
 ## Still required
 
