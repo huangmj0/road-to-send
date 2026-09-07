@@ -30,9 +30,9 @@ GitHub Pages hosts the interface, while a Google Sheet stores shared settings an
 
 The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains a single `name` column; `Activities` contains raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time.
 
-### Literal Sheet text
+### Upgrading to API v14 — literal Sheet text
 
-Each new activity is stored as one complete row of Apps Script rich-text values, so a failed write cannot leave a partially filled row and leading formula characters remain literal. New points cells contain numeric text, normalized back to numbers in API responses. Participant names also use rich-text values. Leading apostrophes, Unicode, markup-like text, and internal whitespace are preserved. Existing outer-whitespace trimming, case-insensitive participant lookup, and the 30/120-character limits remain. Updating the script affects future writes only; it does not rewrite historic activity rows.
+Each new activity is stored as one complete row of Apps Script rich-text values, so a failed write cannot leave a partially filled row and leading formula characters remain literal. New points cells contain numeric text, normalized back to numbers in API responses. Participant names also use rich-text values. Leading apostrophes, Unicode, markup-like text, and internal whitespace are preserved. Existing outer-whitespace trimming, case-insensitive participant lookup, and the 30/120-character limits remain. Deploy the v14 script before sending new names or notes beginning with `=`, `+`, `-`, `@`, or an apostrophe. Updated browsers hold those fields with a specific update message until the endpoint advertises `literal-text-v1`; ordinary text continues to work with compatible older deployments. Updating the script affects future writes only; it does not rewrite historic activity rows.
 
 ### Upgrading to API v13
 
@@ -51,8 +51,8 @@ Reads return:
 
 ```json
 {
-  "version": 13,
-  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1"],
+  "version": 14,
+  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1"],
   "activities": [],
   "config": {
     "startDate": "2026-07-16",
@@ -66,7 +66,7 @@ Reads return:
 }
 ```
 
-The browser sends `protocolVersion: 13` on reads and writes. Activity writes also send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 13, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
+The browser sends `protocolVersion: 14` on reads and writes. Activity writes also send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Current negotiated writes return `{ version: 14, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
 
 A save is confirmed as soon as the Sheet accepts the write, so the only outcomes are **Activity saved** and **Save failed** (safe to retry). The Crew sync control refreshes the shared board on demand.
 

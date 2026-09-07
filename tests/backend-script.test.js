@@ -23,9 +23,9 @@ function loadScript() {
   return context;
 }
 
-test('embedded v13 Apps Script is syntactically valid and exposes only simple capabilities', () => {
+test('embedded v14 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();
-  assert.equal(vm.runInContext('API_VERSION', context), 13);
+  assert.equal(vm.runInContext('API_VERSION', context), 14);
   assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1']);
   assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
 });
@@ -74,7 +74,10 @@ test('GET negotiation is additive and failures use the selected envelope', () =>
   context.sheetTimeZone = () => 'UTC';
   assert.equal(context.doGet().version, 12);
   assert.equal(context.doGet({parameter: {protocolVersion: '13'}}).version, 13);
-  assert.equal(context.negotiatedVersion(14), 12, 'a version newer than this deployment falls back to the legacy envelope');
+  assert.equal(context.negotiatedVersion(15), 12, 'a version newer than this deployment falls back to the legacy envelope');
+  assert.equal(context.doGet({parameter: {protocolVersion: '14'}}).version, 14);
+  assert.ok(context.responseFeatures(14).includes('literal-text-v1'));
+  assert.equal(context.responseFeatures(13).includes('literal-text-v1'), false);
   context.setup = () => { context.apiError('runtime_configuration', 'not configured'); };
   const failed = context.doGet({parameter: {protocolVersion: '13'}});
   assert.equal(failed.version, 13);
@@ -112,6 +115,8 @@ test('backend derives category and bounty points instead of trusting the request
 
 test('new activity names and notes round-trip as literal Sheet text', () => {
   const context = loadScript();
+  // Text-storage seam: runtime routing is exercised separately above.
+  context.spreadsheet = () => context.SpreadsheetApp.getActive();
   const formulas = [];
   const writes = [];
   const parseCell = value => {
@@ -152,6 +157,8 @@ test('new activity names and notes round-trip as literal Sheet text', () => {
 
 test('a failed activity row commit leaves no partial row', () => {
   const context = loadScript();
+  // Text-storage seam: runtime routing is exercised separately above.
+  context.spreadsheet = () => context.SpreadsheetApp.getActive();
   const headers = Array.from(vm.runInContext('ACTIVITY_HEADERS', context));
   const values = [headers];
   const range = (row, col, rows = 1, cols = 1) => ({
@@ -198,6 +205,8 @@ test('self-registration adds one name-only participant and rejects duplicate nam
 
 test('setup writes formula-like participant names as literal text after existing trim normalization', () => {
   const context = loadScript();
+  // Text-storage seam: runtime routing is exercised separately above.
+  context.spreadsheet = () => context.SpreadsheetApp.getActive();
   const formulas = [];
   const literals = [];
   const makeRange = () => ({

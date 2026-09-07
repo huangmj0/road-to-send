@@ -24,9 +24,9 @@ test('shared requests explicitly negotiate the current additive protocol', async
     setTimeout() {}, clearTimeout() {},
   };
   await vm.runInNewContext(`${source}\n(async()=>{await fetchShared('https://sheet.example.test/exec');await fetchShared('https://sheet.example.test/exec',{method:'POST',body:JSON.stringify({action:'delete',id:'a1'})})})()`, context, {filename: 'index.html'});
-  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '13');
-  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '13');
-  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 13);
+  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '14');
+  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '14');
+  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 14);
   assert.equal(JSON.parse(calls[1].options.body).id, 'a1', 'negotiation preserves the request payload');
 });
 
@@ -357,7 +357,7 @@ test('a successful shared delete disappears without waiting on a reload', async 
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the rendered delete control opens confirmation');
     document.querySelector('#confirmOk').dispatchEvent(new window.Event('click',{bubbles:true}));
     await Promise.resolve();await Promise.resolve();
-    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:13}]),'confirmation posts the exact shared row id with protocol negotiation');
+    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:14}]),'confirmation posts the exact shared row id with protocol negotiation');
     assert.equal(state.logs.length,0,'the accepted delete leaves memory immediately');
     assert.equal(document.querySelector('#personalActivity [data-del]'),null,'the deleted row leaves the rendered feed without waiting on GET');
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'the confirmation closes without waiting on GET');
@@ -498,4 +498,28 @@ test('the share sheet is tried first, and a dismissed one is not a failure', asy
   await vm.runInNewContext(`${source}\n(async()=>{${setup}await shareProgress()})()`, broken.context, {filename: 'index.html'});
   assert.equal(broken.written.length, 1, 'a genuine share failure falls back to the clipboard');
   assert.equal(broken.context.document.querySelector('#toast').textContent, 'Progress copied — paste it anywhere.', 'and reports the copy');
+});
+
+test('literal-text rollout holds sensitive fields before sending and preserves supported payloads', async () => {
+  const calls = [];
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/', hash: ''},
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+    fetch: async (url, options) => {calls.push(JSON.parse(options.body)); return {ok: true};},
+    setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{
+    const send=body=>fetchShared('https://sheet.example.test/exec',{method:'POST',body:JSON.stringify(body)});
+    state.protocolFeatures=[];
+    await assert.rejects(send({name:'Alex',note:'=1+1'}),/Note.*Apps Script/);
+    await assert.rejects(send({action:'addParticipant',name:'+Alex'}),/Name.*Apps Script/);
+    await assert.rejects(send({action:'saveConfig',config:{crew:[{name:'@Alex'}]}}),/Name.*Apps Script/);
+    await send({name:'Alex',note:'ordinary text'});
+    state.protocolFeatures=['literal-text-v1'];
+    for(const prefix of ['=','+','-','@',String.fromCharCode(39)])await send({name:prefix+'Alex',note:prefix+'  <text> 雪'});
+  })()`, context, {filename: 'index.html'});
+  assert.equal(calls.length, 6, 'held fields never reach an older backend');
+  assert.equal(calls[1].note, '=  <text> 雪');
+  assert.equal(calls[5].name, "'Alex");
 });
