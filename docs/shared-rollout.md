@@ -1,20 +1,20 @@
 # Shared runtime rollout
 
 Issue #154 changes shared connectivity without changing scoring, activity rows, local storage, or
-challenge-day rules. Protocol v13 is additive and explicitly negotiated.
+challenge-day rules. Protocol v14 is additive and explicitly negotiated.
 
 ## Compatibility matrix
 
 | Browser | Backend | Request and response |
 | --- | --- | --- |
 | Existing v11/v12 | Existing v11/v12 | Existing unnegotiated behavior |
-| Updated v13 | Existing v11/v12 | Browser requests v13; backend ignores it and returns genuine v11/v12, which the browser accepts |
-| Existing v11/v12 | Updated v13 | Request is unnegotiated; backend returns the compatible v12 envelope |
-| Updated v13 | Updated v13 | Browser requests v13; backend returns v13 and `protocol-negotiation-v1` metadata |
+| Updated v14 | Existing v11–v13 | Browser requests v14; backend returns its genuine compatible version |
+| Existing v11–v13 | Updated v14 | Request is unnegotiated or older; backend returns the requested compatible envelope, or v12 for an unnegotiated request |
+| Updated v14 | Updated v14 | Browser requests v14; backend returns v14 with protocol negotiation and recoverable configuration commands |
 
-For later additive backend versions, a request from 13 through the deployed `API_VERSION` receives
+For additive backend versions, a request from 13 through the deployed `API_VERSION` receives
 the requested envelope version. Missing, invalid, or newer requests receive v12. This lets later
-backend changes retain already-open v13 clients when their capabilities remain compatible.
+backend changes retain already-open compatible clients.
 
 ## Organizer deployment order
 

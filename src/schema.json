@@ -1,15 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://huangmj0.github.io/road-to-send/schema/v15.json",
-  "title": "Road to Send protocol v15",
+  "$id": "https://huangmj0.github.io/road-to-send/schema/v16.json",
+  "title": "Road to Send protocol v16",
   "type": "object",
   "required": ["version", "features", "activities", "config"],
   "properties": {
-    "version": { "const": 15 },
+    "version": { "const": 16 },
     "features": { "type": "array", "items": { "type": "string" } },
     "activities": { "type": "array", "items": { "$ref": "#/$defs/activity" } },
     "config": { "anyOf": [{ "$ref": "#/$defs/settings" }, { "type": "null" }] },
     "configErrors": { "type": "array", "items": { "$ref": "#/$defs/errorDetail" } },
+    "configRevision": { "type": "integer", "minimum": 0 },
     "serverDate": { "$ref": "#/$defs/date" },
     "timeZone": { "type": "string" },
     "fetchedAt": { "type": "string" }

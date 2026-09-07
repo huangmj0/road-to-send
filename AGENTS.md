@@ -63,8 +63,8 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
    one-time migration writes `roadToSendConfigV9` from it), `roadToSendWeekReview`, and
    `roadToSendPendingActivityV1` (one endpoint-bound mutation ID and activity draft awaiting an
    authoritative shared-save response), and
-   `roadToSendShared:{activities|config|meta}:{endpoint}`. Read them; write only shapes existing code
-   already reads. A new shape ships as a new key plus a migration that reads the old one — the V8→V9
+   `roadToSendShared:{activities|config|meta|config-command}:{endpoint}`. Read them; write only shapes existing code
+   already reads. The config-command entry holds one immutable setup command until its receipt is acknowledged. A new shape ships as a new key plus a migration that reads the old one — the V8→V9
    path is the worked example. Renaming a key instead makes a climber's history vanish on their next
    load. `tests/docs-check.mjs` asserts every `roadToSend…` literal in the browser sources the build
    bundles — every `src/*.js` except `src/apps-script.js` — appears in this list, so a new key means

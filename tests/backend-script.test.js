@@ -23,9 +23,9 @@ function loadScript() {
   return context;
 }
 
-test('embedded v15 Apps Script advertises idempotent activity saves', () => {
+test('embedded v16 Apps Script advertises idempotent activity saves', () => {
   const context = loadScript();
-  assert.equal(vm.runInContext('API_VERSION', context), 15);
+  assert.equal(vm.runInContext('API_VERSION', context), 16);
   assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1', 'idempotent-activity-v1']);
   assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
 });
@@ -74,11 +74,13 @@ test('GET negotiation is additive and failures use the selected envelope', () =>
   context.sheetTimeZone = () => 'UTC';
   assert.equal(context.doGet().version, 12);
   assert.equal(context.doGet({parameter: {protocolVersion: '13'}}).version, 13);
-  assert.equal(context.negotiatedVersion(16), 12, 'a version newer than this deployment falls back to the legacy envelope');
+  assert.equal(context.negotiatedVersion(17), 12, 'a version newer than this deployment falls back to the legacy envelope');
   assert.equal(context.doGet({parameter: {protocolVersion: '14'}}).version, 14);
   assert.ok(context.responseFeatures(14).includes('literal-text-v1'));
   assert.equal(context.responseFeatures(14).includes('idempotent-activity-v1'), false);
   assert.ok(context.responseFeatures(15).includes('idempotent-activity-v1'));
+  assert.equal(context.responseFeatures(15).includes('config-journal-v1'), false);
+  assert.ok(context.responseFeatures(16).includes('config-journal-v1'));
   assert.equal(context.responseFeatures(13).includes('literal-text-v1'), false);
   context.setup = () => { context.apiError('runtime_configuration', 'not configured'); };
   const failed = context.doGet({parameter: {protocolVersion: '13'}});
@@ -225,10 +227,74 @@ test('setup writes formula-like participant names as literal text after existing
     newRichTextValue: () => {let text = ''; return {setText: value => {text = value; return {build: () => ({getText: () => text})}}}},
   };
   context.formatSheets = () => {};
-  const saved = context.writeConfig({startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: '  =Alex 🧗  '}]});
+  const saved = context.projectConfig(context.validateConfig({startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: '  =Alex 🧗  '}]}));
   assert.equal(saved.crew[0].name, '=Alex 🧗', 'the preexisting outer trim remains the only name normalization');
   assert.deepEqual(formulas, [], 'the normalized name never reaches formula-parsing setValues');
   assert.deepEqual(literals, ['=Alex 🧗'], 'the normalized name is written through the literal text API');
+});
+
+test('config commands commit once, replay immutably, and never roll the head backward', () => {
+  const context = loadScript();
+  const cells = [['entry']];
+  let failCommit = false;
+  const journal = {
+    getLastRow: () => cells.length,
+    getDataRange: () => ({getValues: () => cells.map(row => [...row])}),
+    getRange: row => ({setValue: value => {if (failCommit) throw Error('commit failed'); cells[row - 1] = [value]}}),
+  };
+  context.tab = name => {assert.equal(name, 'Config Journal'); return journal};
+  context.projectConfig = config => config;
+  context.Utilities.getUuid = () => 'receipt-id';
+  const first = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]};
+  const second = {startDate: '2026-07-01', tripDate: '2026-08-31', goal: 700, crew: [{name: 'Alex'}, {name: 'Maya'}]};
+  const result = context.saveConfigCommand('command-1', first);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.config)), first);
+  assert.equal(cells.length, 2, 'one complete journal cell is the commit point');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.saveConfigCommand('command-1', first))), JSON.parse(JSON.stringify(result)), 'replay returns the original immutable result');
+  assert.equal(cells.length, 2, 'replay does not append another commit');
+  assert.throws(() => context.saveConfigCommand('command-1', second), error => error.code === 'command_mismatch');
+  context.saveConfigCommand('command-2', second);
+  context.saveConfigCommand('command-1', first);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.readConfig().config)), second, 'replaying an older command does not roll the committed head backward');
+  failCommit = true;
+  assert.throws(() => context.saveConfigCommand('command-3', first), /commit failed/);
+  assert.equal(cells.length, 3, 'a failed single-cell commit leaves no partial journal entry');
+  failCommit = false;
+  context.projectConfig = () => {throw Error('projection interrupted')};
+  assert.throws(() => context.saveConfigCommand('command-3', first), /projection interrupted/);
+  assert.equal(cells.length, 4, 'the complete command remains committed when rollback projection repair is interrupted');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.readConfig().config)), first, 'a cold read sees the complete journal head instead of the interrupted projection');
+  context.projectConfig = config => config;
+  const recovered = context.saveConfigCommand('command-3', first);
+  assert.equal(recovered.configCommandId, 'command-3');
+  assert.equal(cells.length, 4, 'recovery returns the original receipt without another commit');
+  const oversized = {...first, crew: Array.from({length: 2000}, (_, i) => ({name: 'Climber ' + String(i).padStart(20, '0')}))};
+  assert.throws(() => context.saveConfigCommand('command-large', oversized), error => error.code === 'config_too_large');
+  assert.equal(cells.length, 4, 'oversize validation happens before the commit point');
+});
+
+test('every rollback projection interruption recovers from the committed journal without touching activities', () => {
+  const config = {startDate: '2026-07-01', tripDate: '2026-08-31', goal: 700, crew: [{name: 'Alex'}, {name: 'Maya'}]};
+  for (let failAt = 1; failAt <= 6; failAt++) {
+    const context = loadScript();
+    const journalCells = [['entry']];
+    const activities = [['id'], ['activity-kept']];
+    let stepNumber = 0;
+    const step = () => {stepNumber++; if (stepNumber === failAt) throw Error('projection step ' + failAt)};
+    const journal = {getLastRow: () => journalCells.length, getDataRange: () => ({getValues: () => journalCells.map(row => [...row])}), getRange: row => ({setValue: value => {journalCells[row - 1] = [value]}})};
+    const settings = {getLastRow: () => 4, getRange: () => ({clearContent: () => {step()}, setValues: () => {step()}})};
+    const participants = {clearContents: () => {step()}, getRange: () => ({setValues: () => {step()}, setRichTextValues: () => {step()}})};
+    context.tab = name => ({'Config Journal': journal, Settings: settings, Participants: participants, Activities: activities})[name];
+    context.SpreadsheetApp.newRichTextValue = () => ({setText: text => ({build: () => text})});
+    context.formatSheets = () => {step()};
+    assert.throws(() => context.saveConfigCommand('command-' + failAt, config), new RegExp('projection step ' + failAt));
+    assert.equal(journalCells.length, 2, 'step ' + failAt + ' fails after the complete journal commit');
+    assert.deepEqual(JSON.parse(JSON.stringify(context.readConfig().config)), config, 'step ' + failAt + ' cannot expose a partial projection to current readers');
+    assert.deepEqual(activities, [['id'], ['activity-kept']], 'step ' + failAt + ' leaves activities untouched');
+    stepNumber = -100;
+    context.saveConfigCommand('command-' + failAt, config);
+    assert.equal(journalCells.length, 2, 'step ' + failAt + ' replay repairs without appending');
+  }
 });
 
 test('challenge window remains inclusive', () => {

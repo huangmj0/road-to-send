@@ -24,10 +24,30 @@ test('shared requests explicitly negotiate the current additive protocol', async
     setTimeout() {}, clearTimeout() {},
   };
   await vm.runInNewContext(`${source}\n(async()=>{await fetchShared('https://sheet.example.test/exec');await fetchShared('https://sheet.example.test/exec',{method:'POST',body:JSON.stringify({action:'delete',id:'a1'})})})()`, context, {filename: 'index.html'});
-  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '15');
-  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '15');
-  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 15);
+  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '16');
+  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '16');
+  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 16);
   assert.equal(JSON.parse(calls[1].options.body).id, 'a1', 'negotiation preserves the request payload');
+});
+
+test('a setup command keeps its identity across an interrupted response and cold restart', () => {
+  const store = new Map();
+  const makeContext = () => ({
+    console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/', hash: ''},
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  });
+  const config = {startDate: '2026-09-01', tripDate: '2026-10-01', goal: 500, crew: [{name: 'Alex'}]};
+  const firstContext = makeContext();
+  vm.runInNewContext(source, firstContext, {filename: 'index.html'});
+  const first = firstContext.configCommand('https://sheet.example.test/exec', config);
+  const restartedContext = makeContext();
+  vm.runInNewContext(source, restartedContext, {filename: 'index.html'});
+  const replay = restartedContext.configCommand('https://sheet.example.test/exec', config);
+  assert.equal(replay.id, first.id, 'the same complete payload reuses its durable command identity');
+  assert.deepEqual(JSON.parse(JSON.stringify(replay.config)), config, 'the durable retry retains the complete validated draft');
+  assert.throws(() => restartedContext.configCommand('https://sheet.example.test/exec', {...config, goal: 700}), /Resolve the pending setup command/, 'an unresolved identity cannot be replaced by different settings');
 });
 
 test('background sync respects the open date picker and refreshes stale caches', async () => {
@@ -334,7 +354,7 @@ test('a negotiated shared save keeps one mutation id across response loss and re
   const endpoint = 'https://sheet.example.test/exec';
   const today = new Date().toISOString().slice(0, 10);
   const config = {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}]};
-  const remote = {version: 15, features: ['idempotent-activity-v1'], activities: [], config, configErrors: [], serverDate: today, timeZone: 'UTC'};
+  const remote = {version: 16, features: ['idempotent-activity-v1'], activities: [], config, configErrors: [], serverDate: today, timeZone: 'UTC'};
   store.set('roadToSendEndpoint', endpoint);
   store.set('roadToSendMe', 'Alex');
   store.set('roadToSendShared:config:' + encodeURIComponent(endpoint), JSON.stringify(config));
@@ -357,7 +377,7 @@ test('a negotiated shared save keeps one mutation id across response loss and re
   const first = makeContext(Error('response lost'));
   await vm.runInNewContext(`${source}\n(async()=>{await Promise.resolve();state.protocolFeatures=['idempotent-activity-v1'];state.protocolEndpoint=state.endpoint;document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='Steep red problem';await submitActivity({preventDefault(){}});assert.ok(localStorage.getItem('roadToSendPendingActivityV1'),'the uncertain command is durable');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save');assert.ok(document.querySelector('#toast').textContent.indexOf('same activity ID')>=0,'the negotiated failure promises the bounded safe retry')})()`, first, {filename: 'index.html'});
 
-  const canonical = {version: 15, ok: true, id: 'canonical-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-09-06T12:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: 'Steep red problem'};
+  const canonical = {version: 16, ok: true, id: 'canonical-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-09-06T12:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: 'Steep red problem'};
   const second = makeContext(canonical);
   await vm.runInNewContext(`${source}\n(async()=>{await loadRemote();assert.equal(document.querySelector('#activityNote').value,'Steep red problem','reload restores the pending draft');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save','reload presents the recovered command as a retry');await submitActivity({preventDefault(){}});assert.equal(localStorage.getItem('roadToSendPendingActivityV1'),null,'the authoritative result clears the pending command');assert.equal(state.logs.filter(x=>x.id==='canonical-1').length,1,'the canonical activity appears once')})()`, second, {filename: 'index.html'});
   assert.equal(posted.length, 2);
@@ -501,7 +521,7 @@ test('a successful shared delete disappears without waiting on a reload', async 
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the rendered delete control opens confirmation');
     document.querySelector('#confirmOk').dispatchEvent(new window.Event('click',{bubbles:true}));
     await Promise.resolve();await Promise.resolve();
-    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:15}]),'confirmation posts the exact shared row id with protocol negotiation');
+    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:16}]),'confirmation posts the exact shared row id with protocol negotiation');
     assert.equal(state.logs.length,0,'the accepted delete leaves memory immediately');
     assert.equal(document.querySelector('#personalActivity [data-del]'),null,'the deleted row leaves the rendered feed without waiting on GET');
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'the confirmation closes without waiting on GET');

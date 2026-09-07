@@ -46,14 +46,20 @@ Paste the v15 script over the old Apps Script, run `configureSpreadsheet` once, 
 
 Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
 
-## API v14
+### Upgrading to API v16 — recoverable setup
+
+v16 commits each validated setup command as one immutable JSON cell in `Config Journal`, then repairs the `Settings` and `Participants` projection. Reads use the complete journal head. Updated browsers retain an unacknowledged setup command and replay its stable ID; replay returns its original receipt while repairing the current head. Keep the journal with the other Sheet data. Setup commands exceeding 45,000 serialized characters are rejected before commit.
+
+An independently deployed older backend bypasses the journal. Do not run it against the same Sheet during setup changes or treat reverting its deployment as a safe rollback without reconciliation. Older browsers remain compatible through the new backend.
+
+## API v16
 
 Reads return:
 
 ```json
 {
-  "version": 15,
-  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1", "idempotent-activity-v1"],
+  "version": 16,
+  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1", "idempotent-activity-v1", "config-journal-v1"],
   "activities": [],
   "config": {
     "startDate": "2026-07-16",
@@ -67,7 +73,7 @@ Reads return:
 }
 ```
 
-The browser sends `protocolVersion: 15` on reads and writes. Activity writes also send a stable `mutationId`, `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 15, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
+The browser sends `protocolVersion: 16` on reads and writes. Activity writes also send a stable `mutationId`, `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 16, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
 
 When the backend advertises `idempotent-activity-v1`, the browser stores an endpoint-bound pending command before sending. A missing response can then be retried after a reload with the same mutation ID. The pending draft only appears when the climber deliberately opens the record workflow; it never opens or announces itself. Switching crew links preserves the earlier command and blocks a new save from overwriting it. If durable browser storage is unavailable, the request is not sent. Older backends do not advertise this capability, so the browser reports that a missing response may already have reached the Sheet and asks the climber to check Crew before retrying.
 
