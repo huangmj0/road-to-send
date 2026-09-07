@@ -194,9 +194,9 @@ assert.match(script,/function computeCreditsRaw\(/,'the raw scorer is separable 
 assert.doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|fill|copyWithin)\(/,'logs is replaced, never mutated in place');
 // Retired with Lever 1 (optimistic write): the "Saved to the Sheet, but refresh failed. Do not
 // retry" outcome no longer exists. A shared save is confirmed by the write response and the returned
-// record is added to the feed at once, with loadRemote() reconciling in the background — so there is
-// no blocking reload left to fail on the success path. This asserts that replacement invariant.
-assert.match(script,/state\.logs=state\.logs\.concat\(\[\{id:saved\.id/,'a shared save adds the record the write returned straight to the feed');
+// canonical record is upserted into the feed at once, with loadRemote() reconciling in the background
+// — so a replay replaces the same ID rather than duplicating it. This asserts that replacement invariant.
+assert.match(script,/state\.logs=state\.logs\.filter\(x=>String\(x\.id\)!==String\(row\.id\)\)\.concat\(\[row\]\)/,'a shared save upserts the record the write returned straight into the feed');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');
 assert.match(html,/id="bountyHint"/,'the Record tab has a slot for the chosen bounty description');

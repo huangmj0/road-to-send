@@ -61,6 +61,8 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
 2. **localStorage keys are frozen:** `roadToSendEndpoint`, `roadToSendMe`, `roadToSendLogsV9`,
    `roadToSendConfigV9`, `roadToSendConfigV8` (read-only migration source — only the existing
    one-time migration writes `roadToSendConfigV9` from it), `roadToSendWeekReview`, and
+   `roadToSendPendingActivityV1` (one endpoint-bound mutation ID and activity draft awaiting an
+   authoritative shared-save response), and
    `roadToSendShared:{activities|config|meta}:{endpoint}`. Read them; write only shapes existing code
    already reads. A new shape ships as a new key plus a migration that reads the old one — the V8→V9
    path is the worked example. Renaming a key instead makes a climber's history vanish on their next

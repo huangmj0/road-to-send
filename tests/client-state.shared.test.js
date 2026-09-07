@@ -329,6 +329,81 @@ test('a shared save shows the entry from the write response without waiting on a
   await vm.runInNewContext(`${source}\n${savedChecks}`, savedContext, {filename: 'index.html'});
 });
 
+test('a negotiated shared save keeps one mutation id across response loss and reload', async () => {
+  const store = new Map();
+  const endpoint = 'https://sheet.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const config = {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}]};
+  const remote = {version: 14, features: ['idempotent-activity-v1'], activities: [], config, configErrors: [], serverDate: today, timeZone: 'UTC'};
+  store.set('roadToSendEndpoint', endpoint);
+  store.set('roadToSendMe', 'Alex');
+  store.set('roadToSendShared:config:' + encodeURIComponent(endpoint), JSON.stringify(config));
+  store.set('roadToSendShared:activities:' + encodeURIComponent(endpoint), '[]');
+  store.set('roadToSendShared:meta:' + encodeURIComponent(endpoint), JSON.stringify({protocolVersion: 14, protocolFeatures: ['idempotent-activity-v1'], serverDate: today, timeZone: 'UTC'}));
+  const posted = [];
+  const makeContext = (saveResult, dom = sharedDom()) => ({
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async (url, options = {}) => {
+      if (!options.method) return {ok: true, json: async () => JSON.parse(JSON.stringify(remote))};
+      posted.push(JSON.parse(options.body));
+      if (saveResult instanceof Error) throw saveResult;
+      return {ok: true, json: async () => JSON.parse(JSON.stringify(saveResult))};
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  });
+
+  const first = makeContext(Error('response lost'));
+  await vm.runInNewContext(`${source}\n(async()=>{await Promise.resolve();state.protocolFeatures=['idempotent-activity-v1'];document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='Steep red problem';await submitActivity({preventDefault(){}});assert.ok(localStorage.getItem('roadToSendPendingActivityV1'),'the uncertain command is durable');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save');assert.ok(document.querySelector('#toast').textContent.indexOf('same activity ID')>=0,'the negotiated failure promises the bounded safe retry')})()`, first, {filename: 'index.html'});
+
+  const canonical = {version: 14, ok: true, id: 'canonical-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-09-06T12:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: 'Steep red problem'};
+  const second = makeContext(canonical);
+  await vm.runInNewContext(`${source}\n(async()=>{await loadRemote();assert.equal(document.querySelector('#activityNote').value,'Steep red problem','reload restores the pending draft');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save','reload presents the recovered command as a retry');await submitActivity({preventDefault(){}});assert.equal(localStorage.getItem('roadToSendPendingActivityV1'),null,'the authoritative result clears the pending command');assert.equal(state.logs.filter(x=>x.id==='canonical-1').length,1,'the canonical activity appears once')})()`, second, {filename: 'index.html'});
+  assert.equal(posted.length, 2);
+  assert.equal(posted[0].mutationId, posted[1].mutationId, 'reload reuses the stable mutation id');
+});
+
+test('a legacy shared save reports uncertainty without promising a safe retry', async () => {
+  const dom = sharedDom();
+  const today = new Date().toISOString().slice(0, 10);
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async () => {throw Error('response lost')},
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}}, setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{state.endpoint='https://sheet.example.test/exec';state.protocolFeatures=[];state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});assert.ok(document.querySelector('#toast').textContent.indexOf('may have reached the Sheet')>=0);assert.equal(document.querySelector('#toast').textContent.indexOf('safe to retry'),-1,'legacy copy makes no idempotency promise')})()`, context, {filename: 'index.html'});
+});
+
+test('a pending save for another endpoint is preserved and blocks a new write', async () => {
+  const dom = sharedDom();
+  const today = new Date().toISOString().slice(0, 10);
+  const old = {endpoint: 'https://old.example.test/exec', mutationId: 'old-command', fingerprint: 'old', request: {name: 'Alex', type: 'climb', date: today}};
+  const store = new Map([['roadToSendPendingActivityV1', JSON.stringify(old)]]);
+  let fetches = 0;
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async () => {fetches++; throw Error('must not send')}, fetchCount: () => fetches,
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)}, setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{state.endpoint='https://new.example.test/exec';state.protocolFeatures=['idempotent-activity-v1'];state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';state.pendingActivity=JSON.parse(localStorage.getItem('roadToSendPendingActivityV1'));document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});assert.equal(fetchCount(),0,'the new command is not sent');assert.equal(JSON.parse(localStorage.getItem('roadToSendPendingActivityV1')).mutationId,'old-command','the other endpoint command remains intact');assert.ok(document.querySelector('#toast').textContent.indexOf('another crew link')>=0)})()`, context, {filename: 'index.html'});
+});
+
+test('a negotiated save is not sent when its recovery command cannot be stored', async () => {
+  const dom = sharedDom();
+  const today = new Date().toISOString().slice(0, 10);
+  let fetches = 0;
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async () => {fetches++; throw Error('must not send')}, fetchCount: () => fetches,
+    localStorage: {getItem: () => null, setItem() {throw Error('quota')}, removeItem() {}}, setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{state.endpoint='https://sheet.example.test/exec';state.protocolFeatures=['idempotent-activity-v1'];state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});assert.equal(fetchCount(),0);assert.ok(document.querySelector('#toast').textContent.indexOf('not sent')>=0)})()`, context, {filename: 'index.html'});
+});
+
 test('a successful shared delete disappears without waiting on a reload', async () => {
   const dom = sharedDom();
   const store = new Map();

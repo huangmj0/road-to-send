@@ -23,10 +23,10 @@ function loadScript() {
   return context;
 }
 
-test('embedded v14 Apps Script is syntactically valid and exposes only simple capabilities', () => {
+test('embedded v14 Apps Script advertises idempotent activity saves', () => {
   const context = loadScript();
   assert.equal(vm.runInContext('API_VERSION', context), 14);
-  assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1']);
+  assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1', 'idempotent-activity-v1']);
   assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
 });
 
@@ -40,8 +40,8 @@ test('web requests use a script lock and preserve negotiated or legacy envelopes
   context.out = value => value;
   context.setup = () => {};
 
-  const negotiated = context.doPost({postData: {contents: JSON.stringify({protocolVersion: 13, action: 'unknown'})}});
-  assert.equal(negotiated.version, 13);
+  const negotiated = context.doPost({postData: {contents: JSON.stringify({protocolVersion: 14, action: 'unknown'})}});
+  assert.equal(negotiated.version, 14);
   assert.equal(negotiated.ok, false);
   assert.equal(negotiated.error.code, 'unknown_action');
   assert.ok(Array.from(negotiated.features).includes('protocol-negotiation-v1'));
@@ -234,6 +234,49 @@ test('challenge window remains inclusive', () => {
   assert.equal(context.validateActivityWindow({date: '2026-07-01'}).date, '2026-07-01');
   assert.equal(context.validateActivityWindow({date: '2026-07-31'}).date, '2026-07-31');
   assert.throws(() => context.validateActivityWindow({date: '2026-08-01'}), error => error.code === 'outside_challenge_window');
+});
+
+test('negotiated activity receipts survive interruption and replay without duplication', () => {
+  const context = loadScript();
+  const receipts = [], projected = [];
+  let nextId = 0, projectionFails = true;
+  context.Utilities.getUuid = () => 'saved-' + (++nextId);
+  context.LockService = {getScriptLock: () => ({waitLock() {}, releaseLock() {}})};
+  context.out = value => value;
+  context.setup = () => {};
+  context.participantRecords = () => [{name: 'Alex'}];
+  context.readConfig = () => ({config: {startDate: '2026-07-01', tripDate: '2026-07-31'}, errors: []});
+  context.receiptRecords = () => receipts.map(record => JSON.parse(JSON.stringify(record)));
+  context.appendReceipt = record => {receipts.push(JSON.parse(JSON.stringify(record))); return record;};
+  context.projectActivity = item => {if (projectionFails) throw Error('interrupted projection'); projected.push(JSON.parse(JSON.stringify(item))); return item;};
+  const request = {protocolVersion: 14, mutationId: 'mutation-1', name: 'Alex', type: 'climb', date: '2026-07-13', hardestGrade: 'V5', note: 'Steep red problem'};
+  const post = body => context.doPost({postData: {contents: JSON.stringify(body)}});
+
+  const interrupted = post(request);
+  assert.equal(interrupted.ok, false, 'an interruption after the receipt does not claim success');
+  assert.equal(receipts.length, 1, 'the immutable receipt is the single domain commit');
+  const original = receipts[0].result;
+
+  projectionFails = false;
+  const replay = post(request);
+  assert.equal(replay.ok, true);
+  assert.equal(replay.id, original.id, 'replay returns the original canonical id');
+  assert.equal(replay.createdAt, original.createdAt, 'replay returns the original timestamp');
+  assert.equal(receipts.length, 1, 'replay writes no second receipt');
+  assert.equal(projected.length, 1, 'replay repairs the missing materialized row once');
+
+  const mismatch = post({...request, note: 'Different climb'});
+  assert.equal(mismatch.error.code, 'mutation_mismatch', 'one mutation id cannot name different content');
+  const intentionalRepeat = post({...request, mutationId: 'mutation-2'});
+  assert.equal(intentionalRepeat.ok, true, 'equal content with a different mutation id is intentional');
+  assert.notEqual(intentionalRepeat.id, replay.id);
+  assert.equal(receipts.length, 2);
+
+  receipts.push({kind: 'delete', activityId: replay.id, deletedAt: 'later'});
+  projected.length = 0;
+  const deletedReplay = post(request);
+  assert.equal(deletedReplay.id, replay.id, 'a deleted command still returns its original result');
+  assert.equal(projected.length, 0, 'replay never resurrects a tombstoned activity');
 });
 
 test('v9 setup archives prior activity and benchmark sheets exactly once and rewrites to name-only participants', () => {

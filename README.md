@@ -34,25 +34,26 @@ The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants`
 
 Each new activity is stored as one complete row of Apps Script rich-text values, so a failed write cannot leave a partially filled row and leading formula characters remain literal. New points cells contain numeric text, normalized back to numbers in API responses. Participant names also use rich-text values. Leading apostrophes, Unicode, markup-like text, and internal whitespace are preserved. Existing outer-whitespace trimming, case-insensitive participant lookup, and the 30/120-character limits remain. Deploy the v14 script before sending new names or notes beginning with `=`, `+`, `-`, `@`, or an apostrophe. Updated browsers hold those fields with a specific update message until the endpoint advertises `literal-text-v1`; ordinary text continues to work with compatible older deployments. Updating the script affects future writes only; it does not rewrite historic activity rows.
 
-### Upgrading to API v13
+### Upgrading to API v15 — retryable activities
 
-Paste the v13 script over the old Apps Script, run `configureSpreadsheet` once, and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
+Paste the v14 script over the old Apps Script, run `configureSpreadsheet` once, and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
 
 - v13 uses an explicit spreadsheet ID and a script-scoped mutation lock so web-app requests do not depend on document-context helpers that may return null. A copied Sheet whose current headers are complete is stamped as current without archiving its activities when copied properties are absent.
-- The rollout is compatible in either direction. Updated browsers explicitly request v13 and accept genuine v11/v12 replies from an older backend. The v13 backend returns the existing v12 envelope to an unnegotiated older browser and v13 only to a browser that requests it.
+- v14 adds an `Activity Receipts` tab. Each negotiated activity save commits one complete immutable receipt before updating `Activities`; retries return that receipt's original ID and timestamp, and repair an interrupted `Activities` update. Delete receipts prevent a later retry from restoring a deleted activity. Keep this tab with the Sheet's other data.
+- The rollout is compatible in either direction. Updated browsers explicitly request v14 and accept genuine v11/v12/v13 replies from an older backend. The v14 backend returns the existing v12 envelope to an unnegotiated older browser, preserves the v13 negotiated envelope without advertising idempotent saves, and returns v14 only to a browser that requests it.
 - Upgrading from v10 or v9 keeps every tab and its data. Upgrading from v8 or earlier renames any existing `Activities` (and leftover `Benchmarks`) tab to a timestamped archive tab exactly once, then a fresh `Activities` tab is created. The redesigned scoring starts clean. Existing `Settings` remain; the `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
 - v11 and v12 remain accepted because their scoring and response data are compatible; v10 and earlier endpoints are rejected.
 
 Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
 
-## API v13
+## API v14
 
 Reads return:
 
 ```json
 {
   "version": 14,
-  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1"],
+  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1", "idempotent-activity-v1"],
   "activities": [],
   "config": {
     "startDate": "2026-07-16",
@@ -66,9 +67,9 @@ Reads return:
 }
 ```
 
-The browser sends `protocolVersion: 14` on reads and writes. Activity writes also send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Current negotiated writes return `{ version: 14, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
+The browser sends `protocolVersion: 14` on reads and writes. Activity writes also send a stable `mutationId`, `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 14, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
 
-A save is confirmed as soon as the Sheet accepts the write, so the only outcomes are **Activity saved** and **Save failed** (safe to retry). The Crew sync control refreshes the shared board on demand.
+When the backend advertises `idempotent-activity-v1`, the browser stores an endpoint-bound pending command before sending. A missing response can then be retried after a reload with the same mutation ID. The pending draft only appears when the climber deliberately opens the record workflow; it never opens or announces itself. Switching crew links preserves the earlier command and blocks a new save from overwriting it. If durable browser storage is unavailable, the request is not sent. Older backends do not advertise this capability, so the browser reports that a missing response may already have reached the Sheet and asks the climber to check Crew before retrying.
 
 ## Development
 
