@@ -516,7 +516,8 @@ test('literal-text rollout holds sensitive fields before sending and preserves s
     await assert.rejects(send({action:'addParticipant',name:'+Alex'}),/Name.*Apps Script/);
     await assert.rejects(send({action:'saveConfig',config:{crew:[{name:'@Alex'}]}}),/Name.*Apps Script/);
     await send({name:'Alex',note:'ordinary text'});
-    state.protocolFeatures=['literal-text-v1'];
+    state.literalEndpoint='https://sheet.example.test/exec';
+    await assert.rejects(fetchShared('https://other.example.test/exec',{method:'POST',body:JSON.stringify({name:'=Alex'})}),/Name.*Apps Script/);
     for(const prefix of ['=','+','-','@',String.fromCharCode(39)])await send({name:prefix+'Alex',note:prefix+'  <text> 雪'});
   })()`, context, {filename: 'index.html'});
   assert.equal(calls.length, 6, 'held fields never reach an older backend');
