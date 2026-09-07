@@ -60,7 +60,7 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
    green `npm test`; that gate is what keeps a broken build off the crew's phones.
 2. **localStorage keys are frozen:** `roadToSendEndpoint`, `roadToSendMe`, `roadToSendLogsV9`,
    `roadToSendConfigV9`, `roadToSendConfigV8` (read-only migration source — only the existing
-   one-time migration writes `roadToSendConfigV9` from it), `roadToSendWeekReview`, and
+   one-time migration writes `roadToSendConfigV9` from it), `roadToSendWeekReview` (obsolete, read-only historical data left by the retired automatic recap), and
    `roadToSendPendingActivityV1` (one endpoint-bound mutation ID and activity draft awaiting an
    authoritative shared-save response), and
    `roadToSendShared:{activities|config|meta|config-command}:{endpoint}`. Read them; write only shapes existing code

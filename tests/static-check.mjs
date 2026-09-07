@@ -24,6 +24,7 @@ const script=readFileSync(new URL('../src/app-core.js',import.meta.url),'utf8')+
 const scoring=JSON.parse(readFileSync(new URL('../src/scoring.json',import.meta.url),'utf8'));
 assert.ok(artifactScript,'index.html contains an inline application script');
 assert.doesNotThrow(()=>new Function(artifactScript),'application JavaScript parses');
+assert.doesNotMatch(artifactScript,/roadToSendWeekReview/,'the obsolete automatic-recap preference is not read by the shipped browser');
 const ids=[...html.matchAll(/\sid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,'HTML ids are unique');
 for(const id of ['hardestGrade','bountySelect','activityNote','activityDate','identityMember','newParticipantName','proxyMember','endpoint','challengeStart','tripDate','groupGoalInput'])assert.match(html,new RegExp(`<label[^>]+for="${id}"`),`${id} has an associated label`);
