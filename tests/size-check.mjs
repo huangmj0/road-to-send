@@ -93,7 +93,12 @@ import { readFileSync } from 'node:fs';
 // add the rest. The 6832 bytes the esbuild closure reserved for this work went almost
 // entirely unused, so per the rule above (a pass landing under its projection lowers the cap
 // again) this brings BUDGET back down, leaving 5238 bytes of headroom for what comes next.
-const BUDGET = 159000;
+// Re-baselined 159000 -> 160000 for the reliability stack through #158.
+// Measured 159213 bytes: #154 runtime negotiation adds 3064 bytes, #155 local
+// recovery adds 1428, and #158 atomic literal rows plus endpoint-scoped rollout
+// checks add 959 over the 153762-byte main artifact. This leaves 787 bytes;
+// later reliability slices must justify their own measured growth.
+const BUDGET = 160000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
