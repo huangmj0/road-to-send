@@ -36,11 +36,11 @@ Each new activity is stored as one complete row of Apps Script rich-text values,
 
 ### Upgrading to API v15 — retryable activities
 
-Paste the v14 script over the old Apps Script, run `configureSpreadsheet` once, and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
+Paste the v15 script over the old Apps Script, run `configureSpreadsheet` once, and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
 
 - v13 uses an explicit spreadsheet ID and a script-scoped mutation lock so web-app requests do not depend on document-context helpers that may return null. A copied Sheet whose current headers are complete is stamped as current without archiving its activities when copied properties are absent.
-- v14 adds an `Activity Receipts` tab. Each negotiated activity save commits one complete immutable receipt before updating `Activities`; retries return that receipt's original ID and timestamp, and repair an interrupted `Activities` update. Delete receipts prevent a later retry from restoring a deleted activity. Keep this tab with the Sheet's other data.
-- The rollout is compatible in either direction. Updated browsers explicitly request v14 and accept genuine v11/v12/v13 replies from an older backend. The v14 backend returns the existing v12 envelope to an unnegotiated older browser, preserves the v13 negotiated envelope without advertising idempotent saves, and returns v14 only to a browser that requests it.
+- v15 adds an `Activity Receipts` tab. Each negotiated activity save commits one complete immutable receipt before updating `Activities`; retries return that receipt's original ID and timestamp, and repair an interrupted `Activities` update. Delete receipts prevent a later retry from restoring a deleted activity. Keep this tab with the Sheet's other data.
+- The rollout is compatible in either direction. Updated browsers explicitly request v15 and accept genuine v11/v12/v13/v14 replies from an older backend. The v15 backend returns the existing v12 envelope to an unnegotiated older browser, preserves the v13/v14 negotiated envelopes without advertising idempotent saves, and returns v15 only to a browser that requests it.
 - Upgrading from v10 or v9 keeps every tab and its data. Upgrading from v8 or earlier renames any existing `Activities` (and leftover `Benchmarks`) tab to a timestamped archive tab exactly once, then a fresh `Activities` tab is created. The redesigned scoring starts clean. Existing `Settings` remain; the `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
 - v11 and v12 remain accepted because their scoring and response data are compatible; v10 and earlier endpoints are rejected.
 
@@ -52,7 +52,7 @@ Reads return:
 
 ```json
 {
-  "version": 14,
+  "version": 15,
   "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1", "idempotent-activity-v1"],
   "activities": [],
   "config": {
@@ -67,7 +67,7 @@ Reads return:
 }
 ```
 
-The browser sends `protocolVersion: 14` on reads and writes. Activity writes also send a stable `mutationId`, `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 14, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
+The browser sends `protocolVersion: 15` on reads and writes. Activity writes also send a stable `mutationId`, `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 15, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
 
 When the backend advertises `idempotent-activity-v1`, the browser stores an endpoint-bound pending command before sending. A missing response can then be retried after a reload with the same mutation ID. The pending draft only appears when the climber deliberately opens the record workflow; it never opens or announces itself. Switching crew links preserves the earlier command and blocks a new save from overwriting it. If durable browser storage is unavailable, the request is not sent. Older backends do not advertise this capability, so the browser reports that a missing response may already have reached the Sheet and asks the climber to check Crew before retrying.
 

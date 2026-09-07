@@ -24,9 +24,9 @@ test('shared requests explicitly negotiate the current additive protocol', async
     setTimeout() {}, clearTimeout() {},
   };
   await vm.runInNewContext(`${source}\n(async()=>{await fetchShared('https://sheet.example.test/exec');await fetchShared('https://sheet.example.test/exec',{method:'POST',body:JSON.stringify({action:'delete',id:'a1'})})})()`, context, {filename: 'index.html'});
-  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '14');
-  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '14');
-  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 14);
+  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '15');
+  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '15');
+  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 15);
   assert.equal(JSON.parse(calls[1].options.body).id, 'a1', 'negotiation preserves the request payload');
 });
 
@@ -334,12 +334,12 @@ test('a negotiated shared save keeps one mutation id across response loss and re
   const endpoint = 'https://sheet.example.test/exec';
   const today = new Date().toISOString().slice(0, 10);
   const config = {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}]};
-  const remote = {version: 14, features: ['idempotent-activity-v1'], activities: [], config, configErrors: [], serverDate: today, timeZone: 'UTC'};
+  const remote = {version: 15, features: ['idempotent-activity-v1'], activities: [], config, configErrors: [], serverDate: today, timeZone: 'UTC'};
   store.set('roadToSendEndpoint', endpoint);
   store.set('roadToSendMe', 'Alex');
   store.set('roadToSendShared:config:' + encodeURIComponent(endpoint), JSON.stringify(config));
   store.set('roadToSendShared:activities:' + encodeURIComponent(endpoint), '[]');
-  store.set('roadToSendShared:meta:' + encodeURIComponent(endpoint), JSON.stringify({protocolVersion: 14, protocolFeatures: ['idempotent-activity-v1'], serverDate: today, timeZone: 'UTC'}));
+  store.set('roadToSendShared:meta:' + encodeURIComponent(endpoint), JSON.stringify({protocolVersion: 15, protocolFeatures: ['idempotent-activity-v1'], serverDate: today, timeZone: 'UTC'}));
   const posted = [];
   const makeContext = (saveResult, dom = sharedDom()) => ({
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
@@ -357,7 +357,7 @@ test('a negotiated shared save keeps one mutation id across response loss and re
   const first = makeContext(Error('response lost'));
   await vm.runInNewContext(`${source}\n(async()=>{await Promise.resolve();state.protocolFeatures=['idempotent-activity-v1'];document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='Steep red problem';await submitActivity({preventDefault(){}});assert.ok(localStorage.getItem('roadToSendPendingActivityV1'),'the uncertain command is durable');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save');assert.ok(document.querySelector('#toast').textContent.indexOf('same activity ID')>=0,'the negotiated failure promises the bounded safe retry')})()`, first, {filename: 'index.html'});
 
-  const canonical = {version: 14, ok: true, id: 'canonical-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-09-06T12:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: 'Steep red problem'};
+  const canonical = {version: 15, ok: true, id: 'canonical-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-09-06T12:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: 'Steep red problem'};
   const second = makeContext(canonical);
   await vm.runInNewContext(`${source}\n(async()=>{await loadRemote();assert.equal(document.querySelector('#activityNote').value,'Steep red problem','reload restores the pending draft');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save','reload presents the recovered command as a retry');await submitActivity({preventDefault(){}});assert.equal(localStorage.getItem('roadToSendPendingActivityV1'),null,'the authoritative result clears the pending command');assert.equal(state.logs.filter(x=>x.id==='canonical-1').length,1,'the canonical activity appears once')})()`, second, {filename: 'index.html'});
   assert.equal(posted.length, 2);
@@ -432,7 +432,7 @@ test('a successful shared delete disappears without waiting on a reload', async 
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the rendered delete control opens confirmation');
     document.querySelector('#confirmOk').dispatchEvent(new window.Event('click',{bubbles:true}));
     await Promise.resolve();await Promise.resolve();
-    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:14}]),'confirmation posts the exact shared row id with protocol negotiation');
+    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:15}]),'confirmation posts the exact shared row id with protocol negotiation');
     assert.equal(state.logs.length,0,'the accepted delete leaves memory immediately');
     assert.equal(document.querySelector('#personalActivity [data-del]'),null,'the deleted row leaves the rendered feed without waiting on GET');
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'the confirmation closes without waiting on GET');

@@ -10,7 +10,7 @@ const TYPE_ICONS={climb:'climb',exercise:'exercise',mobility:'mobility',bounty:'
 function glyph(k){return `<svg class="glyph" aria-hidden="true"><use href="#g-${k}"/></svg>`}
 const TITLE_CATEGORIES=[{id:'crusher',title:'Crusher',type:'climb'},{id:'gym-rat',title:'Gym Rat',type:'exercise'},{id:'yogi',title:'Yogi',type:'mobility'}];
 const SCRIPT=__APPS_SCRIPT__;
-const SUPPORTED_API_VERSIONS=new Set([__API_VERSION__,13,12,11]);// current additive protocol leads; genuine v11-v13 backends remain compatible because scoring and response data are unchanged.
+const SUPPORTED_API_VERSIONS=new Set([__API_VERSION__,14,13,12,11]);// current additive protocol leads; genuine v11-v13 backends remain compatible because scoring and response data are unchanged.
 function localDate(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function parseDateOnly(value){const s=String(value||''),m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);if(!m)return null;const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),12);return localDate(d)===s?d:null}
 function windowStart(today,days=7){const d=parseDateOnly(String(today||'').slice(0,10));if(!d)return'';d.setDate(d.getDate()-days+1);return localDate(d)}

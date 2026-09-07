@@ -1,6 +1,6 @@
 {
   "current": {
-    "version": 14,
+    "version": 15,
     "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1", "idempotent-activity-v1"],
     "activities": [
       {"id":"a1","name":"Alex","type":"climb","category":"climb","points":3,"date":"2026-09-07","createdAt":"2026-09-07T16:00:00.000Z","hardestGrade":"V4","bountyId":"","bountyTitle":"","note":""},
