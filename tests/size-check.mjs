@@ -98,7 +98,12 @@ import { readFileSync } from 'node:fs';
 // recovery adds 1428, and #158 atomic literal rows plus endpoint-scoped rollout
 // checks add 959 over the 153762-byte main artifact. This leaves 787 bytes;
 // later reliability slices must justify their own measured growth.
-const BUDGET = 160000;
+// Re-baselined 160000 -> 165000 for #156 durable activity commands.
+// Measured 164688 bytes, +5475 over the 159213-byte #158 parent: immutable
+// backend receipts and replay/projection repair, plus endpoint-bound browser
+// pending-command persistence and retry handling. The 312-byte margin keeps
+// later slices responsible for measuring and explaining their own growth.
+const BUDGET = 165000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
