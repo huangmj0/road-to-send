@@ -27,7 +27,7 @@ const frozen=/^\d+\. \*\*localStorage keys are frozen:\*\*[\s\S]*?(?=\n\d+\. \*\
 assert.ok(frozen,'AGENTS.md carries a numbered constraint listing the frozen localStorage keys');
 const keys=[...new Set(app.match(/roadToSend[A-Za-z0-9_]*/g)||[])].sort();
 assert.ok(browserSources.length>=1,'src/ holds the bundled browser sources');
-assert.deepEqual(keys,['roadToSendConfigV8','roadToSendConfigV9','roadToSendEndpoint','roadToSendLogsV9','roadToSendMe','roadToSendShared'],'the browser sources use exactly the current frozen localStorage key families');
+assert.deepEqual(keys,['roadToSendConfigV8','roadToSendConfigV9','roadToSendEndpoint','roadToSendLogsV9','roadToSendMe','roadToSendPendingActivityV1','roadToSendShared'],'the browser sources use exactly the current frozen localStorage key families');
 for(const key of keys)assert.ok(frozen.includes(key),`${key} is used in the browser sources but missing from the frozen-key list in AGENTS.md`);
 assert.ok(frozen.includes('roadToSendWeekReview'),'the retired automatic-recap key remains documented as historical frozen data');
 
