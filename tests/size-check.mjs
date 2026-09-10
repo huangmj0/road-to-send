@@ -114,7 +114,12 @@ import { readFileSync } from 'node:fs';
 // growth stores complete configuration journal entries, repairs projections,
 // and retains browser setup commands across response loss. The 808-byte
 // margin requires later reliability slices to justify their own growth.
-const BUDGET = 169000;
+// Re-baselined 169000 -> 171000 for #157 bounded shared saves. Measured
+// 170337 bytes, +1886 over the 168451-byte history-snapshot parent. The
+// growth adds a foreground deadline, endpoint-scoped late acknowledgements,
+// and ordering guards for reads after saves and deletes. This leaves 663
+// bytes of headroom; later slices must account for their own growth.
+const BUDGET = 171000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
