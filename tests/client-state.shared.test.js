@@ -14,6 +14,32 @@ function sharedDom() {
   return {window, document: window.document, fire: type => window.document.dispatchEvent(new window.Event(type, {bubbles: true}))};
 }
 
+function deferredTimers() {
+  let now = 0;
+  let nextId = 0;
+  const timers = new Map();
+  return {
+    setTimeout(callback, delay = 0) {
+      const id = ++nextId;
+      timers.set(id, {callback, due: now + Number(delay) || now});
+      return id;
+    },
+    clearTimeout(id) {timers.delete(id)},
+    advance(milliseconds) {
+      now += milliseconds;
+      let due;
+      while ((due = [...timers.entries()].filter(([, timer]) => timer.due <= now).sort((a, b) => a[1].due - b[1].due)[0])) {
+        timers.delete(due[0]);
+        due[1].callback();
+      }
+    },
+  };
+}
+
+async function flushPromises() {
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+}
+
 test('shared requests explicitly negotiate the current additive protocol', async () => {
   const calls = [];
   const context = {
@@ -74,6 +100,7 @@ test('background sync respects the open date picker and refreshes stale caches',
   };
   const syncChecks = `(async()=>{
     await loadRemote();
+    assert.equal(state.protocolEndpoint,'https://sheet.example.test/exec','a successful read records which endpoint supplied the capabilities');
     const dateBox=document.querySelector('#dateFields'),dateField=document.querySelector('#activityDate');
 
     // Closed picker: a sync still re-syncs the record date to today.
@@ -110,6 +137,7 @@ test('background sync respects the open date picker and refreshes stale caches',
     setPayloadVersion(99);
     await loadRemote();
     const mismatchDetail=document.querySelector('#diagnosticDetail').textContent;
+    assert.equal(state.protocolEndpoint,'','an unsupported response expires the verified endpoint');
     assert.ok(mismatchDetail.indexOf('This build expects v'+expectedVersion)>=0,'the expected version is still named after an unsupported payload');
     assert.equal(document.querySelector('#diagnosticCode').textContent,'RTS-REFRESH-VERSION','the version-mismatch code is still reported');
     setPayloadVersion(12);
@@ -349,6 +377,199 @@ test('a shared save shows the entry from the write response without waiting on a
   await vm.runInNewContext(`${source}\n${savedChecks}`, savedContext, {filename: 'index.html'});
 });
 
+test('a timed-out save keeps its draft and reuses the same mutation before commit', async () => {
+  const dom = sharedDom();
+  const timers = deferredTimers();
+  const endpoint = 'https://sheet.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const config = {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}]};
+  const store = new Map();
+  const posted = [];
+  const resolvers = [];
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    advanceTimers: timers.advance,
+    posted, resolvers,
+    fetch: async (url, options = {}) => {
+      if (options.method === 'POST') {posted.push(JSON.parse(options.body)); return new Promise(resolve => resolvers.push(resolve))}
+      return {ok: true, json: async () => ({version: 14, features: ['idempotent-activity-v1'], activities: [], config, configErrors: [], serverDate: today, timeZone: 'UTC'})};
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
+  };
+  const checks = `(async()=>{
+    state.endpoint='${endpoint}';state.protocolEndpoint='${endpoint}';state.protocolFeatures=['idempotent-activity-v1'];state.config=${JSON.stringify(config)};state.me='Alex';state.recordingFor='Alex';state.logs=[];
+    document.querySelector('#activityDate').value='${today}';document.querySelector('#hardestGrade').value='V7';document.querySelector('#activityNote').value='Steep red problem';
+    const first=submitActivity({preventDefault(){}});await Promise.resolve();advanceTimers(15000);await first;
+    const pending=JSON.parse(localStorage.getItem('roadToSendPendingActivityV1'));
+    assert.equal(state.logs.length,0,'a timeout before either response keeps the activity unresolved');
+    assert.equal(state.saving,false,'the foreground save lock is released at the deadline');
+    assert.equal(document.querySelector('#activityDate').value,'${today}','the chosen date stays in the form');
+    assert.equal(document.querySelector('#hardestGrade').value,'V7','the grade stays in the form');
+    assert.equal(document.querySelector('#activityNote').value,'Steep red problem','the note stays in the form');
+    assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save','the form offers the same recoverable command');
+    assert.equal(pending.endpoint,'${endpoint}');assert.ok(pending.mutationId,'the pending command has a durable mutation id');
+    const retry=submitActivity({preventDefault(){}});await Promise.resolve();advanceTimers(15000);await retry;
+    assert.equal(posted.length,2,'retrying an unresolved save sends one second safe command');
+    assert.equal(posted[0].mutationId,posted[1].mutationId,'both attempts use the same mutation identity');
+    const saved={version:14,ok:true,id:'srv-timeout-before',name:'Alex',type:'climb',category:'climb',points:3,date:'${today}',createdAt:'2026-09-09T12:00:00.000Z',hardestGrade:'V7',bountyId:'',bountyTitle:'',note:'Steep red problem'};
+    resolvers[0]( {ok:true,json:async()=>saved} );resolvers[1]( {ok:true,json:async()=>saved} );await flushPromises();
+    assert.equal(state.logs.filter(x=>x.id==='srv-timeout-before').length,1,'duplicate late responses reconcile to one canonical row');
+    assert.equal(localStorage.getItem('roadToSendPendingActivityV1'),null,'the acknowledged command is cleared after the late response');
+  })()`;
+  context.flushPromises = flushPromises;
+  await vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
+});
+
+test('a save that commits before the deadline but answers after it reconciles independently of a hanging refresh', async () => {
+  const dom = sharedDom();
+  const timers = deferredTimers();
+  const endpoint = 'https://sheet.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const config = {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}]};
+  const store = new Map();
+  const reads = [];
+  let resolvePost;
+  let committed = false;
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    advanceTimers: timers.advance,
+    committedState: () => committed,
+    resolvePost: value => resolvePost(value),
+    reads,
+    fetch: async (url, options = {}) => {
+      if (options.method === 'POST') {committed=true; return new Promise(resolve => {resolvePost=resolve})}
+      return new Promise(resolve => reads.push(resolve));
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
+  };
+  const checks = `(async()=>{
+    state.endpoint='${endpoint}';state.protocolEndpoint='${endpoint}';state.protocolFeatures=['idempotent-activity-v1'];state.config=${JSON.stringify(config)};state.me='Alex';state.recordingFor='Alex';state.logs=[];
+    document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='Committed, response delayed';
+    const save=submitActivity({preventDefault(){}});await Promise.resolve();assert.equal(committedState(),true,'the request reached the backend before the foreground deadline');advanceTimers(15000);await save;
+    assert.equal(state.logs.length,0,'the unresolved form does not claim a row before confirmation');
+    assert.ok(localStorage.getItem('roadToSendPendingActivityV1'),'the recoverable command remains while the response is delayed');
+    const saved={version:14,ok:true,id:'srv-timeout-after',name:'Alex',type:'climb',category:'climb',points:3,date:'${today}',createdAt:'2026-09-09T12:01:00.000Z',hardestGrade:'',bountyId:'',bountyTitle:'',note:'Committed, response delayed'};
+    resolvePost({ok:true,json:async()=>saved});await flushPromises();
+    assert.equal(state.logs.filter(x=>x.id==='srv-timeout-after').length,1,'the late authoritative row appears without waiting for GET');
+    assert.equal(reads.length,1,'the background refresh starts after the write acknowledgement');
+    const currentSnapshot={version:14,features:['idempotent-activity-v1'],activities:[saved],config:${JSON.stringify(config)},configErrors:[],serverDate:'${today}',timeZone:'UTC'};
+    reads[0]({ok:true,json:async()=>currentSnapshot});await flushPromises();
+    const laterRead=loadRemote();await Promise.resolve();
+    reads[1]({ok:true,json:async()=>({version:14,features:['idempotent-activity-v1'],activities:[],config:${JSON.stringify(config)},configErrors:[],serverDate:'${today}',timeZone:'UTC'})});await flushPromises();await laterRead;
+    assert.equal(state.logs.filter(x=>x.id==='srv-timeout-after').length,0,'a read begun after acknowledgement can report another browser deletion');
+    assert.equal(localStorage.getItem('roadToSendPendingActivityV1'),null,'the late authoritative response resolves the command');
+    assert.equal(document.querySelector('#activityNote').value,'','the acknowledged save can clear the form');
+    assert.equal(document.querySelector('#toast').textContent,'Activity saved.','the acknowledgement owns its own success status');
+  })()`;
+  context.flushPromises = flushPromises;
+  await vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
+});
+
+test('a late save response stays with its endpoint across a crew-link change', async () => {
+  const dom = sharedDom();
+  const timers = deferredTimers();
+  const oldEndpoint = 'https://old.example.test/exec';
+  const newEndpoint = 'https://new.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const config = {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}]};
+  const store = new Map();
+  let resolvePost;
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    advanceTimers: timers.advance,
+    resolvePost: value => resolvePost(value),
+    fetch: async (url, options = {}) => {
+      if (options.method === 'POST') return new Promise(resolve => {resolvePost=resolve});
+      return {ok: true, json: async () => ({version: 14, features: ['idempotent-activity-v1'], activities: [], config, configErrors: [], serverDate: today, timeZone: 'UTC'})};
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
+  };
+  const checks = `(async()=>{
+    state.endpoint='${oldEndpoint}';state.protocolEndpoint='${oldEndpoint}';state.protocolFeatures=['idempotent-activity-v1'];state.config=${JSON.stringify(config)};state.me='Alex';state.recordingFor='Alex';state.logs=[];
+    document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='Old crew entry';
+    const save=submitActivity({preventDefault(){}});await Promise.resolve();advanceTimers(15000);await save;
+    const pending=JSON.parse(localStorage.getItem('roadToSendPendingActivityV1'));assert.equal(pending.endpoint,'${oldEndpoint}','the unresolved command remembers its crew link');
+    state.endpoint='${newEndpoint}';state.protocolEndpoint='${newEndpoint}';
+    const saved={version:14,ok:true,id:'srv-old-crew',name:'Alex',type:'climb',category:'climb',points:3,date:'${today}',createdAt:'2026-09-09T12:02:00.000Z',hardestGrade:'',bountyId:'',bountyTitle:'',note:'Old crew entry'};
+    resolvePost({ok:true,json:async()=>saved});await flushPromises();
+    assert.equal(state.logs.length,0,'a late old-crew response cannot paint the current crew feed');
+    assert.equal(localStorage.getItem('roadToSendPendingActivityV1'),null,'the old endpoint command clears only after its own response arrives');
+    state.endpoint='${oldEndpoint}';state.protocolEndpoint='${oldEndpoint}';await loadRemote();
+    assert.equal(state.logs.filter(x=>x.id==='srv-old-crew').length,1,'returning to the old crew reconciles its confirmed row');
+  })()`;
+  context.flushPromises = flushPromises;
+  await vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
+});
+
+test('a delayed snapshot cannot resurrect an acknowledged shared deletion', async () => {
+  const dom = sharedDom();
+  const endpoint = 'https://sheet.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const config = {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}]};
+  const row = {id: 'srv-delete-delayed', name: 'Alex', type: 'exercise', category: 'exercise', points: 2, date: today, createdAt: '1', hardestGrade: '', bountyId: '', bountyTitle: '', note: ''};
+  const store = new Map();
+  const reads = [];
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    reads,
+    fetch: async (url, options = {}) => {
+      if (options.method === 'POST') return {ok: true, json: async () => ({version: 14, ok: true, deleted: row.id})};
+      return new Promise(resolve => reads.push(resolve));
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const checks = `(async()=>{
+    state.endpoint='${endpoint}';state.protocolEndpoint='${endpoint}';state.config=${JSON.stringify(config)};state.me='Alex';state.recordingFor='Alex';state.logs=[${JSON.stringify(row)}];render();
+    const oldRead=loadRemote();await Promise.resolve();
+    const del=document.querySelector('#personalActivity [data-del]');del.dispatchEvent(new window.Event('click',{bubbles:true}));document.querySelector('#confirmOk').dispatchEvent(new window.Event('click',{bubbles:true}));await flushPromises();
+    assert.equal(state.logs.length,0,'the accepted delete leaves the row gone immediately');assert.equal(reads.length,2,'delete reconciliation starts a second snapshot');
+    const oldSnapshot={version:14,features:[],activities:[${JSON.stringify(row)}],config:${JSON.stringify(config)},configErrors:[],serverDate:'${today}',timeZone:'UTC'};
+    reads[0]({ok:true,json:async()=>oldSnapshot});await flushPromises();assert.equal(state.logs.length,0,'the delayed pre-delete snapshot is ignored');
+    reads[1]({ok:true,json:async()=>({version:14,features:[],activities:[],config:${JSON.stringify(config)},configErrors:[],serverDate:'${today}',timeZone:'UTC'})});await flushPromises();
+    const laterRead=loadRemote();await Promise.resolve();
+    reads[2]({ok:true,json:async()=>oldSnapshot});await flushPromises();await laterRead;await oldRead;assert.equal(state.logs.length,0,'even a stale snapshot after the Sheet reflects the delete respects the tombstone');
+  })()`;
+  context.flushPromises = flushPromises;
+  await vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
+});
+
+test('proxy saves return to the personal target before the next personal form save', async () => {
+  const dom = sharedDom();
+  const endpoint = 'https://sheet.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const config = {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}, {name: 'Bea'}]};
+  const store = new Map();
+  const posted = [];
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    posted,
+    fetch: async (url, options = {}) => {
+      if (options.method === 'POST') {const request=JSON.parse(options.body);posted.push(request);return {ok:true,json:async()=>({version:14,ok:true,id:'srv-proxy-'+posted.length,name:request.name,type:request.type,category:request.type,points:3,date:request.date,createdAt:'2026-09-09T12:03:00.000Z',hardestGrade:'',bountyId:'',bountyTitle:'',note:request.note})}}
+      return {ok:true,json:async()=>({version:14,features:['idempotent-activity-v1'],activities:[],config,configErrors:[],serverDate:today,timeZone:'UTC'})};
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  const checks = `(async()=>{
+    state.endpoint='${endpoint}';state.protocolEndpoint='${endpoint}';state.protocolFeatures=['idempotent-activity-v1'];state.config=${JSON.stringify(config)};state.me='Alex';state.recordingFor='Alex';state.logs=[];render();
+    openProxy();document.querySelector('#proxyMember').value='Bea';saveProxy();document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='For Bea';await submitActivity({preventDefault(){}});
+    assert.equal(posted[0].name,'Bea','the first form save carries the proxy target');assert.equal(state.recordingFor,'Alex','the acknowledged proxy save returns recording to the personal target');assert.equal(state.logs[0].name,'Bea');
+    showTab('record');document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='For Alex';await submitActivity({preventDefault(){}});
+    assert.equal(posted[1].name,'Alex','the next form save carries the personal target');assert.equal(state.logs.filter(x=>x.name==='Bea').length,1);assert.equal(state.logs.filter(x=>x.name==='Alex').length,1,'both canonical rows survive stale snapshots');
+  })()`;
+  context.flushPromises = flushPromises;
+  await vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
+});
+
 test('a negotiated shared save keeps one mutation id across response loss and reload', async () => {
   const store = new Map();
   const endpoint = 'https://sheet.example.test/exec';
@@ -463,6 +684,26 @@ test('a legacy shared save reports uncertainty without promising a safe retry', 
     localStorage: {getItem: () => null, setItem() {}, removeItem() {}}, setTimeout() {}, clearTimeout() {},
   };
   await vm.runInNewContext(`${source}\n(async()=>{state.endpoint='https://sheet.example.test/exec';state.protocolFeatures=[];state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});assert.ok(document.querySelector('#toast').textContent.indexOf('may have reached the Sheet')>=0);assert.equal(document.querySelector('#toast').textContent.indexOf('safe to retry'),-1,'legacy copy makes no idempotency promise')})()`, context, {filename: 'index.html'});
+});
+
+test('an unverified endpoint cannot borrow the safe activity retry capability', async () => {
+  const dom = sharedDom();
+  const today = new Date().toISOString().slice(0, 10);
+  const posts = [];
+  const context = {
+    posts, assert, console, URL, URLSearchParams, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async (url, options = {}) => {if (options.method) posts.push(JSON.parse(options.body)); throw Error('response unavailable')},
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}}, setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{
+    state.endpoint='https://older.example.test/exec';state.protocolEndpoint='https://newer.example.test/exec';state.protocolFeatures=['idempotent-activity-v1'];
+    state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';
+    document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});
+    assert.equal(state.pendingActivity,null,'an unverified endpoint does not create a retry command');
+    assert.equal(posts.length,1);assert.equal(posts[0].mutationId,undefined,'the request does not claim idempotency from another endpoint');
+    assert.ok(document.querySelector('#toast').textContent.includes('Check Crew before retrying'));
+  })()`, context, {filename: 'index.html'});
 });
 
 test('a pending save for another endpoint is preserved and blocks a new write', async () => {
@@ -715,4 +956,9 @@ test('failed endpoint verification cannot lend safe-retry capability to another 
   })()`, context, {filename: 'index.html'});
   assert.equal(posts.length, 1);
   assert.equal(posts[0].mutationId, undefined);
+});
+
+test('a fresh snapshot retires the temporary acknowledged activity overlay', () => {
+  const context = {assert};
+  vm.runInNewContext(`${source}\nconst endpoint='https://sheet.example.test/exec';const row={id:'saved-row',name:'Alex',type:'climb',points:3,date:'2026-09-09'};authoritativeActivities(endpoint).set('mutation',row);assert.equal(reconcileRemoteActivities(endpoint,[row]).length,1);assert.equal(reconcileRemoteActivities(endpoint,[]).length,0,'a subsequent authoritative deletion is allowed to remove the row');`, context);
 });
