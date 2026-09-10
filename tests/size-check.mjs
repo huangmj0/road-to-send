@@ -109,7 +109,12 @@ import { readFileSync } from 'node:fs';
 // roster, while the endpoint binding stays explicit. The resulting artifact is
 // 165028 bytes, 28 over the prior cap; this measured step leaves 972 bytes for
 // the next bounded slice, and the next entry must re-measure rather than assume.
-const BUDGET = 166000;
+// Re-baselined 165000 -> 169000 for #159 recoverable setup. Measured
+// 168192 bytes, +3371 over the 164821-byte activity-receipt parent. The
+// growth stores complete configuration journal entries, repairs projections,
+// and retains browser setup commands across response loss. The 808-byte
+// margin requires later reliability slices to justify their own growth.
+const BUDGET = 169000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
