@@ -21,6 +21,11 @@ artifact, deployed Apps Script routing, or real Google runtime behavior.
 The recovery snapshot is older than the source. Refresh it immediately before an intended merge;
 do not use the earlier comparison as evidence of a current recovery point.
 
+A September 10 read-only Apps Script inspection confirmed that the rehearsal project remains
+bound to the disposable Sheet. Its deployment list contains only Head, its script-property list
+is empty, and its only recorded execution is the property-access helper. No web-app runtime or
+explicit routing rehearsal has yet been demonstrated.
+
 ## Required release evidence
 
 | Requirement | Evidence required to close the gate | Status |
