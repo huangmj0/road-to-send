@@ -27,9 +27,12 @@ backend changes retain already-open compatible clients.
 5. Deploy the backend to the intended live container, then publish the browser. The compatibility
    matrix also permits browser-first rollout if Pages finishes first.
 
-Rollback the browser independently to the prior artifact while the backend continues serving v12
-to unnegotiated requests. Roll back the Apps Script deployment to its prior version if runtime
-checks fail. Before either rollback, reconcile every acknowledged activity written after the
+Rollback the browser independently to the prior artifact while the new backend continues serving
+v12 to unnegotiated requests. Once activity receipts or configuration journal entries exist, an
+older backend cannot replace the new backend safely without reconciling the journals. It may miss
+committed configuration, ignore deletion receipts, or duplicate a pending retry. Keep the new
+compatible backend in place for browser rollback. Any backend rollback must separately demonstrate
+preservation of every acknowledged activity, deletion, setup command, and pending retry after the
 recovery snapshot; restoring an older Sheet alone is not a no-data-loss rollback.
 
 ## Residual release gates
@@ -40,3 +43,22 @@ rejected-request envelopes, and preservation of copied current-schema rows. The 
 confirm the intended live source and active deployment, refresh the private recovery copy, and
 verify replay of all later acknowledged writes. Deployment URLs, Sheet IDs, crew rows, and private
 recovery evidence stay outside the repository.
+
+
+## Capabilities through API v16
+
+| Requested version | Capabilities added at that version |
+| --- | --- |
+| Missing or invalid | v12 envelope and legacy uncertainty |
+| v13 | Explicit protocol negotiation and web-runtime routing |
+| v14 | Literal names and notes (`literal-text-v1`) |
+| v15 | Durable activity commands (`idempotent-activity-v1`) |
+| v16 | Durable setup commands (`config-journal-v1`) |
+
+Each supported version retains the capabilities below it. A newer browser talking to an older
+backend accepts its genuine older envelope and uses only that endpoint's verified capabilities.
+Keep the deployment URL stable when publishing a new backend version so existing crew links and
+endpoint-bound pending commands continue to reach the same data and command history.
+
+The Activity Receipts and Config Journal tabs must travel with the Sheet during recovery. Never
+clear them as a performance cleanup or restore only the visible projection tabs.
