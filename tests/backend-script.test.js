@@ -371,3 +371,30 @@ test('formatSheets runs once while provisioning, then every read and write skips
   assert.equal(copied.sheets.Activities.values[1][0], 'kept-id', 'current copied activity rows survive missing document properties');
   assert.equal(Object.keys(copied.sheets).filter(name => name.indexOf(' Archive ') >= 0).length, 0, 'a current copied schema creates no archive tabs');
 });
+
+// This read seam supplies raw rows and receipts; it does not simulate Sheet writes.
+test('receipt overlays preserve historical rows with blank or repeated IDs', () => {
+  const context = loadScript();
+  const headers = Array.from(vm.runInContext('ACTIVITY_HEADERS', context));
+  const history = [
+    {id: '', name: 'Alex', note: 'first blank'},
+    {id: '', name: 'Maya', note: 'second blank'},
+    {id: 'old-id', name: 'Alex', note: 'first repeated'},
+    {id: 'old-id', name: 'Maya', note: 'second repeated'},
+    {id: 'committed', name: 'Alex', note: 'projection'},
+  ].map(item => Object.assign({type: 'exercise', category: 'exercise', points: 2, date: '2026-07-13'}, item));
+  context.tab = () => ({getDataRange: () => ({getValues: () => [headers, ...history.map(item => headers.map(key => item[key] ?? ''))]})});
+  context.receiptRecords = () => [];
+  const original = JSON.parse(JSON.stringify(context.rows()));
+  assert.equal(original.length, 5);
+  assert.deepEqual(original.map(item => item.note), history.map(item => item.note));
+  const canonical = Object.assign({}, original[4], {note: 'canonical'});
+  const unprojected = Object.assign({}, canonical, {id: 'unprojected'});
+  context.receiptRecords = () => [
+    {kind: 'activity', result: canonical},
+    {kind: 'activity', result: unprojected},
+  ];
+  assert.deepEqual(JSON.parse(JSON.stringify(context.rows())), original.slice(0, 4).concat([canonical, unprojected]));
+  context.receiptRecords = () => [{kind: 'activity', result: canonical}, {kind: 'delete', activityId: 'committed'}];
+  assert.deepEqual(JSON.parse(JSON.stringify(context.rows())), original.slice(0, 4));
+});
