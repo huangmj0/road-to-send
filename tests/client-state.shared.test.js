@@ -355,7 +355,7 @@ test('a negotiated shared save keeps one mutation id across response loss and re
   });
 
   const first = makeContext(Error('response lost'));
-  await vm.runInNewContext(`${source}\n(async()=>{await Promise.resolve();state.protocolFeatures=['idempotent-activity-v1'];document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='Steep red problem';await submitActivity({preventDefault(){}});assert.ok(localStorage.getItem('roadToSendPendingActivityV1'),'the uncertain command is durable');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save');assert.ok(document.querySelector('#toast').textContent.indexOf('same activity ID')>=0,'the negotiated failure promises the bounded safe retry')})()`, first, {filename: 'index.html'});
+  await vm.runInNewContext(`${source}\n(async()=>{await Promise.resolve();state.protocolFeatures=['idempotent-activity-v1'];state.protocolEndpoint=state.endpoint;document.querySelector('#activityDate').value='${today}';document.querySelector('#activityNote').value='Steep red problem';await submitActivity({preventDefault(){}});assert.ok(localStorage.getItem('roadToSendPendingActivityV1'),'the uncertain command is durable');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save');assert.ok(document.querySelector('#toast').textContent.indexOf('same activity ID')>=0,'the negotiated failure promises the bounded safe retry')})()`, first, {filename: 'index.html'});
 
   const canonical = {version: 15, ok: true, id: 'canonical-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-09-06T12:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: 'Steep red problem'};
   const second = makeContext(canonical);
@@ -388,7 +388,7 @@ test('a pending save for another endpoint is preserved and blocks a new write', 
     fetch: async () => {fetches++; throw Error('must not send')}, fetchCount: () => fetches,
     localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)}, setTimeout() {}, clearTimeout() {},
   };
-  await vm.runInNewContext(`${source}\n(async()=>{state.endpoint='https://new.example.test/exec';state.protocolFeatures=['idempotent-activity-v1'];state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';state.pendingActivity=JSON.parse(localStorage.getItem('roadToSendPendingActivityV1'));document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});assert.equal(fetchCount(),0,'the new command is not sent');assert.equal(JSON.parse(localStorage.getItem('roadToSendPendingActivityV1')).mutationId,'old-command','the other endpoint command remains intact');assert.ok(document.querySelector('#toast').textContent.indexOf('another crew link')>=0)})()`, context, {filename: 'index.html'});
+  await vm.runInNewContext(`${source}\n(async()=>{state.endpoint='https://new.example.test/exec';state.protocolFeatures=['idempotent-activity-v1'];state.protocolEndpoint=state.endpoint;state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';state.pendingActivity=JSON.parse(localStorage.getItem('roadToSendPendingActivityV1'));document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});assert.equal(fetchCount(),0,'the new command is not sent');assert.equal(JSON.parse(localStorage.getItem('roadToSendPendingActivityV1')).mutationId,'old-command','the other endpoint command remains intact');assert.ok(document.querySelector('#toast').textContent.indexOf('another crew link')>=0)})()`, context, {filename: 'index.html'});
 });
 
 test('a negotiated save is not sent when its recovery command cannot be stored', async () => {
@@ -401,7 +401,7 @@ test('a negotiated save is not sent when its recovery command cannot be stored',
     fetch: async () => {fetches++; throw Error('must not send')}, fetchCount: () => fetches,
     localStorage: {getItem: () => null, setItem() {throw Error('quota')}, removeItem() {}}, setTimeout() {}, clearTimeout() {},
   };
-  await vm.runInNewContext(`${source}\n(async()=>{state.endpoint='https://sheet.example.test/exec';state.protocolFeatures=['idempotent-activity-v1'];state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});assert.equal(fetchCount(),0);assert.ok(document.querySelector('#toast').textContent.indexOf('not sent')>=0)})()`, context, {filename: 'index.html'});
+  await vm.runInNewContext(`${source}\n(async()=>{state.endpoint='https://sheet.example.test/exec';state.protocolFeatures=['idempotent-activity-v1'];state.protocolEndpoint=state.endpoint;state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});assert.equal(fetchCount(),0);assert.ok(document.querySelector('#toast').textContent.indexOf('not sent')>=0)})()`, context, {filename: 'index.html'});
 });
 
 test('a successful shared delete disappears without waiting on a reload', async () => {
@@ -598,4 +598,32 @@ test('literal-text rollout holds sensitive fields before sending and preserves s
   assert.equal(calls.length, 6, 'held fields never reach an older backend');
   assert.equal(calls[1].note, '=  <text> 雪');
   assert.equal(calls[5].name, "'Alex");
+});
+
+
+test('failed endpoint verification cannot lend safe-retry capability to another crew', async () => {
+  const dom = sharedDom();
+  const posts = [];
+  const context = {
+    assert, URL, URLSearchParams, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async (url, options = {}) => {if (options.method) posts.push(JSON.parse(options.body)); throw Error('response unavailable')},
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}}, setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{
+    await Promise.resolve();
+    state.endpoint='https://older.example.test/exec';
+    state.protocolEndpoint='https://newer.example.test/exec';
+    state.protocolFeatures=['idempotent-activity-v1'];
+    state.config={startDate:'2026-09-09',tripDate:'2026-09-09',goal:500,crew:[{name:'Alex'}]};
+    state.me='Alex';state.recordingFor='Alex';
+    document.querySelector('#activityDate').value='2026-09-09';
+    await loadRemote();
+    await submitActivity({preventDefault(){}});
+    assert.equal(state.pendingActivity,null,'an unverified endpoint cannot create a safe-retry command');
+    assert.ok(document.querySelector('#toast').textContent.includes('Check Crew before retrying'));
+    assert.equal(document.querySelector('#toast').textContent.includes('same activity ID'),false);
+  })()`, context, {filename: 'index.html'});
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].mutationId, undefined);
 });
