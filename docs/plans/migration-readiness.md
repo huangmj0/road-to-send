@@ -12,7 +12,9 @@ capture. Private raw evidence and comparison results remain outside the reposito
 
 The captured source was evaluated through the activity and configuration readers in the
 activity-receipt and configuration-journal branches. Both preserved all captured activities,
-reported no configuration errors, and accepted the historical names and dates. This proves
+reported no configuration errors, and accepted the historical names and dates. The check was
+repeated after integrating the configuration journal with the activity receipts at API v16,
+with the same preservation result. This proves
 source-reader compatibility at those branch versions. It does not prove the final integrated
 artifact, deployed Apps Script routing, or real Google runtime behavior.
 
