@@ -5,16 +5,17 @@ stack, not authorization to deploy or merge. All release PRs remain draft with a
 
 ## Data comparison
 
-The September 9, 2026 read-only inspection covered every allocated cell in all 13 source tabs.
-Existing captured activity records were unchanged; the source contained additional activities
-since the earlier snapshot. Settings, Participants, and the other tabs matched the earlier
-capture. Private raw evidence and comparison results remain outside the repository.
+The September 10, 2026 read-only inspection refreshed every allocated cell in all 13 source tabs.
+All previously captured activity records were unchanged; additional activities had accumulated
+since September 9 and since the recovery snapshot. Settings and Participants values were
+unchanged; the comparison with the recovery-era capture found header-format differences only
+in those tabs. Private raw evidence and comparison results remain outside the repository.
 
 The captured source was evaluated through the activity and configuration readers in the
 activity-receipt and configuration-journal branches. Both preserved all captured activities,
 reported no configuration errors, and accepted the historical names and dates. The check was
-repeated after integrating the configuration journal with the activity receipts at API v16,
-with the same preservation result. This proves
+repeated on September 10 against both API v15 and the integrated API v16 readers,
+with the same preservation result and no missing or duplicate activity IDs. This proves
 source-reader compatibility at those branch versions. It does not prove the final integrated
 artifact, deployed Apps Script routing, or real Google runtime behavior.
 
