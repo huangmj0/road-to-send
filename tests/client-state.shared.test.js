@@ -364,6 +364,54 @@ test('a negotiated shared save keeps one mutation id across response loss and re
   assert.equal(posted[0].mutationId, posted[1].mutationId, 'reload reuses the stable mutation id');
 });
 
+test('a pending shared save reloads when its shared cache is unavailable', async () => {
+  const endpoint = 'https://sheet.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const request = {name: 'Alex', type: 'climb', date: today, hardestGrade: 'V5', note: 'Steep red problem', bountyId: ''};
+  const pending = {endpoint, mutationId: 'reload-command', fingerprint: JSON.stringify(request), request};
+  const remote = {version: 15, features: ['idempotent-activity-v1'], activities: [], config: {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: today, timeZone: 'UTC'};
+  const store = new Map([['roadToSendEndpoint', endpoint], ['roadToSendMe', 'Alex'], ['roadToSendPendingActivityV1', JSON.stringify(pending)]]);
+  const posted = [];
+  const dom = sharedDom();
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async (url, options = {}) => {
+      if (!options.method) return {ok: true, json: async () => JSON.parse(JSON.stringify(remote))};
+      posted.push(JSON.parse(options.body));
+      return {ok: true, json: async () => ({version: 15, ok: true, id: 'reloaded-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-09-06T12:00:00.000Z', hardestGrade: 'V5', bountyId: '', bountyTitle: '', note: 'Steep red problem'})};
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{await loadRemote();assert.equal(document.querySelector('#activityNote').value,'Steep red problem','the pending request is restored after the remote roster loads');assert.equal(document.querySelector('#saveActivityBtn').textContent,'Retry save');await submitActivity({preventDefault(){}});assert.equal(localStorage.getItem('roadToSendPendingActivityV1'),null,'the replay clears the pending request')})()`, context, {filename: 'index.html'});
+  assert.equal(posted.filter(body => body.mutationId === 'reload-command').length, 1, 'reload retries the stored mutation ID once');
+});
+
+test('a pending shared save remains retryable after its climber leaves the roster', async () => {
+  const endpoint = 'https://sheet.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const request = {name: 'Alex', type: 'climb', date: today, hardestGrade: 'V5', note: 'Steep red problem', bountyId: ''};
+  const pending = {endpoint, mutationId: 'removed-climber-command', fingerprint: JSON.stringify(request), request};
+  const remote = {version: 15, features: ['idempotent-activity-v1'], activities: [], config: {startDate: today, tripDate: today, goal: 500, crew: [{name: 'Maya'}]}, configErrors: [], serverDate: today, timeZone: 'UTC'};
+  const store = new Map([['roadToSendEndpoint', endpoint], ['roadToSendMe', 'Alex'], ['roadToSendPendingActivityV1', JSON.stringify(pending)]]);
+  const posted = [];
+  const dom = sharedDom();
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async (url, options = {}) => {
+      if (!options.method) return {ok: true, json: async () => JSON.parse(JSON.stringify(remote))};
+      posted.push(JSON.parse(options.body));
+      return {ok: true, json: async () => ({version: 15, ok: true, id: 'removed-1', name: 'Alex', type: 'climb', category: 'climb', points: 3, date: today, createdAt: '2026-09-06T12:00:00.000Z', hardestGrade: 'V5', bountyId: '', bountyTitle: '', note: 'Steep red problem'})};
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{await loadRemote();assert.equal(document.querySelector('#activityNote').value,'Steep red problem','the stored request remains visible after roster refresh');state.me='';state.recordingFor='';await submitActivity({preventDefault(){}});assert.equal(localStorage.getItem('roadToSendPendingActivityV1'),null,'the receipt replay clears the pending request')})()`, context, {filename: 'index.html'});
+  assert.equal(posted.filter(body => body.mutationId === 'removed-climber-command').length, 1, 'the removed climber request is replayed with its original ID');
+});
+
 test('a legacy shared save reports uncertainty without promising a safe retry', async () => {
   const dom = sharedDom();
   const today = new Date().toISOString().slice(0, 10);
