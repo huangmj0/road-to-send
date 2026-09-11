@@ -103,7 +103,13 @@ import { readFileSync } from 'node:fs';
 // backend receipts and replay/projection repair, plus endpoint-bound browser
 // pending-command persistence and retry handling. The 312-byte margin keeps
 // later slices responsible for measuring and explaining their own growth.
-const BUDGET = 165000;
+// Re-baselined 165000 -> 166000 for the final #156 recovery edge cases. The
+// reload path now restores a pending command when its shared cache is absent,
+// and receipt replay remains available after the named climber leaves the
+// roster, while the endpoint binding stays explicit. The resulting artifact is
+// 165028 bytes, 28 over the prior cap; this measured step leaves 972 bytes for
+// the next bounded slice, and the next entry must re-measure rather than assume.
+const BUDGET = 166000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
