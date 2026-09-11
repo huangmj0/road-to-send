@@ -40,6 +40,43 @@ async function flushPromises() {
   for (let i = 0; i < 8; i++) await Promise.resolve();
 }
 
+test('a shared save finishing after navigation keeps confirmation in the original workflow', async () => {
+  for (const features of [[], ['idempotent-activity-v1']]) {
+    const dom = sharedDom();
+    const timers = deferredTimers();
+    const store = new Map();
+    let resolvePost;
+    let request;
+    const context = {
+      assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+      location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+      localStorage: {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+      fetch: (url, options = {}) => {
+        if (!options.method) return new Promise(() => {});
+        request = JSON.parse(options.body);
+        return new Promise(resolve => {resolvePost = resolve});
+      },
+      setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
+    };
+    vm.runInNewContext(source, context, {filename: 'index.html'});
+    vm.runInContext(`state.endpoint='https://sheet.example.test/exec';state.protocolEndpoint=state.endpoint;state.protocolFeatures=${JSON.stringify(features)};state.config={startDate:'2026-09-01',tripDate:'2026-10-01',goal:500,crew:[{name:'Alex'}]};state.me='Alex';state.recordingFor='Alex';closeModal('identityModal');showTab('record');document.querySelector('#dateToggle').click();document.querySelector('#activityDate').value='2026-09-10';document.querySelector('#activityNote').value='Saved before moving on';document.querySelector('#saveActivityBtn').click();`, context);
+    await flushPromises();
+    assert.ok(request, 'the shipped form submits the activity');
+    vm.runInContext("showTab('crew')", context);
+    const previousStatus = dom.document.querySelector('#toast').textContent;
+    timers.advance(15000);
+    await flushPromises();
+    assert.equal(dom.document.querySelector('#toast').textContent, previousStatus, 'the expired foreground wait stays quiet after navigation');
+    resolvePost({ok: true, json: async () => ({...request, ok: true, id: 'late-away', category: 'climb', points: 3, createdAt: '2026-09-10T12:00:00Z'})});
+    await flushPromises();
+    assert.equal(dom.document.querySelector('[data-panel="crew"]').classList.contains('active'), true, 'late confirmation preserves the chosen page');
+    assert.equal(dom.document.querySelector('#toast').textContent, previousStatus, 'late confirmation does not speak in another workflow');
+    assert.equal(context.state.logs.filter(row => row.id === 'late-away').length, 1, 'the acknowledged record still reconciles');
+    assert.equal(store.has('roadToSendPendingActivityV1'), false, 'successful confirmation still clears its pending command');
+    assert.equal(dom.document.querySelector('#activityNote').value, '', 'the unchanged saved form resets without reopening it');
+  }
+});
+
 test('shared requests explicitly negotiate the current additive protocol', async () => {
   const calls = [];
   const context = {
