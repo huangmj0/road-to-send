@@ -119,7 +119,12 @@ import { readFileSync } from 'node:fs';
 // growth adds a foreground deadline, endpoint-scoped late acknowledgements,
 // and ordering guards for reads after saves and deletes. This leaves 663
 // bytes of headroom; later slices must account for their own growth.
-const BUDGET = 171000;
+// Re-baselined 171000 -> 172000 after integrating recovery and save ordering.
+// Measured 171142 bytes: the recovered pending-form handling and protection
+// against unsolicited navigation/status after a late save account for this
+// growth. The navigation fix adds 237 bytes to the 170905-byte integrated
+// parent. The 858-byte margin keeps subsequent changes separately accountable.
+const BUDGET = 172000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
