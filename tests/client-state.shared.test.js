@@ -388,6 +388,27 @@ test('a pending shared save reloads when its shared cache is unavailable', async
   assert.equal(posted.filter(body => body.mutationId === 'reload-command').length, 1, 'reload retries the stored mutation ID once');
 });
 
+test('a later shared refresh preserves edits to the already restored pending retry', async () => {
+  const endpoint = 'https://sheet.example.test/exec';
+  const today = new Date().toISOString().slice(0, 10);
+  const earlier = new Date(today + 'T12:00:00');
+  earlier.setDate(earlier.getDate() - 1);
+  const chosen = earlier.toISOString().slice(0, 10);
+  const request = {name: 'Alex', type: 'climb', date: today, hardestGrade: 'V5', note: 'Steep red problem', bountyId: ''};
+  const pending = {endpoint, mutationId: 'refresh-command', fingerprint: JSON.stringify(request), request};
+  const remote = {version: 15, features: ['idempotent-activity-v1'], activities: [], config: {startDate: chosen, tripDate: today, goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: today, timeZone: 'UTC'};
+  const store = new Map([['roadToSendEndpoint', endpoint], ['roadToSendMe', 'Alex'], ['roadToSendPendingActivityV1', JSON.stringify(pending)]]);
+  const dom = sharedDom();
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search: '', href: 'https://example.test/app/', hash: ''}, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    fetch: async (url, options = {}) => {if (options.method) throw Error('unexpected write'); return {ok: true, json: async () => JSON.parse(JSON.stringify(remote))}},
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{await loadRemote();const dateBox=document.querySelector('#dateFields'),dateField=document.querySelector('#activityDate'),noteField=document.querySelector('#activityNote');dateBox.classList.remove('hide');dateField.value='${chosen}';noteField.value='Edited locally';await loadRemote();assert.equal(dateField.value,'${chosen}','a later refresh leaves the deliberately chosen retry date alone');assert.equal(noteField.value,'Edited locally','a later refresh leaves the edited retry note alone')})()`, context, {filename: 'index.html'});
+});
+
 test('a pending shared save remains retryable after its climber leaves the roster', async () => {
   const endpoint = 'https://sheet.example.test/exec';
   const today = new Date().toISOString().slice(0, 10);

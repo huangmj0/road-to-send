@@ -1071,6 +1071,27 @@ const domChecks = `(()=>{
   updateRecordPreview();
   assert.equal(hintEl.textContent,'','clearing the choice empties the hint');
 
+  // Issue 156: once the endpoint has verified idempotent activity saves, a retry uses the
+  // immutable request even when its date is now outside the local window or its bounty is gone.
+  state.endpoint='https://sheet.example.test/exec';
+  state.protocolEndpoint=state.endpoint;
+  state.protocolFeatures=['idempotent-activity-v1'];
+  state.pendingActivity={endpoint:state.endpoint,mutationId:'retry-1',fingerprint:'',request:{name:'Alex',type:'bounty',date:shift(-20),hardestGrade:'',note:'',bountyId:'stale-bounty'}};
+  state.recordingFor='Alex';
+  dateBox.classList.remove('hide');
+  dateField.value=shift(-20);
+  typeRadio.value='bounty';
+  bountyEl.value='stale-bounty';
+  updateRecordPreview();
+  assert.equal(saveBtn.disabled,false,'a verified immutable retry stays clickable outside the current window with a stale bounty');
+  state.pendingActivity=null;
+  state.protocolFeatures=[];
+  state.protocolEndpoint='';
+  state.endpoint='';
+  dateBox.classList.add('hide');
+  dateField.value=challengeToday();
+  populateBountySelect();
+
   // Entry 95: the date-aware picker marks claims for the person being recorded, without
   // changing its options or losing the caller's current selection on a repaint.
   const pickerBounties=dailyBounties(challengeToday()),claimedBounty=pickerBounties[0],otherBounty=pickerBounties[1];
