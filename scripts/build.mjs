@@ -19,7 +19,7 @@ export function buildHtml() {
   const appsScript = injectSharedConfig(read('../src/apps-script.js'));
   const appSource = injectSharedConfig(read('../src/app-core.js')+'\n'+read('../src/app.js')).replace('const SCRIPT=__APPS_SCRIPT__;\n', '').replace(/const SUPPORTED_API_VERSIONS=.*?\n/, '');
   const app = buildSync({stdin:{contents:appSource,loader:'js'},bundle:true,minify:true,format:'iife',write:false}).outputFiles[0].text;
-  const prefix = `const SCRIPT=\`${appsScript.replaceAll('\\', '\\\\').replaceAll('`', '\\`').replaceAll('${', '\\${')}\`;\nconst SUPPORTED_API_VERSIONS=new Set([${apiVersion},15,14,13,12,11]);\n`;
+  const prefix = `const SCRIPT=\`${appsScript.replaceAll('\\', '\\\\').replaceAll('`', '\\`').replaceAll('${', '\\${')}\`;\nconst SUPPORTED_API_VERSIONS=new Set([${apiVersion},16,15,14,13,12,11]);\n`;
 
   if (!template.includes('__INLINE_STYLES__') || !template.includes('__INLINE_APP__')) {
     throw new Error('Source template is missing an inline build marker.');

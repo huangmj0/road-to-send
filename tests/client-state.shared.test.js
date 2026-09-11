@@ -87,9 +87,9 @@ test('shared requests explicitly negotiate the current additive protocol', async
     setTimeout() {}, clearTimeout() {},
   };
   await vm.runInNewContext(`${source}\n(async()=>{await fetchShared('https://sheet.example.test/exec');await fetchShared('https://sheet.example.test/exec',{method:'POST',body:JSON.stringify({action:'delete',id:'a1'})})})()`, context, {filename: 'index.html'});
-  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '16');
-  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '16');
-  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 16);
+  assert.equal(new URL(calls[0].url).searchParams.get('protocolVersion'), '17');
+  assert.equal(new URL(calls[1].url).searchParams.get('protocolVersion'), '17');
+  assert.equal(JSON.parse(calls[1].options.body).protocolVersion, 17);
   assert.equal(JSON.parse(calls[1].options.body).id, 'a1', 'negotiation preserves the request payload');
 });
 
@@ -109,6 +109,7 @@ test('a setup command keeps its identity across an interrupted response and cold
   vm.runInNewContext(source, restartedContext, {filename: 'index.html'});
   const replay = restartedContext.configCommand('https://sheet.example.test/exec', config);
   assert.equal(replay.id, first.id, 'the same complete payload reuses its durable command identity');
+  assert.equal(replay.expectedConfigRevision, 0, 'the pending command carries the observed configuration revision');
   assert.deepEqual(JSON.parse(JSON.stringify(replay.config)), config, 'the durable retry retains the complete validated draft');
   assert.throws(() => restartedContext.configCommand('https://sheet.example.test/exec', {...config, goal: 700}), /Resolve the pending setup command/, 'an unresolved identity cannot be replaced by different settings');
 });
@@ -884,7 +885,7 @@ test('a successful shared delete disappears without waiting on a reload', async 
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the rendered delete control opens confirmation');
     document.querySelector('#confirmOk').dispatchEvent(new window.Event('click',{bubbles:true}));
     await Promise.resolve();await Promise.resolve();
-    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:16}]),'confirmation posts the exact shared row id with protocol negotiation');
+    assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1',protocolVersion:17}]),'confirmation posts the exact shared row id with protocol negotiation');
     assert.equal(state.logs.length,0,'the accepted delete leaves memory immediately');
     assert.equal(document.querySelector('#personalActivity [data-del]'),null,'the deleted row leaves the rendered feed without waiting on GET');
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),false,'the confirmation closes without waiting on GET');
@@ -1088,4 +1089,37 @@ test('a fresh snapshot retires the temporary acknowledged activity overlay', () 
 test('a fresh read may omit a saved activity deleted before its first refresh', () => {
   const context = {assert};
   vm.runInNewContext(`${source}\nconst endpoint='https://sheet.example.test/exec';authoritativeActivities(endpoint).set('mutation',{id:'saved-then-deleted'});assert.equal(reconcileRemoteActivities(endpoint,[]).length,0,'fresh server state owns deletion even before the saved row was observed');`, context);
+});
+
+test('setup retries preserve uncertain command identity until a conflict explicitly permits reapply', async () => {
+  const dom = sharedDom(), store = new Map(), posts = [], responses = [];
+  const context = {
+    assert, URL, URLSearchParams, console, posts, responses,
+    window: dom.window, document: dom.document,
+    location: {search: '', href: 'https://example.test/', hash: ''}, history: {replaceState() {}},
+    localStorage: {getItem: key => store.get(key) || null, setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+    fetch: async (url, options) => {posts.push(JSON.parse(options.body)); const next = responses.shift(); if (next instanceof Error) throw next; return {ok: true, json: async () => next}},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{
+    const url='https://sheet.example.test/exec', draft={startDate:'2026-07-01',tripDate:'2026-12-01',goal:500,crew:[{name:'Alex'}]}, current={...draft,crew:[{name:'Alex'},{name:'Maya'}]};
+    state.endpoint=url;state.protocolEndpoint=url;state.protocolFeatures=['config-journal-v1','config-revision-v1'];state.configRevision=1;state.config=draft;state.me='Alex';
+    document.querySelector('#endpoint').value=url;
+    readSetupConfig=()=>draft;loadRemote=async()=>true;copyCrewLink=async()=>true;
+    responses.push(new Error('lost response'));await saveSetup();
+    const original=posts[0].configCommandId;
+    state.configRevision=2;
+    responses.push({ok:true,configCommandId:original,config:draft,configRevision:2,version:17});await saveSetup();
+    assert.equal(posts[1].configCommandId,original,'observing a newer revision cannot replace an uncertain command');
+    assert.equal(posts[1].expectedConfigRevision,1,'retry retains its original precondition');
+    assert.equal(storedConfigCommand(url),null);
+    responses.push({ok:false,error:{code:'config_conflict'},config:current,configRevision:3});await saveSetup();
+    const rejected=storedConfigCommand(url);
+    assert.equal(rejected.conflictRevision,3,'the authoritative rejection is retained across reload');
+    assert.ok(document.querySelector('#configConflictDetails').innerHTML.includes('Maya'),'the committed roster is visible beside the retained draft');
+    state.configConflict=null;state.configRevision=3;
+    responses.push(new Error('lost reapply response'));await saveSetup();
+    assert.notEqual(posts[3].configCommandId,rejected.id,'explicit save after a confirmed conflict uses a new command');
+    assert.equal(posts[3].expectedConfigRevision,3);
+  })()`, context);
 });

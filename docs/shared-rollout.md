@@ -1,20 +1,22 @@
 # Shared runtime rollout
 
-Issue #154 changes shared connectivity without changing scoring, activity rows, local storage, or
-challenge-day rules. Protocol v14 is additive and explicitly negotiated.
+Issues #154–#160 change shared connectivity without changing scoring, activity rows, local storage,
+or challenge-day rules. Protocol v17 is additive and explicitly negotiated. API17 adds an expected
+configuration revision for setup commands; the Config Journal remains the authoritative source.
 
 ## Compatibility matrix
 
 | Browser | Backend | Request and response |
 | --- | --- | --- |
 | Existing v11/v12 | Existing v11/v12 | Existing unnegotiated behavior |
-| Updated v14 | Existing v11–v13 | Browser requests v14; backend returns its genuine compatible version |
-| Existing v11–v13 | Updated v14 | Request is unnegotiated or older; backend returns the requested compatible envelope, or v12 for an unnegotiated request |
-| Updated v14 | Updated v14 | Browser requests v14; backend returns v14 with protocol negotiation and recoverable configuration commands |
+| Updated v17 | Existing v11–v16 | Browser requests v17; backend returns its genuine compatible version and the browser uses only that endpoint's verified capabilities |
+| Existing v11–v16 | Updated v17 | Request is unnegotiated or older; backend returns the requested compatible envelope, or v12 for an unnegotiated request; setup saves without an expected revision retain legacy last-writer-wins behavior |
+| Updated v17 | Updated v17 | Browser requests v17; backend returns v17 with literal text, activity receipts, the Config Journal, and revision-checked setup saves |
 
-For additive backend versions, a request from 13 through the deployed `API_VERSION` receives
-the requested envelope version. Missing, invalid, or newer requests receive v12. This lets later
-backend changes retain already-open compatible clients.
+For additive backend versions, a request from 13 through the deployed `API_VERSION` receives the
+requested envelope version. Missing, invalid, or newer requests receive v12. This lets later
+backend changes retain already-open compatible clients while keeping revision checks opt-in to
+requests that actually provide an expected revision.
 
 ## Organizer deployment order
 
@@ -24,8 +26,9 @@ backend changes retain already-open compatible clients.
    disposable Sheet. Never use the live or recovery Sheet for rehearsal.
 4. Deploy a rehearsal web-app version. Exercise negotiated and unnegotiated GET/POST requests,
    rejected bodies, and concurrent saves; compare all activity identities and rows afterward.
-5. Deploy the backend to the intended live container, then publish the browser. The compatibility
-   matrix also permits browser-first rollout if Pages finishes first.
+5. Deploy the backend to the intended live container at the existing web-app URL, then publish the
+   browser. Keep that URL stable so endpoint-bound pending commands continue to reach the same
+   journal.
 
 Rollback the browser independently to the prior artifact while the new backend continues serving
 v12 to unnegotiated requests. Once activity receipts or configuration journal entries exist, an
@@ -45,7 +48,7 @@ verify replay of all later acknowledged writes. Deployment URLs, Sheet IDs, crew
 recovery evidence stay outside the repository.
 
 
-## Capabilities through API v16
+## Capabilities through API v17
 
 | Requested version | Capabilities added at that version |
 | --- | --- |
@@ -54,6 +57,7 @@ recovery evidence stay outside the repository.
 | v14 | Literal names and notes (`literal-text-v1`) |
 | v15 | Durable activity commands (`idempotent-activity-v1`) |
 | v16 | Durable setup commands (`config-journal-v1`) |
+| v17 | Revision-checked setup saves (`config-revision-v1`) |
 
 Each supported version retains the capabilities below it. A newer browser talking to an older
 backend accepts its genuine older envelope and uses only that endpoint's verified capabilities.

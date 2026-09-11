@@ -23,9 +23,9 @@ function loadScript() {
   return context;
 }
 
-test('embedded v16 Apps Script advertises idempotent activity saves', () => {
+test('embedded v17 Apps Script advertises idempotent activity saves', () => {
   const context = loadScript();
-  assert.equal(vm.runInContext('API_VERSION', context), 16);
+  assert.equal(vm.runInContext('API_VERSION', context), 17);
   assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1', 'idempotent-activity-v1']);
   assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
 });
@@ -74,13 +74,15 @@ test('GET negotiation is additive and failures use the selected envelope', () =>
   context.sheetTimeZone = () => 'UTC';
   assert.equal(context.doGet().version, 12);
   assert.equal(context.doGet({parameter: {protocolVersion: '13'}}).version, 13);
-  assert.equal(context.negotiatedVersion(17), 12, 'a version newer than this deployment falls back to the legacy envelope');
+  assert.equal(context.negotiatedVersion(18), 12, 'a version newer than this deployment falls back to the legacy envelope');
   assert.equal(context.doGet({parameter: {protocolVersion: '14'}}).version, 14);
   assert.ok(context.responseFeatures(14).includes('literal-text-v1'));
   assert.equal(context.responseFeatures(14).includes('idempotent-activity-v1'), false);
   assert.ok(context.responseFeatures(15).includes('idempotent-activity-v1'));
   assert.equal(context.responseFeatures(15).includes('config-journal-v1'), false);
   assert.ok(context.responseFeatures(16).includes('config-journal-v1'));
+  assert.equal(context.responseFeatures(16).includes('config-revision-v1'), false);
+  assert.ok(context.responseFeatures(17).includes('config-revision-v1'));
   assert.equal(context.responseFeatures(13).includes('literal-text-v1'), false);
   context.setup = () => { context.apiError('runtime_configuration', 'not configured'); };
   const failed = context.doGet({parameter: {protocolVersion: '13'}});
@@ -295,6 +297,118 @@ test('every rollback projection interruption recovers from the committed journal
     context.saveConfigCommand('command-' + failAt, config);
     assert.equal(journalCells.length, 2, 'step ' + failAt + ' replay repairs without appending');
   }
+});
+
+test('revisioned setup commits reject stale drafts with the current snapshot and never append on conflict', () => {
+  const context = loadScript();
+  const cells = [['entry']];
+  const journal = {
+    getLastRow: () => cells.length,
+    getDataRange: () => ({getValues: () => cells.map(row => [...row])}),
+    getRange: row => ({setValue: value => {cells[row - 1] = [value]}}),
+  };
+  context.tab = name => {assert.equal(name, 'Config Journal'); return journal};
+  context.projectConfig = config => config;
+  context.Utilities.getUuid = () => 'receipt-id';
+  const first = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]};
+  const second = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}, {name: 'Maya'}]};
+  context.saveConfigCommand('command-1', first, 0);
+  const committed = context.saveConfigCommand('command-2', second, 1);
+  assert.equal(committed.configRevision, 2);
+  assert.throws(() => context.saveConfigCommand('command-3', {...second, goal: 700}, 1), error => {
+    assert.equal(error.code, 'config_conflict');
+    assert.deepEqual(JSON.parse(JSON.stringify(error.currentConfig)), second);
+    assert.equal(error.currentConfigRevision, 2);
+    return true;
+  });
+  assert.equal(cells.length, 3, 'a stale draft does not append a journal entry');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.readConfig().config)), second, 'the committed head remains current');
+});
+
+test('revisioned web saves serialize two organizers and expose a structured conflict envelope', () => {
+  const context = loadScript();
+  const cells = [['entry']];
+  const journal = {
+    getLastRow: () => cells.length,
+    getDataRange: () => ({getValues: () => cells.map(row => [...row])}),
+    getRange: row => ({setValue: value => {cells[row - 1] = [value]}}),
+  };
+  context.tab = name => {assert.equal(name, 'Config Journal'); return journal};
+  context.setup = () => {};
+  context.projectConfig = config => config;
+  context.out = value => value;
+  context.LockService = {getScriptLock: () => ({waitLock() {}, releaseLock() {}})};
+  let receipt = 0;
+  context.Utilities.getUuid = () => 'receipt-' + (++receipt);
+  const base = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]};
+  const joined = {...base, crew: [...base.crew, {name: 'Maya'}]};
+  const post = body => context.doPost({postData: {contents: JSON.stringify(body)}});
+  const first = post({protocolVersion: 17, action: 'saveConfig', configCommandId: 'organizer-a', expectedConfigRevision: 0, config: base});
+  assert.equal(first.ok, true);
+  const second = post({protocolVersion: 17, action: 'saveConfig', configCommandId: 'organizer-b', expectedConfigRevision: 1, config: joined});
+  assert.equal(second.configRevision, 2);
+  const conflict = post({protocolVersion: 17, action: 'saveConfig', configCommandId: 'organizer-c', expectedConfigRevision: 1, config: {...joined, goal: 700}});
+  assert.equal(conflict.ok, false);
+  assert.equal(conflict.error.code, 'config_conflict');
+  assert.deepEqual(JSON.parse(JSON.stringify(conflict.config)), joined);
+  assert.equal(conflict.configRevision, 2);
+  assert.equal(cells.length, 3, 'the rejected organizer does not append a journal cell');
+});
+
+test('profile projection appends one literal participant while the journal remains authoritative', () => {
+  const context = loadScript();
+  const journalCells = [['entry']];
+  const participantRows = [['name'], ['Alex']];
+  const journal = {
+    getLastRow: () => journalCells.length,
+    getDataRange: () => ({getValues: () => journalCells.map(row => [...row])}),
+    getRange: row => ({setValue: value => {journalCells[row - 1] = [value]}}),
+  };
+  const literals = [];
+  const participants = {
+    getDataRange: () => ({getValues: () => participantRows.map(row => [...row])}),
+    getLastRow: () => participantRows.length,
+    getRange: () => ({setRichTextValues: rows => {literals.push(...rows.flat().map(value => value.getText())); participantRows.push([literals.at(-1)]);}}),
+    clearContents: () => {throw Error('normal profile projection must not clear the roster')},
+  };
+  const settings = {getDataRange: () => ({getValues: () => [['key', 'value'], ['challengeStart', '2026-07-01'], ['tripDate', '2026-07-31'], ['groupGoal', 500]]})};
+  context.tab = name => ({'Config Journal': journal, Participants: participants, Settings: settings})[name];
+  context.SpreadsheetApp.newRichTextValue = () => {let text = ''; return {setText: value => {text = value; return {build: () => ({getText: () => text})}}}};
+  context.projectConfig = config => config;
+  context.Utilities.getUuid = () => 'receipt-id';
+  const current = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]};
+  context.saveConfigCommand('command-1', current, 0);
+  context.projectConfig = () => {throw Error('profile projection must append')};
+  const added = context.addParticipant('=Maya');
+  assert.equal(added.configRevision, 2);
+  assert.deepEqual(participantRows, [['name'], ['Alex'], ['=Maya']]);
+  assert.deepEqual(literals, ['=Maya']);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.readConfig().config.crew)), [{name: 'Alex'}, {name: '=Maya'}]);
+});
+
+test('legacy setup saves remain last-writer-wins when no revision is supplied', () => {
+  const context = loadScript();
+  const cells = [['entry']];
+  const journal = {getLastRow: () => cells.length, getDataRange: () => ({getValues: () => cells.map(row => [...row])}), getRange: row => ({setValue: value => {cells[row - 1] = [value]}})};
+  context.tab = name => {assert.equal(name, 'Config Journal'); return journal};
+  context.setup = () => {};
+  context.projectConfig = config => config;
+  context.out = value => value;
+  context.LockService = {getScriptLock: () => ({waitLock() {}, releaseLock() {}})};
+  const config = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]};
+  const post = body => context.doPost({postData: {contents: JSON.stringify(body)}});
+  const first = post({protocolVersion: 17, configCommandId: 'legacy-first', action: 'saveConfig', config});
+  const second = post({protocolVersion: 17, configCommandId: 'legacy-second', action: 'saveConfig', config: {...config, goal: 700}});
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true, 'a request without an expected revision keeps legacy behavior');
+  assert.equal(second.configRevision, 2);
+  for (const protocolVersion of [16, 17]) {
+    const missing = post({protocolVersion, action: 'saveConfig', config});
+    assert.equal(missing.error.code, 'invalid_command', 'negotiated durable setup cannot silently substitute a random command ID');
+  }
+  const oldBrowser = post({action: 'saveConfig', config: {...config, goal: 800}});
+  assert.equal(oldBrowser.ok, true, 'unnegotiated legacy setup still accepts no command ID or revision');
+  assert.equal(oldBrowser.configRevision, 3);
 });
 
 test('challenge window remains inclusive', () => {

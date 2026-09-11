@@ -52,14 +52,28 @@ v16 commits each validated setup command as one immutable JSON cell in `Config J
 
 An independently deployed older backend bypasses the journal. Do not run it against the same Sheet during setup changes or treat reverting its deployment as a safe rollback without reconciliation. Older browsers remain compatible through the new backend.
 
-## API v16
+### Upgrading to API v17 — revision-checked setup
+
+v17 keeps the v16 Config Journal authoritative and adds an expected configuration revision to each
+new setup command. A stale organizer draft is rejected with the current committed configuration and
+revision; the draft remains available in the setup form for deliberate comparison and reapplication.
+Profile creation appends one literal rich-text participant to the current journal head under the
+mutation lock, so a joining climber cannot be removed by an older full-roster draft.
+
+Requests without an expected revision retain legacy last-writer-wins setup behavior. They do not get
+optimistic concurrency protection. Updated browsers send the expected revision only after verifying
+the endpoint advertises `config-revision-v1`; uncertain commands retain their original ID, payload,
+and precondition until the endpoint returns an authoritative conflict. Only that conflict permits a
+fresh command against the returned revision. Keep the `/exec` URL and `Config Journal` tab stable.
+
+## API v17
 
 Reads return:
 
 ```json
 {
-  "version": 16,
-  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1", "idempotent-activity-v1", "config-journal-v1"],
+  "version": 17,
+  "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1", "protocol-negotiation-v1", "literal-text-v1", "idempotent-activity-v1", "config-journal-v1", "config-revision-v1"],
   "activities": [],
   "config": {
     "startDate": "2026-07-16",
@@ -68,12 +82,13 @@ Reads return:
     "crew": [{"name": "Alex"}]
   },
   "configErrors": [],
+  "configRevision": 1,
   "serverDate": "2026-07-16",
   "timeZone": "America/Los_Angeles"
 }
 ```
 
-The browser sends `protocolVersion: 16` on reads and writes. Activity writes also send a stable `mutationId`, `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 16, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
+The browser sends `protocolVersion: 17` on reads and writes. Activity writes also send a stable `mutationId`, `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Negotiated writes return `{ version: 17, ok, ... }`; unnegotiated writes retain the v12 envelope. The machine-readable current contract is in `src/schema.json`.
 
 When the backend advertises `idempotent-activity-v1`, the browser stores an endpoint-bound pending command before sending. A missing response can then be retried after a reload with the same mutation ID. The pending draft only appears when the climber deliberately opens the record workflow; it never opens or announces itself. Switching crew links preserves the earlier command and blocks a new save from overwriting it. If durable browser storage is unavailable, the request is not sent. Older backends do not advertise this capability, so the browser reports that a missing response may already have reached the Sheet and asks the climber to check Crew before retrying.
 
