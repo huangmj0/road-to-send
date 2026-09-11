@@ -19,6 +19,10 @@ with the same preservation result and no missing or duplicate activity IDs. This
 source-reader compatibility at those branch versions. It does not prove the final integrated
 artifact, deployed Apps Script routing, or real Google runtime behavior.
 
+The same September 10 capture produced identical scoring credits and every scoring map through
+the committed API v16 browser source and the captured `origin/main` source. The private parity
+record pins both commit IDs. Repeat this comparison at the final integrated commit.
+
 The recovery snapshot is older than the source. Refresh it immediately before an intended merge;
 do not use the earlier comparison as evidence of a current recovery point.
 
