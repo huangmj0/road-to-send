@@ -124,7 +124,12 @@ import { readFileSync } from 'node:fs';
 // against unsolicited navigation/status after a late save account for this
 // growth. The navigation fix adds 237 bytes to the 170905-byte integrated
 // parent. The 858-byte margin keeps subsequent changes separately accountable.
-const BUDGET = 172000;
+// Re-baselined 172000 -> 174000 for #160 revision-checked setup. Measured
+// 173408 bytes, +2266 over the 171142-byte integrated save-recovery parent.
+// The growth adds revision preconditions, conflict snapshots, literal profile
+// projection, and the organizer's retained draft comparison. The remaining
+// 592 bytes require future slices to measure their own cost.
+const BUDGET = 174000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
