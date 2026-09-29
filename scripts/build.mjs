@@ -3,6 +3,15 @@ import { fileURLToPath } from 'node:url';
 import { buildSync } from 'esbuild';
 
 export const artifactPath = new URL('../index.html', import.meta.url);
+export const contractPath = new URL('../supabase/functions/road-to-send/contract.generated.json', import.meta.url);
+
+// Pure: the Supabase function's copy of the shared contract, {apiVersion, scoring}, taken from
+// src/schema.json and src/scoring.json so scoring has one source. Byte-stable across builds.
+export function buildContract() {
+  const read = path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+  const apiVersion = read('../src/schema.json').properties.version.const;
+  return `${JSON.stringify({apiVersion, scoring: read('../src/scoring.json')}, null, 2)}\n`;
+}
 
 // Pure: reads src/ and returns the rendered artifact as a string. Writes nothing,
 // so scripts/check-generated.mjs can compare in memory.
@@ -37,5 +46,7 @@ export function buildHtml() {
 // CLI path: `npm run build` still writes index.html and prints the same line.
 if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
   writeFileSync(artifactPath, buildHtml());
+  writeFileSync(contractPath, buildContract());
   console.log('Built self-contained index.html from src/.');
+  console.log('Built the Supabase function contract from src/.');
 }
