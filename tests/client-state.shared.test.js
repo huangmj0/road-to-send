@@ -569,8 +569,17 @@ test('movedTo that is not https, is not a URL, or equals the current endpoint is
 test('local mode never looks at movedTo', async () => {
   await movedScenario({
     endpoint: '',
-    backends: {},
+    backends: {
+      [OLD_URL]: (m, b, board) => m === 'POST' ? movedReply() : Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: (m, b, board) => board(13),
+    },
     checks: `
+      ${settle}
+      assert.equal(state.syncState,'local','the page booted in local mode');
+      state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+      populateSetup();document.querySelector('#endpoint').value='';
+      await saveSetup();${settle}
+      assert.equal(store.get('roadToSendEndpoint'),undefined,'saving local setup leaves the endpoint unset');
       assert.equal(followMove('${NEW_URL}'),false,'no endpoint means no adoption');
       followRejectedMove(${JSON.stringify(movedReply())});
       await loadRemote();${settle}

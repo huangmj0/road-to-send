@@ -91,7 +91,10 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
 6. **The page loads cold, on a trailhead connection.** One self-contained artifact, no runtime
    dependency on another host, no network request beyond the crew's own Sheet. `tests/size-check.mjs`
    caps `index.html` at a byte `BUDGET`; move it in a change that reports what it measured and why —
-   in either direction. A cap that only ratchets upward stops being a guard.
+   in either direction. A cap that only ratchets upward stops being a guard. One stated exception to
+   "no request beyond the crew's own Sheet": a shared-mode browser follows an organizer-set `movedTo`
+   to the new endpoint. The organizer controls the Sheet that names it, it must be `https`, and it is
+   followed at most once per page load.
 7. **What the built artifact holds:** exactly **one `<script>`** and exactly **one `<table>`** in
    `index.html` (new visualizations use divs/CSS grid); the built ``const SCRIPT=`…`;`` line and the
    `const SUPPORTED_API_VERSIONS` line immediately after it survive intact (no backtick enters the

@@ -10,7 +10,7 @@ const schema = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'src', 'schema.json'), 'utf8'),
 );
 
-test('protocol fixtures cover current, legacy, malformed, and partial responses', () => {
+test('protocol fixtures cover current, legacy, malformed, partial, moved, and v12 responses', () => {
   assert.deepEqual(Object.keys(fixtures).sort(), ['current', 'legacy', 'malformed', 'moved', 'partial', 'v12']);
 });
 

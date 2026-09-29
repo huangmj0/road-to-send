@@ -228,7 +228,13 @@ test('with movedTo set every POST kind is rejected as moved and no sheet changes
     const context = loadScript();
     const sheets = movedBook(context, [['movedTo', target]]);
     const before = sheets.snapshot();
+    let setups = 0, locks = 0;
+    const realSetup = context.setup;
+    context.setup = () => { setups++; return realSetup(); };
+    context.LockService = {getDocumentLock: () => { locks++; return {waitLock() {}, releaseLock() {}}; }};
     const response = post(context, request);
+    assert.equal(setups, 0, 'a moved Sheet never runs setup for ' + JSON.stringify(request));
+    assert.equal(locks, 0, 'a moved Sheet never takes the lock for ' + JSON.stringify(request));
     assert.deepEqual(response, {version: vm.runInContext('API_VERSION', context), ok: false, error: {code: 'moved', message: 'The crew board has moved. Try again.', details: []}, movedTo: target}, JSON.stringify(request));
     assert.equal(sheets.snapshot(), before, 'nothing changed for ' + JSON.stringify(request));
     assert.equal(sheets.writes(), 0, 'nothing was written for ' + JSON.stringify(request));
