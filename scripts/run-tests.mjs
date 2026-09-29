@@ -20,6 +20,8 @@ const suites = [
       'tests/client-state.shared.test.js',
       'tests/protocol-fixtures.test.js',
       'tests/smoke.test.js',
+      'tests/supabase-conformance.test.js',
+      'tests/supabase-function.test.js',
     ],
   },
   { name: 'static-check', args: ['tests/static-check.mjs'] },

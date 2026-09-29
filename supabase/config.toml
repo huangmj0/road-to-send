@@ -1,0 +1,7 @@
+# Road to Send: the function is called like the Apps Script URL, with a plain unauthenticated
+# fetch, so the platform must not demand a JWT. Access to the data is the service-role key the
+# function holds; the tables have RLS on and no policies.
+[functions.road-to-send]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/road-to-send/index.mjs"

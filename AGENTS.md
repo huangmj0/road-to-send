@@ -25,6 +25,23 @@ validates the embedded Apps Script, `protocol-fixtures.test.js` checks wire-form
 syntax, accessibility, and required UI hooks, `docs-check.mjs` checks the documented invariants
 below, and `size-check.mjs` caps the bundle.
 
+`supabase/` holds a **second implementation of the wire protocol**, a Supabase Edge Function that
+serves the same payload as the Apps Script (it does not replace it yet; see the spec in issue #175).
+`supabase/migrations/` is the Postgres schema (RLS on every table, no policies, so only the
+function's service-role key reaches data); `supabase/config.toml` sets `verify_jwt = false` for the
+function; `supabase/functions/road-to-send/` is plain ES-module JavaScript with no npm/jsr imports:
+`core.mjs` (pure `handle({method, bodyText}, store, now)`, the store interface is documented at its
+top), `http.mjs` (CORS/OPTIONS as a pure `route`), `store.mjs` (PostgREST over `fetch`), `index.mjs`
+(the `Deno.serve` entry) and `contract.generated.json`. Behavior must stay equal to
+`src/apps-script.js`; `tests/supabase-conformance.test.js` and `tests/supabase-function.test.js` hold
+it to that, with the scenarios in `tests/supabase/scenarios.mjs` written once against a
+`send({method, bodyText}) -> json` transport.
+
+**Build exception:** `npm run build` also writes `contract.generated.json` (`{apiVersion, scoring}`)
+from `src/schema.json` and `src/scoring.json`, and `check:generated` fails when it is stale. Scoring
+has one source; the function cannot import from `src/`, so it gets a generated copy. Commit it with
+the source change, like `index.html`.
+
 **Every test file opens with a `TRAP` comment describing its harness's sharp edges — read it before
 adding assertions to that file.** `README.md` documents setup and deployment.
 
@@ -38,7 +55,8 @@ adding assertions to that file.** `README.md` documents setup and deployment.
   before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml`
   runs it again in a `verify` job that gates the deploy job, which publishes only `index.html` to
   GitHub Pages on pushes to `main`.
-- `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html`.
+- `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html` and the regenerated
+  `supabase/functions/road-to-send/contract.generated.json`.
 - `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to
   exercise browser behavior.
 
