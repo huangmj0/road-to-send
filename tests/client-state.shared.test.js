@@ -431,3 +431,166 @@ test('the share sheet is tried first, and a dismissed one is not a failure', asy
   assert.equal(broken.written.length, 1, 'a genuine share failure falls back to the clipboard');
   assert.equal(broken.context.document.querySelector('#toast').textContent, 'Progress copied — paste it anywhere.', 'and reports the copy');
 });
+
+// Protocol v13: a backend that answers with movedTo is followed, once per page load.
+const OLD_URL = 'https://old.example.test/exec';
+const NEW_URL = 'https://new.example.test/fn';
+async function movedScenario({endpoint = OLD_URL, search = '', seed = {}, backends, checks}) {
+  const dom = sharedDom();
+  const store = new Map(Object.entries(seed));
+  if (endpoint) store.set('roadToSendEndpoint', endpoint);
+  store.set('roadToSendMe', 'Alex');
+  const fetched = [];
+  const replaced = [];
+  const board = version => ({version, features: [], activities: [{id: 'a1', name: 'Alex', type: 'exercise', date: '2026-07-13', createdAt: '1'}], config: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '2026-07-13', timeZone: 'UTC'});
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: {search, href: 'https://example.test/app/' + search, hash: ''},
+    history: {replaceState: (state, title, url) => replaced.push(url)},
+    window: dom.window, document: dom.document,
+    store: {get: key => store.get(key), keys: () => [...store.keys()].sort()},
+    fetched: () => fetched, replaced: () => replaced,
+    fetch: async (url, options = {}) => {
+      const base = String(url).split('?')[0];
+      const method = options.method || 'GET';
+      fetched.push(method + ' ' + base);
+      const handler = backends[base];
+      return {ok: true, json: async () => handler(method, options.body ? JSON.parse(options.body) : null, board)};
+    },
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{${checks}\n})()`, context, {filename: 'index.html'});
+}
+const movedReply = (to = NEW_URL) => ({version: 13, ok: false, error: {code: 'moved', message: 'The crew board has moved. Try again.', details: []}, movedTo: to});
+const settle = 'for(let i=0;i<20;i++)await Promise.resolve();';
+
+test('a GET carrying movedTo adopts the new endpoint, caches there, keeps the old cache and rewrites the sheet param', async () => {
+  await movedScenario({
+    search: '?sheet=' + encodeURIComponent(OLD_URL) + '&keep=1',
+    seed: {['roadToSendShared:activities:' + encodeURIComponent(OLD_URL)]: '[]'},
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: (m, b, board) => board(13),
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}','the stored endpoint follows the move');
+      for(const kind of ['activities','config','meta'])assert.notEqual(store.get(cacheKey(kind,'${NEW_URL}')),undefined,kind+' is cached under the new endpoint');
+      assert.equal(store.get(cacheKey('activities','${OLD_URL}')),'[]','the old activities cache is byte-for-byte unchanged');
+      assert.equal(store.keys().filter(k=>k.endsWith(':'+encodeURIComponent('${OLD_URL}'))).length,1,'no other old endpoint cache key is created');
+      assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${OLD_URL}','GET ${NEW_URL}']),'the next fetch goes to the new URL');
+      const rewritten=new URL(replaced().filter(u=>u[0]!=='#')[0]);
+      assert.equal(rewritten.searchParams.get('sheet'),'${NEW_URL}','the sheet param is rewritten');
+      assert.equal(rewritten.searchParams.get('keep'),'1','other params are left alone');
+      assert.equal(state.syncState,'live');
+      assert.equal(state.logs.length,1);
+    `,
+  });
+});
+
+test('adopting a move without a sheet param does not touch the address bar', async () => {
+  await movedScenario({
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(12), {movedTo: NEW_URL}),
+      [NEW_URL]: (m, b, board) => board(13),
+    },
+    checks: `
+      ${settle}
+      assert.equal(replaced().filter(u=>u[0]!=='#').length,0,'no sheet param means no address bar rewrite');
+      assert.equal(state.endpoint,'${NEW_URL}','a v12 payload carrying movedTo is followed too');
+    `,
+  });
+});
+
+test('every POST that answers moved shows the server message and adopts the new endpoint', async () => {
+  const today = '2026-07-13';
+  const config = `state.config={startDate:'${today}',tripDate:'${today}',goal:500,crew:[{name:'Alex'}]};`;
+  const cases = {
+    submit: `${config}state.logs=[];state.me='Alex';state.recordingFor='Alex';document.querySelector('#activityDate').value='${today}';await submitActivity({preventDefault(){}});`,
+    create: `${config}document.querySelector('#newParticipantName').value='Maya';await createProfile();`,
+    remove: `${config}state.logs=[{id:'a1',name:'Alex',type:'exercise',date:'${today}',createdAt:'1'}];state.pendingDelete={entry:state.logs[0],index:0,id:'a1',feed:'personal',position:0};await performDelete();`,
+    setup: `${config}populateSetup();document.querySelector('#endpoint').value='${OLD_URL}';await saveSetup();`,
+  };
+  for (const [name, action] of Object.entries(cases)) {
+    await movedScenario({
+      search: '?sheet=' + encodeURIComponent(OLD_URL),
+      backends: {
+        [OLD_URL]: (method, body, board) => method === 'POST' ? movedReply() : board(13),
+        [NEW_URL]: (method, body, board) => board(13),
+      },
+      checks: `
+        ${settle}
+        state.endpoint='${OLD_URL}';
+        const before=fetched().length;
+        ${action}${settle}
+        assert.equal(state.endpoint,'${NEW_URL}','${name}: adopts the new endpoint');
+        assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}','${name}: stores it');
+        const shown=[document.querySelector('#toast').textContent,document.querySelector('#setupErrors').textContent,document.querySelector('#createProfileError').textContent].join('|');
+        assert.equal(shown.indexOf('The crew board has moved. Try again.')>=0,true,'${name}: shows the server message, got '+shown);
+        assert.equal(fetched().slice(before).filter(x=>x.startsWith('POST')).length,1,'${name}: the write is not retried automatically');
+        assert.equal(fetched().slice(before).includes('GET ${NEW_URL}'),true,'${name}: reloads from the new URL');
+      `,
+    });
+  }
+});
+
+test('a move is followed at most once per page load, so A to B to A stops after one hop', async () => {
+  await movedScenario({
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: (m, b, board) => Object.assign(board(13), {movedTo: OLD_URL}),
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}','the browser stays on B');
+      assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${OLD_URL}','GET ${NEW_URL}']),'exactly one hop');
+      assert.equal(state.syncState,'live');
+    `,
+  });
+});
+
+test('movedTo that is not https, is not a URL, or equals the current endpoint is ignored', async () => {
+  for (const bad of ['http://new.example.test/fn', 'ftp://new.example.test', 'not a url', OLD_URL, '', 42, null, {href: NEW_URL}]) {
+    await movedScenario({
+      backends: {[OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: bad})},
+      checks: `
+        ${settle}
+        assert.equal(state.endpoint,'${OLD_URL}');
+        assert.equal(store.get('roadToSendEndpoint'),'${OLD_URL}');
+        assert.equal(fetched().length,1);
+        assert.equal(state.syncState,'live');
+      `,
+    });
+  }
+});
+
+test('local mode never looks at movedTo', async () => {
+  await movedScenario({
+    endpoint: '',
+    backends: {},
+    checks: `
+      assert.equal(followMove('${NEW_URL}'),false,'no endpoint means no adoption');
+      followRejectedMove(${JSON.stringify(movedReply())});
+      await loadRemote();${settle}
+      assert.equal(state.endpoint,'');
+      assert.equal(store.get('roadToSendEndpoint'),undefined);
+      assert.equal(fetched().length,0);
+    `,
+  });
+});
+
+test('both v12 and v13 payloads load', async () => {
+  for (const version of [12, 13]) {
+    await movedScenario({
+      backends: {[OLD_URL]: (m, b, board) => board(version)},
+      checks: `
+        ${settle}
+        assert.equal(state.syncState,'live');
+        assert.equal(state.protocolVersion,${version});
+        assert.equal(state.logs.length,1);
+      `,
+    });
+  }
+});

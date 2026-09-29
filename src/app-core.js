@@ -10,7 +10,7 @@ const TYPE_ICONS={climb:'climb',exercise:'exercise',mobility:'mobility',bounty:'
 function glyph(k){return `<svg class="glyph" aria-hidden="true"><use href="#g-${k}"/></svg>`}
 const TITLE_CATEGORIES=[{id:'crusher',title:'Crusher',type:'climb'},{id:'gym-rat',title:'Gym Rat',type:'exercise'},{id:'yogi',title:'Yogi',type:'mobility'}];
 const SCRIPT=__APPS_SCRIPT__;
-const SUPPORTED_API_VERSIONS=new Set([__API_VERSION__,11]);// current version leads (drives the "expects vN" displays); 11 is accepted through the v12 rollout so a not-yet-redeployed backend keeps working — its JSON is identical. Drop 11 once every backend is on 12.
+const SUPPORTED_API_VERSIONS=new Set([__API_VERSION__,12]);// current version leads (drives the "expects vN" displays); 12 is accepted while the Sheet may still run v12 — v13 only adds the optional movedTo, so a v12 backend's JSON still validates. Drop 12 once every backend is on 13.
 function localDate(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function parseDateOnly(value){const s=String(value||''),m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);if(!m)return null;const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),12);return localDate(d)===s?d:null}
 function windowStart(today,days=7){const d=parseDateOnly(String(today||'').slice(0,10));if(!d)return'';d.setDate(d.getDate()-days+1);return localDate(d)}
@@ -22,7 +22,7 @@ function normalizeCrew(value){const seen=new Set();return(Array.isArray(value)?v
 function parseRemoteConfig(value,remoteErrors){const errors={};for(const item of Array.isArray(remoteErrors)?remoteErrors:[]){if(item&&item.field)errors[item.field+(item.value?'_'+item.value:'')]=`${item.value?item.value+': ':''}${item.reason||'is invalid'}`}if(!value||typeof value!=='object'||Array.isArray(value))return{value:null,errors};const startDate=String(value.startDate||''),tripDate=String(value.tripDate||''),goal=Number(value.goal),crew=normalizeCrew(value.crew);if(!parseDateOnly(startDate))errors.challengeStart='Challenge start must use YYYY-MM-DD.';if(!parseDateOnly(tripDate))errors.tripDate='Challenge end must use YYYY-MM-DD.';if(parseDateOnly(startDate)&&parseDateOnly(tripDate)&&startDate>tripDate)errors.challengeStart='Challenge start must be on or before the end.';if(!Number.isInteger(goal)||goal<50||goal>10000)errors.groupGoal='Group goal must be a whole number from 50 to 10,000.';return{value:Object.keys(errors).some(k=>['challengeStart','tripDate','groupGoal'].includes(k))?null:{startDate,tripDate,goal,crew},errors}}
 function sanitizeConfig(value,fallback=defaultConfig()){return parseRemoteConfig(value,[]).value||fallback}
 // Every field below arrives untrusted: normalizeActivityRow in the Apps Script keeps a date it could
-// not parse rather than dropping the row, and SUPPORTED_API_VERSIONS still accepts a v11 backend that
+// not parse rather than dropping the row, and SUPPORTED_API_VERSIONS still accepts a v12 backend that
 // predates some of these checks. Coerce each field to the shape src/schema.json declares, in place, so
 // an unknown Sheet column survives untouched — and normalize rather than reject, because an entry that
 // disappears is a climber's logged session gone. The date is matched whole, not sliced: a time suffix is
