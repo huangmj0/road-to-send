@@ -55,7 +55,8 @@ adding assertions to that file.** `README.md` documents setup and deployment.
   before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml`
   runs it again in a `verify` job that gates the deploy job, which publishes only `index.html` to
   GitHub Pages on pushes to `main`.
-- `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html`.
+- `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html` and the regenerated
+  `supabase/functions/road-to-send/contract.generated.json`.
 - `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to
   exercise browser behavior.
 

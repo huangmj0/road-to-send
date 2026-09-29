@@ -2,26 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
 const vm = require('node:vm');
-
-function loadScript() {
-  const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
-  const match = html.match(/const SCRIPT=(`[^`]*`);\nconst SUPPORTED_API_VERSIONS/);
-  assert.ok(match, 'embedded Apps Script was found');
-  const outer = {};
-  vm.createContext(outer);
-  vm.runInContext(`SCRIPT=${match[1]}`, outer);
-  const context = {
-    Utilities: {
-      getUuid: () => 'uuid-test',
-      formatDate: date => [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, '0'), String(date.getUTCDate()).padStart(2, '0')].join('-'),
-    },
-    SpreadsheetApp: {getActive: () => ({getSpreadsheetTimeZone: () => 'UTC'})},
-  };
-  vm.createContext(context);
-  vm.runInContext(outer.SCRIPT, context);
-  context.__source = outer.SCRIPT;
-  return context;
-}
+const {loadScript} = require('./apps-script-harness.js');
 
 test('embedded v12 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();

@@ -2,13 +2,14 @@
 // with dynamic import() inside async tests, never a top-level require. The function reads
 // `version` from the generated contract, so a stale contract.generated.json (run
 // `npm run build`) fails here as a version mismatch, not as a logic bug. The vm harness for the
-// Apps Script FEATURES comes from the built index.html, like backend-script.test.js. Scenarios in
+// Apps Script FEATURES come from tests/apps-script-harness.js, shared with backend-script.test.js. Scenarios in
 // tests/supabase/scenarios.mjs must stay valid against an empty real backend: seeded-data and
 // injected-clock cases belong in this file, not there.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
 const vm = require('node:vm');
+const {loadScript} = require('./apps-script-harness.js');
 
 const schema = JSON.parse(fs.readFileSync(new URL('../src/schema.json', `file://${__filename}`), 'utf8'));
 const fn = name => import(new URL(`../supabase/functions/road-to-send/${name}`, `file://${__filename}`));
@@ -17,17 +18,7 @@ const helper = name => import(new URL(`./supabase/${name}`, `file://${__filename
 const clock = iso => () => new Date(iso);
 const transport = (handle, store, now) => request => handle(request, store, now);
 
-function appsScriptFeatures() {
-  const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
-  const match = html.match(/const SCRIPT=(`[^`]*`);\nconst SUPPORTED_API_VERSIONS/);
-  const outer = {};
-  vm.createContext(outer);
-  vm.runInContext(`SCRIPT=${match[1]}`, outer);
-  const context = {Utilities: {}, SpreadsheetApp: {}};
-  vm.createContext(context);
-  vm.runInContext(outer.SCRIPT, context);
-  return Array.from(vm.runInContext('FEATURES', context));
-}
+const appsScriptFeatures = () => Array.from(vm.runInContext('FEATURES', loadScript()));
 
 test('conformance scenarios pass in-process against an empty in-memory store', async () => {
   const {handle} = await fn('core.mjs');
@@ -43,13 +34,14 @@ test('a seeded store serves activities in insertion order and crew in position o
   const {handle} = await fn('core.mjs');
   const {createMemoryStore} = await helper('memory-store.mjs');
   const {assertConforms} = await helper('scenarios.mjs');
-  const activity = (id, name, createdAt) => ({id, name, type: 'exercise', category: 'exercise', points: 2, date: '2026-07-13', createdAt, hardestGrade: '', bountyId: '', bountyTitle: '', note: ''});
-  const activities = [activity('b', 'Maya', '2026-07-13T09:00:00.000Z'), activity('a', 'Alex', '2026-07-13T08:00:00.000Z')];
-  const store = createMemoryStore({settings: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, timeZone: 'UTC'}, participants: ['Zed', 'Alex', 'Maya'], activities});
+  const activity = (seq, id, name, createdAt) => ({seq, id, name, type: 'exercise', category: 'exercise', points: 2, date: '2026-07-13', createdAt, hardestGrade: '', bountyId: '', bountyTitle: '', note: ''});
+  const activities = [activity(3, 'c', 'Zed', '2026-07-13T07:00:00.000Z'), activity(1, 'b', 'Maya', '2026-07-13T09:00:00.000Z'), activity(2, 'a', 'Alex', '2026-07-13T08:00:00.000Z')];
+  const store = createMemoryStore({settings: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, timeZone: 'UTC'}, participants: [{name: 'Zed', position: 2}, {name: 'Alex', position: 0}, {name: 'Maya', position: 1}], activities});
   const board = await handle({method: 'GET', bodyText: ''}, store, clock('2026-07-13T12:00:00Z'));
   assertConforms(schema, board);
-  assert.deepEqual(board.activities.map(x => x.id), ['b', 'a']);
-  assert.deepEqual(board.config, {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Zed'}, {name: 'Alex'}, {name: 'Maya'}]});
+  assert.deepEqual(board.activities.map(x => x.id), ['b', 'a', 'c']);
+  assert.deepEqual(board.config, {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}, {name: 'Maya'}, {name: 'Zed'}]});
+  assert.ok(board.activities.every(x => !('seq' in x)), 'seq is storage order, not wire data');
   assert.deepEqual(board.configErrors, []);
 });
 

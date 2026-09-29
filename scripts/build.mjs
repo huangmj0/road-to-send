@@ -43,7 +43,7 @@ export function buildHtml() {
   return `${template.replace('__INLINE_STYLES__', () => styles).replace('__INLINE_APP__', () => prefix+app)}\n`;
 }
 
-// CLI path: `npm run build` still writes index.html and prints the same line.
+// CLI path: `npm run build` writes index.html and the Supabase function contract, one line each.
 if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
   writeFileSync(artifactPath, buildHtml());
   writeFileSync(contractPath, buildContract());

@@ -31,16 +31,16 @@ export function calendarDay(date, timeZone) {
 
 async function readBoard(store, now) {
   const [settings, participants, activities] = await Promise.all([store.getSettings(), store.listParticipants(), store.listActivities()]);
-  const timeZone = settings?.timeZone || 'UTC';
+  const timeZone = settings?.timeZone || 'UTC', at = now();
   return {
     version: API_VERSION,
     features: FEATURES,
     activities,
     config: settings ? {startDate: settings.startDate, tripDate: settings.tripDate, goal: settings.goal, crew: participants.map(person => ({name: person.name}))} : null,
     configErrors: [],
-    serverDate: calendarDay(now(), timeZone),
+    serverDate: calendarDay(at, timeZone),
     timeZone,
-    fetchedAt: now().toISOString(),
+    fetchedAt: at.toISOString(),
   };
 }
 
