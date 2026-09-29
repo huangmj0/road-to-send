@@ -6,6 +6,7 @@
 //
 // Snapshots and the SQL they produce hold crew data: never commit either. The transform is pure
 // and exported; it throws ImportError before producing any output, so the SQL is never partial.
+// renderSnapshot also returns the rows it rendered so tests can compare them with the snapshot.
 import { fileURLToPath } from 'node:url';
 
 export class ImportError extends Error {}
@@ -15,22 +16,32 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Standard-conforming string literal: only the single quote needs escaping. Backslashes,
 // newlines and unicode are literal. Postgres text cannot hold NUL.
-function lit(value, what) {
-  if (typeof value !== 'string') throw new ImportError(`${what} must be a string.`);
-  if (value.includes('\0')) throw new ImportError(`${what} contains a NUL character, which Postgres cannot store.`);
+// The Sheet's GET passes raw cells through, so a note "100" or a numeric id can arrive as a
+// number or boolean; those are kept verbatim as their string form. Only null/undefined are empty.
+function text(value, what) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  throw new ImportError(`${what} must be a string, number or boolean.`);
+}
+
+function lit(value) {
+  if (value.includes('\0')) throw new ImportError('A value contains a NUL character, which Postgres cannot store.');
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function optional(value, what) {
-  return lit(value === undefined || value === null ? '' : value, what);
+// The goal, date and name checks below mirror the migration's check constraints, so they fail
+// here, before any SQL is produced, rather than inside Postgres.
+export function snapshotToSql(payload) {
+  return renderSnapshot(payload).sql;
 }
 
-export function snapshotToSql(payload) {
+export function renderSnapshot(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new ImportError('The snapshot must be a JSON object (the Sheet GET response).');
   }
   if (!ACCEPTED_VERSIONS.includes(payload.version)) {
-    throw new ImportError(`Unsupported snapshot version ${JSON.stringify(payload.version)}; expected 12 or 13.`);
+    throw new ImportError(`Unsupported snapshot version ${JSON.stringify(payload.version)}; expected ${ACCEPTED_VERSIONS.join(' or ')}.`);
   }
   if (!Array.isArray(payload.activities)) throw new ImportError('The snapshot has no activities array.');
   const config = payload.config;
@@ -50,10 +61,12 @@ export function snapshotToSql(payload) {
     throw new ImportError('The snapshot has no timeZone; importing without it would shift challenge days.');
   }
 
-  const lines = ['begin;', ''];
+  const rows = { settings: null, participants: [], activities: [] };
+  const lines = ['begin;', 'set local standard_conforming_strings = on;', ''];
+  rows.settings = { startDate: config.startDate, tripDate: config.tripDate, goal: config.goal, timeZone: payload.timeZone };
   lines.push(
     'insert into settings (id, start_date, trip_date, goal, time_zone)',
-    `values (1, ${lit(config.startDate, 'startDate')}, ${lit(config.tripDate, 'tripDate')}, ${config.goal}, ${lit(payload.timeZone, 'timeZone')})`,
+    `values (1, ${lit(config.startDate)}, ${lit(config.tripDate)}, ${config.goal}, ${lit(payload.timeZone)})`,
     'on conflict (id) do update set start_date = excluded.start_date, trip_date = excluded.trip_date,',
     '  goal = excluded.goal, time_zone = excluded.time_zone;',
     '',
@@ -61,27 +74,44 @@ export function snapshotToSql(payload) {
 
   config.crew.forEach((person, index) => {
     const name = person && person.name;
-    if (typeof name !== 'string' || name.length < 1 || name.length > 30) {
+    // code points, to match Postgres char_length
+    if (typeof name !== 'string' || [...name].length < 1 || [...name].length > 30) {
       throw new ImportError(`config.crew[${index}].name must be a string of 1 to 30 characters.`);
     }
-    lines.push(`insert into participants (name, position) values (${lit(name, 'crew name')}, ${index}) on conflict ((lower(name))) do nothing;`);
+    rows.participants.push({ name, position: index });
+    lines.push(`insert into participants (name, position) values (${lit(name)}, ${index}) on conflict ((lower(name))) do nothing;`);
   });
   lines.push('');
 
   payload.activities.forEach((a, index) => {
     const at = `activities[${index}]`;
     if (!a || typeof a !== 'object') throw new ImportError(`${at} must be an object.`);
-    if (typeof a.id !== 'string' || !a.id) throw new ImportError(`${at}.id must be a non-empty string.`);
-    if (!Number.isInteger(a.points)) throw new ImportError(`${at}.points must be an integer.`);
+    const row = {};
+    for (const key of ['id', 'name', 'type', 'category', 'points', 'date', 'createdAt', 'hardestGrade', 'bountyId', 'bountyTitle', 'note']) {
+      if (key === 'points') {
+        // The Sheet sends Number(points)||0, so a hand-edited 1.5 is legitimate. The column is
+        // int, so Postgres rounds it on insert (half away from zero); nothing is rejected.
+        const n = typeof a.points === 'string' && a.points.trim() ? Number(a.points) : a.points;
+        if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > 2147483647) {
+          throw new ImportError(`${at}.points must be a number within the int range.`);
+        }
+        row.points = n;
+      } else {
+        row[key] = text(a[key], `${at}.${key}`);
+      }
+    }
+    if (!row.id) throw new ImportError(`${at}.id must not be empty.`);
+    rows.activities.push(row);
+    const v = row;
     lines.push(
       'insert into activities (id, name, type, category, points, date, created_at, hardest_grade, bounty_id, bounty_title, note)',
-      `values (${lit(a.id, `${at}.id`)}, ${lit(a.name, `${at}.name`)}, ${lit(a.type, `${at}.type`)}, ${optional(a.category, `${at}.category`)}, ${a.points}, ${lit(a.date, `${at}.date`)}, ${lit(a.createdAt, `${at}.createdAt`)}, ${optional(a.hardestGrade, `${at}.hardestGrade`)}, ${optional(a.bountyId, `${at}.bountyId`)}, ${optional(a.bountyTitle, `${at}.bountyTitle`)}, ${optional(a.note, `${at}.note`)})`,
+      `values (${lit(v.id)}, ${lit(v.name)}, ${lit(v.type)}, ${lit(v.category)}, ${v.points}, ${lit(v.date)}, ${lit(v.createdAt)}, ${lit(v.hardestGrade)}, ${lit(v.bountyId)}, ${lit(v.bountyTitle)}, ${lit(v.note)})`,
       'on conflict (id) do nothing;',
     );
   });
 
   lines.push('', 'commit;', '');
-  return lines.join('\n');
+  return { sql: lines.join('\n'), rows };
 }
 
 async function main() {

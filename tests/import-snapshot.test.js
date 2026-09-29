@@ -27,7 +27,7 @@ const snapshot = (over = {}) => ({
 test('emits one transaction: settings upsert, roster in order, activities in order', async () => {
   const {snapshotToSql} = await load();
   const sql = snapshotToSql(snapshot());
-  assert.ok(sql.startsWith('begin;') && sql.trimEnd().endsWith('commit;'));
+  assert.ok(sql.startsWith('begin;\nset local standard_conforming_strings = on;') && sql.trimEnd().endsWith('commit;'));
   assert.equal(sql.match(/^begin;/gm).length, 1);
   assert.match(sql, /insert into settings \(id, start_date, trip_date, goal, time_zone\)\nvalues \(1, '2026-09-07', '2026-11-15', 3000, 'America\/Los_Angeles'\)\non conflict \(id\) do update/);
   const alex = sql.indexOf("values ('Alex', 0)"), maya = sql.indexOf("values ('Maya', 1)");
@@ -48,9 +48,100 @@ test('escapes quotes, backslashes, unicode and newlines in strings', async () =>
   const {snapshotToSql} = await load();
   const note = "it's a \\ back\\slash\nline two 🧗 café'; drop table activities;--";
   const sql = snapshotToSql(snapshot({activities: [activity({note})]}));
-  assert.ok(sql.includes(`'${note.replaceAll("'", "''")}'`));
-  // the injection text stays inside the literal because its quote is doubled
+  // an independent reader of the emitted literals recovers the exact note
+  assert.equal(parseSql(sql).activities[0].note, note);
   assert.ok(sql.includes("café''; drop table activities;--'"));
+});
+
+// Independent SQL literal reader: walks 'quoted' strings ('' is an escaped quote) and bare numbers.
+function readTuple(sql, from) {
+  const out = [];
+  let i = sql.indexOf('(', from) + 1;
+  for (;;) {
+    while (sql[i] === ' ') i++;
+    if (sql[i] === "'") {
+      let v = '';
+      i++;
+      for (;;) {
+        if (sql[i] === "'" && sql[i + 1] === "'") { v += "'"; i += 2; }
+        else if (sql[i] === "'") { i++; break; }
+        else v += sql[i++];
+      }
+      out.push(v);
+    } else {
+      const m = /^-?[0-9.]+(?:e[+-]?[0-9]+)?/.exec(sql.slice(i));
+      out.push(Number(m[0]));
+      i += m[0].length;
+    }
+    while (sql[i] === ' ') i++;
+    if (sql[i] === ',') { i++; continue; }
+    assert.equal(sql[i], ')');
+    return [out, i];
+  }
+}
+function parseSql(sql) {
+  const parsed = {settings: null, participants: [], activities: []};
+  const keys = ['id', 'name', 'type', 'category', 'points', 'date', 'createdAt', 'hardestGrade', 'bountyId', 'bountyTitle', 'note'];
+  const [s, end] = readTuple(sql, sql.indexOf('values', sql.indexOf('insert into settings')));
+  parsed.settings = {startDate: s[1], tripDate: s[2], goal: s[3], timeZone: s[4]};
+  let pos = end;
+  for (;;) {
+    const p = sql.indexOf('insert into participants', pos);
+    if (p < 0) break;
+    const [t, e] = readTuple(sql, sql.indexOf('values', p));
+    parsed.participants.push({name: t[0], position: t[1]});
+    pos = e;
+  }
+  for (;;) {
+    const a = sql.indexOf('insert into activities', pos);
+    if (a < 0) break;
+    const [t, e] = readTuple(sql, sql.indexOf('values', a));
+    parsed.activities.push(Object.fromEntries(keys.map((k, n) => [k, t[n]])));
+    pos = e;
+  }
+  return parsed;
+}
+
+test('round trip: rendered rows and independently parsed SQL both reproduce the snapshot', async () => {
+  const {renderSnapshot} = await load();
+  const snap = snapshot({activities: [
+    activity({note: "it's \\ tricky\nnewline 🧗"}),
+    activity({id: 'a2', name: "O'Neil", note: ''}),
+    activity({id: 'a3', points: 0}),
+  ]});
+  const {sql, rows} = renderSnapshot(snap);
+  assert.deepEqual(rows.activities, snap.activities);
+  assert.deepEqual(rows.settings, {startDate: snap.config.startDate, tripDate: snap.config.tripDate, goal: snap.config.goal, timeZone: snap.timeZone});
+  assert.deepEqual(rows.participants, [{name: 'Alex', position: 0}, {name: 'Maya', position: 1}]);
+  const parsed = parseSql(sql);
+  assert.deepEqual(parsed.activities, snap.activities);
+  assert.deepEqual(parsed.settings, rows.settings);
+  assert.deepEqual(parsed.participants, rows.participants);
+});
+
+test('raw Sheet cells: numbers and booleans are kept verbatim as text, null is empty', async () => {
+  const {renderSnapshot} = await load();
+  const snap = snapshot({activities: [
+    activity({id: 42, note: 100, bountyId: true, hardestGrade: null, date: 20260907, category: undefined}),
+  ]});
+  const {sql, rows} = renderSnapshot(snap);
+  const want = activity({id: '42', note: '100', bountyId: 'true', hardestGrade: '', date: '20260907', category: ''});
+  assert.deepEqual(rows.activities, [want]);
+  assert.deepEqual(parseSql(sql).activities, [want]);
+});
+
+test('fractional points are accepted and emitted for the int column to round', async () => {
+  const {renderSnapshot} = await load();
+  const {sql, rows} = renderSnapshot(snapshot({activities: [activity({points: 1.5}), activity({id: 'b', points: '2'})]}));
+  assert.deepEqual(rows.activities.map(a => a.points), [1.5, 2]);
+  assert.deepEqual(parseSql(sql).activities.map(a => a.points), [1.5, 2]);
+});
+
+test('crew name length counts code points like char_length', async () => {
+  const {snapshotToSql} = await load();
+  const crew = names => snapshot({config: {startDate: '2026-09-07', tripDate: '2026-11-15', goal: 3000, crew: names.map(name => ({name}))}});
+  assert.doesNotThrow(() => snapshotToSql(crew(['🧗'.repeat(30)])), '30 emoji is 60 UTF-16 units but 30 characters');
+  assert.throws(() => snapshotToSql(crew(['🧗'.repeat(31)])));
 });
 
 test('keeps activities that name people outside the roster, and imports v12 snapshots', async () => {
@@ -83,7 +174,10 @@ test('aborts on bad payloads and never returns partial SQL', async () => {
     'bad goal': snapshot({config: {...crew([]), goal: 5}}),
     'bad date': snapshot({config: {...crew([]), startDate: '9/7'}}),
     'empty crew name': snapshot({config: crew([{name: ''}])}),
-    'fractional points': snapshot({activities: [activity({points: 1.5})]}),
+    'non-numeric points': snapshot({activities: [activity({points: 'lots'})]}),
+    'points beyond int': snapshot({activities: [activity({points: 3e9})]}),
+    'crew name over 30 code points': snapshot({config: crew([{name: 'x'.repeat(31)}])}),
+    'object in a text field': snapshot({activities: [activity({note: {a: 1}})]}),
     'activity without id': snapshot({activities: [activity(), activity({id: ''})]}),
     'NUL in note': snapshot({activities: [activity({note: 'a\0b'})]}),
     'not an object': [],
