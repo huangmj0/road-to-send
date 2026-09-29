@@ -40,6 +40,10 @@ local Supabase stack in `tests/supabase-stack.test.mjs` (with `tests/supabase/lo
 adds what only the real stack can prove: CORS through the gateway, RLS against the `anon` key, and
 the unique index under two concurrent sign-ups.
 
+`scripts/import-snapshot.mjs` is the one-shot cutover tool: it reads a Sheet GET snapshot on stdin and
+writes idempotent SQL for that schema to stdout (`tests/import-snapshot.test.js`). It is not part of the
+app; snapshots and the SQL they produce hold crew data and are never committed.
+
 **Build exception:** `npm run build` also writes `contract.generated.json` (`{apiVersion, scoring}`)
 from `src/schema.json` and `src/scoring.json`, and `check:generated` fails when it is stale. Scoring
 has one source; the function cannot import from `src/`, so it gets a generated copy. Commit it with
