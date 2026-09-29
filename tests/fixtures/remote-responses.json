@@ -1,5 +1,23 @@
 {
   "current": {
+    "version": 13,
+    "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1"],
+    "activities": [
+      {"id":"a1","name":"Alex","type":"climb","category":"climb","points":3,"date":"2026-09-07","createdAt":"2026-09-07T16:00:00.000Z","hardestGrade":"V4","bountyId":"","bountyTitle":"","note":""},
+      {"id":"a2","name":"Maya","type":"bounty","category":"exercise","points":3,"date":"2026-09-07","createdAt":"2026-09-07T17:00:00.000Z","hardestGrade":"","bountyId":"century-club","bountyTitle":"Century Club","note":""}
+    ],
+    "config": {
+      "startDate": "2026-09-07",
+      "tripDate": "2026-11-15",
+      "goal": 3000,
+      "crew": [{"name":"Alex"},{"name":"Maya"}]
+    },
+    "configErrors": [],
+    "serverDate": "2026-09-07",
+    "timeZone": "America/Los_Angeles",
+    "fetchedAt": "2026-09-07T16:00:00.000Z"
+  },
+  "v12": {
     "version": 12,
     "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1"],
     "activities": [
@@ -16,6 +34,25 @@
     "serverDate": "2026-09-07",
     "timeZone": "America/Los_Angeles",
     "fetchedAt": "2026-09-07T16:00:00.000Z"
+  },
+  "moved": {
+    "version": 13,
+    "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1"],
+    "activities": [
+      {"id":"a1","name":"Alex","type":"climb","category":"climb","points":3,"date":"2026-09-07","createdAt":"2026-09-07T16:00:00.000Z","hardestGrade":"V4","bountyId":"","bountyTitle":"","note":""},
+      {"id":"a2","name":"Maya","type":"bounty","category":"exercise","points":3,"date":"2026-09-07","createdAt":"2026-09-07T17:00:00.000Z","hardestGrade":"","bountyId":"century-club","bountyTitle":"Century Club","note":""}
+    ],
+    "config": {
+      "startDate": "2026-09-07",
+      "tripDate": "2026-11-15",
+      "goal": 3000,
+      "crew": [{"name":"Alex"},{"name":"Maya"}]
+    },
+    "configErrors": [],
+    "serverDate": "2026-09-07",
+    "timeZone": "America/Los_Angeles",
+    "fetchedAt": "2026-09-07T16:00:00.000Z",
+    "movedTo": "https://project.example.test/functions/v1/road-to-send"
   },
   "legacy": [{"id":"legacy-1","name":"Alex","type":"climb","points":3,"date":"2026-09-07"}],
   "malformed": {"version":12,"features":"not-an-array","activities":[null,42,{"id":"valid-row"}],"config":null,"configErrors":[{"field":"startDate","reason":"must be a real calendar date"}]},

@@ -10,8 +10,8 @@ const schema = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'src', 'schema.json'), 'utf8'),
 );
 
-test('protocol fixtures cover current, legacy, malformed, and partial responses', () => {
-  assert.deepEqual(Object.keys(fixtures).sort(), ['current', 'legacy', 'malformed', 'partial']);
+test('protocol fixtures cover current, legacy, malformed, partial, moved, and v12 responses', () => {
+  assert.deepEqual(Object.keys(fixtures).sort(), ['current', 'legacy', 'malformed', 'moved', 'partial', 'v12']);
 });
 
 test('current fixture follows the versioned settings and collection contract', () => {
@@ -32,4 +32,15 @@ test('compatibility fixtures retain intentionally unsafe response shapes', () =>
   assert.ok(fixtures.malformed.activities.some(value => value === null));
   assert.equal(fixtures.partial.config, null);
   assert.ok(fixtures.partial.configErrors.length > 0);
+});
+
+test('the v13 moved fixture carries an https movedTo, and the v12 fixture predates it', () => {
+  assert.equal(fixtures.moved.version, schema.properties.version.const);
+  assert.match(fixtures.moved.movedTo, new RegExp(schema.properties.movedTo.pattern));
+  assert.equal(schema.properties.movedTo.type, 'string');
+  assert.equal(schema.required.includes('movedTo'), false, 'movedTo stays optional');
+  assert.equal(fixtures.v12.version, schema.properties.version.const - 1);
+  assert.equal('movedTo' in fixtures.v12, false);
+  assert.equal('movedTo' in fixtures.current, false);
+  assert.match(schema.$id, /v13\.json$/);
 });
