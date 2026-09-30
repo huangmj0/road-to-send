@@ -46,6 +46,14 @@ also applies its SQL for the synthetic `tests/supabase/snapshot-fixture.mjs` wit
 back through the function). It is not part of the app; snapshots and the SQL they produce hold crew
 data and are never committed.
 
+`scripts/smoke-check.mjs` is the organizer's live check of a deployed function during the cutover
+that README.md's "Moving the shared backend to Supabase" runbook walks through: a GET validated
+against `src/schema.json`, an OPTIONS for CORS, and a POST of `{"action":"__smoke__"}` that must
+answer `unknown_action`. It is non-mutating by construction: every request comes from its frozen
+`SMOKE_REQUESTS`, and `tests/smoke-check.test.js` proves that statically as well as with a stubbed
+`fetch`. The real-stack suite also runs it against the local function. `docs-check` holds the
+runbook to its six steps and to scripts that exist.
+
 **Build exception:** `npm run build` also writes `contract.generated.json` (`{apiVersion, scoring}`)
 from `src/schema.json` and `src/scoring.json`, and `check:generated` fails when it is stale. Scoring
 has one source; the function cannot import from `src/`, so it gets a generated copy. Commit it with

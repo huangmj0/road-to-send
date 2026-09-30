@@ -72,6 +72,111 @@ Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty
 
 A save is confirmed as soon as the Sheet accepts the write, so the only outcomes are **Activity saved** and **Save failed** (safe to retry). The Crew sync control refreshes the shared board on demand.
 
+## Moving the shared backend to Supabase
+
+This is the organizer's runbook for moving a crew's shared board from the Google Sheet to a Supabase Edge Function that speaks the same API. The app URL stays the same. Crew members don't have to do anything: each browser follows the Sheet's `movedTo` to the new backend on its next load. Profiles, local logs and caches stay in each browser.
+
+Run every command from a checkout of this repository. The placeholders are `<project-ref>` (your Supabase project's reference id), `<apps-script-url>` (the Sheet's `/exec` URL), `<app-url>` (the GitHub Pages address) and `<database-connection-string>` (from the project's **Connect** dialog). **Snapshots and generated SQL hold crew data.** Write them only to the temporary directory below, which is outside the repository, and never commit them.
+
+### Prerequisites
+
+- A Supabase account and a new, empty project for this crew.
+- The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), logged in with `supabase login`.
+- Node.js 22 or later, `curl`, and `psql` (the PostgreSQL client). You can paste the import SQL into the project's SQL editor instead of using `psql`.
+- Edit access to the crew's Google Sheet and its Apps Script.
+- About half an hour. Between steps 3 and 4, crew members see an empty board and can't log.
+
+### Create the project and apply the migration
+
+```bash
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+`db push` applies `supabase/migrations/`: the `settings`, `participants` and `activities` tables, with row-level security on and no policies. Only the function can reach the data.
+
+### Deploy the function
+
+```bash
+supabase functions deploy road-to-send
+```
+
+`supabase/config.toml` sets `verify_jwt = false` for this function. The crew's browsers call it with a plain, unauthenticated `fetch`, just like the Apps Script URL, so the platform must not require a JWT. If a request is rejected with HTTP 401, deploy again with `supabase functions deploy road-to-send --no-verify-jwt`. The function reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which Supabase injects, so there are no secrets to set.
+
+The function URL is `https://<project-ref>.supabase.co/functions/v1/road-to-send`.
+
+### Cutover
+
+Open one terminal and keep it open for every step. It holds the function URL and the temporary directory:
+
+```bash
+FUNCTION_URL='https://<project-ref>.supabase.co/functions/v1/road-to-send'
+WORK="$(mktemp -d)"
+echo "Snapshot and SQL go in $WORK"
+```
+
+**1. Ship the v13 browser.** Pushing to `main` publishes the page. Before you go on, confirm that the live page accepts v13, so every browser understands `movedTo`. The Sheet can stay on v12 for now.
+
+```bash
+curl -fsSL '<app-url>' | grep -o 'SUPPORTED_API_VERSIONS=new Set(\[[0-9,]*\])'
+# expect: SUPPORTED_API_VERSIONS=new Set([13,12])
+```
+
+**2. Check the new backend.** Complete the two sections above, then run the smoke check against the empty function:
+
+```bash
+node scripts/smoke-check.mjs "$FUNCTION_URL"
+```
+
+All three checks must pass, and GET reports `config not set yet`. The smoke check never writes: it sends a GET, an OPTIONS and a POST of `{"action":"__smoke__"}`, which every backend rejects with `unknown_action`. An empty backend rejects every write with `setup_required` or `invalid_activity`, so nothing can land on it before the import.
+
+**3. Freeze the Sheet and start the move.** Redeploy the Apps Script at v13. Paste the script from the app's **Apps Script source** over the old one and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same. Then, in the Sheet's `Settings` tab, add a row with key `movedTo` and the function URL as its value. From now on, the Sheet serves reads but refuses every write with `moved`. Browsers start switching to the function, and they show an empty board until step 4 finishes. Confirm the Sheet is frozen:
+
+```bash
+curl -fsSL '<apps-script-url>' | node -e 'const p=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log("version", p.version, "movedTo", p.movedTo)'
+# expect: version 13 movedTo https://<project-ref>.supabase.co/functions/v1/road-to-send
+```
+
+**4. Snapshot the Sheet and import it.** The Sheet is frozen now, so the snapshot is final:
+
+```bash
+curl -fsSL '<apps-script-url>' > "$WORK/snapshot.json"
+node scripts/import-snapshot.mjs < "$WORK/snapshot.json" > "$WORK/import.sql"
+psql '<database-connection-string>' --set ON_ERROR_STOP=1 --file "$WORK/import.sql"
+```
+
+The import tool stops with a message and writes no SQL if the snapshot has no activities array, has no config, or is not version 12 or 13. The SQL runs as one transaction. It keeps every activity id, timestamp and the feed order, and running it again changes nothing. Without `psql`, paste the contents of `import.sql` into the SQL editor and run it.
+
+**5. Verify.** Run the smoke check again. GET now reports the crew and the activity count:
+
+```bash
+node scripts/smoke-check.mjs "$FUNCTION_URL"
+```
+
+Then check that the function serves exactly the snapshot's activities, in the same order:
+
+```bash
+curl -fsS "$FUNCTION_URL" > "$WORK/after.json"
+node -e 'const fs=require("fs"),ids=f=>JSON.parse(fs.readFileSync(f,"utf8")).activities.map(a=>a.id);const [a,b]=[ids(process.argv[1]),ids(process.argv[2])];console.log(a.length,"in snapshot,",b.length,"served:",JSON.stringify(a)===JSON.stringify(b)?"MATCH":"MISMATCH")' "$WORK/snapshot.json" "$WORK/after.json"
+# expect: MATCH
+```
+
+Last, open the app. Your browser follows `movedTo` on this load. Log one activity, then delete it.
+
+**6. Leave the Sheet deployed permanently.** Don't delete the Apps Script deployment or clear `movedTo`. The Sheet is now a read-only redirector and a frozen backup. Once step 5 passes, delete the temporary directory: `rm -rf "$WORK"`.
+
+### Rollback is fix-forward
+
+**Browsers that have moved don't move back.** Each one has stored the function URL as its endpoint. Clearing `movedTo` doesn't return them to the Sheet. It only stops the browsers that haven't moved yet, which splits the crew across two backends. So fix problems on Supabase, and keep `movedTo` set:
+
+- If the smoke check or the id comparison fails, fix the function or project and run `supabase functions deploy road-to-send` again.
+- If the import failed or was cut short, fix the cause and run the same `import.sql` again. It's one transaction, and rows that are already there are skipped.
+- If the database needs to start over, rebuild it with `supabase db reset --linked`, which erases the project's data. Then run the same `import.sql` again. The snapshot is still the whole board, because the Sheet refused every write after step 3.
+
+### Why the Sheet stays up
+
+Crew links in chats and bookmarks carry `?sheet=<apps-script-url>`. Each time someone opens one, the browser sets the Sheet as its endpoint again. It reaches the function only through the Sheet's `movedTo`. Then it rewrites the link in the address bar to the new backend. If you take the Sheet down, every old crew link stops working.
+
 ## Development
 
 The editable sources live in `src/`. `npm run build` generates the self-contained `index.html`; do not edit the generated file directly.

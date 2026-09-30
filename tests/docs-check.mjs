@@ -63,6 +63,28 @@ assert.match(supabaseJob,/uses: supabase\/setup-cli@v\d+\.\d+\.\d+\n\s*with:\n\s
 assert.ok(!/secrets\./.test(supabaseJob),'supabase.yml uses only the local stack\'s printed dev keys, never repository secrets');
 assert.ok(!readFileSync(at('scripts/run-tests.mjs'),'utf8').includes('supabase-stack'),'npm test never runs the Docker-only real-stack suite');
 
+// The organizer's cutover runbook (spec #175, "Cutover order"): the six steps in order, every
+// script and npm command it tells the organizer to run exists, the smoke check it verifies with is
+// the one the real-stack job runs, crew data goes to a temp dir outside the repo, and no live
+// backend URL is written down -- every https URL in it is a placeholder or a docs link.
+const readme=readFileSync(at('README.md'),'utf8');
+const runbook=/^## Moving the shared backend to Supabase\n[\s\S]*?(?=\n## |(?![\s\S]))/m.exec(readme)?.[0];
+assert.ok(runbook,'README.md has a "Moving the shared backend to Supabase" section');
+for(const heading of ['Prerequisites','Create the project and apply the migration','Deploy the function','Cutover','Rollback is fix-forward','Why the Sheet stays up'])
+  assert.ok(runbook.includes(`\n### ${heading}\n`),`the runbook has a "${heading}" subsection`);
+const steps=[...runbook.matchAll(/^\*\*(\d)\. /gm)].map(m=>Number(m[1]));
+assert.deepEqual(steps,[1,2,3,4,5,6],'the runbook walks the six cutover steps in order');
+const scriptsRun=[...new Set([...runbook.matchAll(/node (scripts\/[\w.-]+\.mjs)/g)].map(m=>m[1]))];
+assert.deepEqual(scriptsRun.sort(),['scripts/import-snapshot.mjs','scripts/smoke-check.mjs'],'the runbook runs the import tool and the smoke check');
+for(const script of scriptsRun)assert.ok(existsSync(at(script)),`${script}, which the runbook runs, exists`);
+for(const [,name] of runbook.matchAll(/npm run ([\w:-]+)/g))assert.ok(pkg.scripts[name],`npm run ${name}, which the runbook runs, exists`);
+assert.match(runbook,/mktemp -d/,'the runbook writes snapshots and SQL to a temp dir outside the repo');
+assert.ok(runbook.includes('verify_jwt = false')&&/^verify_jwt = false$/m.test(readFileSync(at('supabase/config.toml'),'utf8')),'the runbook\'s verify_jwt = false note matches supabase/config.toml');
+assert.match(runbook,/don't move back/,'the runbook says moved browsers don\'t move back');
+for(const [url] of runbook.matchAll(/https:\/\/[^\s)'"`]+/g))
+  assert.ok(url.includes('<')||url.startsWith('https://supabase.com/docs/'),`the runbook names no live endpoint: ${url}`);
+assert.match(readFileSync(at('tests/supabase-stack.test.mjs'),'utf8'),/runSmokeCheck\(stack\.functionUrl\)/,'the real-stack job runs the smoke check against the local function');
+
 // The generated-artifact check is read-only: a stale index.html must keep failing.
 const checkGenerated=readFileSync(at('scripts/check-generated.mjs'),'utf8');
 assert.ok(!checkGenerated.includes('execFileSync'),'scripts/check-generated.mjs compares in memory instead of shelling out to build.mjs');

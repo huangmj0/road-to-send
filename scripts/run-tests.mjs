@@ -21,6 +21,7 @@ const suites = [
       'tests/import-snapshot.test.js',
       'tests/protocol-fixtures.test.js',
       'tests/smoke.test.js',
+      'tests/smoke-check.test.js',
       'tests/supabase-conformance.test.js',
       'tests/supabase-function.test.js',
     ],
