@@ -181,6 +181,13 @@ test('keeps activities that name people outside the roster, and imports v12 snap
   assert.ok(!sql.includes("values ('Former Member', "), 'not added to the roster');
 });
 
+test('duplicate activity ids abort with every duplicated id named once', async () => {
+  const {snapshotToSql, ImportError} = await load();
+  const snap = snapshot({activities: [activity({id: 'a'}), activity({id: 'b'}), activity({id: 'a'}), activity({id: 'c'}), activity({id: 'b'}), activity({id: 'a'})]});
+  assert.throws(() => snapshotToSql(snap), error => error instanceof ImportError && /\["a","b"\]/.test(error.message) && !/"c"/.test(error.message));
+  assert.doesNotThrow(() => snapshotToSql(snapshot({activities: [activity({id: 'a'}), activity({id: 'A'})]})), 'ids are case-sensitive, like the primary key');
+});
+
 test('does not import movedTo', async () => {
   const {snapshotToSql} = await load();
   assert.ok(!snapshotToSql(snapshot({movedTo: 'https://example.invalid/fn'})).includes('example.invalid'));
@@ -213,6 +220,8 @@ test('aborts on bad payloads and never returns partial SQL', async () => {
     'crew name over 30 code points': snapshot({config: crew([{name: 'x'.repeat(31)}])}),
     'object in a text field': snapshot({activities: [activity({note: {a: 1}})]}),
     'activity without id': snapshot({activities: [activity(), activity({id: ''})]}),
+    'duplicate activity id': snapshot({activities: [activity(), activity({name: 'Maya'})]}),
+    'duplicate id from a raw number cell': snapshot({activities: [activity({id: 7}), activity({id: '7'})]}),
     'NUL in note': snapshot({activities: [activity({note: 'a\0b'})]}),
     'not an object': [],
   };
@@ -233,6 +242,7 @@ test('CLI reads stdin, writes SQL to stdout; every abort exits 1 with a message 
     'null config': [JSON.stringify(snapshot({config: null})), /config: null/],
     'version 11': [JSON.stringify(snapshot({version: 11})), /Unsupported snapshot version 11/],
     'version 14': [JSON.stringify(snapshot({version: 14})), /Unsupported snapshot version 14/],
+    'duplicate activity ids': [JSON.stringify(snapshot({activities: [activity({id: 'x1'}), activity({id: "o'k"}), activity({id: 'x1'}), activity({id: "o'k"}), activity({id: 'x1'})]})), /duplicate activity id.*"x1".*"o'k"/],
     'late bad activity': [JSON.stringify(snapshot({activities: [activity(), activity({id: 'b', points: 'lots'})]})), /activities\[1\]\.points/],
   };
   for (const [label, [input, message]] of Object.entries(aborts)) {

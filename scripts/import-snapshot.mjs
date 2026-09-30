@@ -62,9 +62,12 @@ export function renderSnapshot(payload) {
     throw new ImportError('The snapshot has no timeZone; importing without it would shift challenge days.');
   }
 
-  const rows = { settings: null, participants: [], activities: [] };
+  const rows = {
+    settings: { startDate: config.startDate, tripDate: config.tripDate, goal: config.goal, timeZone: payload.timeZone },
+    participants: [],
+    activities: [],
+  };
   const lines = ['begin;', 'set local standard_conforming_strings = on;', ''];
-  rows.settings = { startDate: config.startDate, tripDate: config.tripDate, goal: config.goal, timeZone: payload.timeZone };
   lines.push(
     'insert into settings (id, start_date, trip_date, goal, time_zone)',
     `values (1, ${lit(config.startDate)}, ${lit(config.tripDate)}, ${config.goal}, ${lit(payload.timeZone)})`,
@@ -103,13 +106,19 @@ export function renderSnapshot(payload) {
     }
     if (!row.id) throw new ImportError(`${at}.id must not be empty.`);
     rows.activities.push(row);
-    const v = row;
     lines.push(
       'insert into activities (id, name, type, category, points, date, created_at, hardest_grade, bounty_id, bounty_title, note)',
-      `values (${lit(v.id)}, ${lit(v.name)}, ${lit(v.type)}, ${lit(v.category)}, ${v.points}, ${lit(v.date)}, ${lit(v.createdAt)}, ${lit(v.hardestGrade)}, ${lit(v.bountyId)}, ${lit(v.bountyTitle)}, ${lit(v.note)})`,
+      `values (${lit(row.id)}, ${lit(row.name)}, ${lit(row.type)}, ${lit(row.category)}, ${row.points}, ${lit(row.date)}, ${lit(row.createdAt)}, ${lit(row.hardestGrade)}, ${lit(row.bountyId)}, ${lit(row.bountyTitle)}, ${lit(row.note)})`,
       'on conflict (id) do nothing;',
     );
   });
+
+  // The primary key would make `on conflict (id) do nothing` silently drop a copied row's points.
+  const seen = new Set(), duplicates = new Set();
+  for (const { id } of rows.activities) (seen.has(id) ? duplicates : seen).add(id);
+  if (duplicates.size) {
+    throw new ImportError(`The snapshot has duplicate activity ids ${JSON.stringify([...duplicates])}; give each Sheet row its own id before importing.`);
+  }
 
   lines.push('', 'commit;', '');
   return { sql: lines.join('\n'), rows };
