@@ -15,11 +15,14 @@
 // psql (postgresql-client; PSQL overrides the binary) as the local postgres superuser from
 // DB_URL, which bypasses RLS the way the Supabase SQL editor does. It cannot live in
 // scenarios.mjs because no in-process target runs SQL; tests/import-snapshot.test.js holds the
-// SQL-free half of it against the same fixture (tests/supabase/snapshot-fixture.mjs).
+// SQL-free half of it against the same fixture (tests/supabase/snapshot-fixture.mjs). The live
+// smoke check (scripts/smoke-check.mjs) runs here with the real fetch, as the organizer runs it;
+// like the CORS test it sends a bare OPTIONS, so the function, not Kong, answers it.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {snapshotToSql} from '../scripts/import-snapshot.mjs';
+import {runSmokeCheck} from '../scripts/smoke-check.mjs';
 import {FEATURES} from '../supabase/functions/road-to-send/core.mjs';
 import {assertLoopback, createHttpTransport, createRest, resetDatabase, runPsql} from './supabase/local-stack.mjs';
 import {scenarios} from './supabase/scenarios.mjs';
@@ -149,5 +152,19 @@ test('import tool: a snapshot applied with psql is served back exactly, and re-r
     for (const [table, count] of Object.entries(counts)) {
       assert.equal((await rows(table)).length, count, `${run} import: ${table} row count`);
     }
+  }
+});
+
+test('live smoke check: passes against the empty and the imported backend, and writes nothing', async () => {
+  await reset();
+  const snapshot = snapshotFixture({version: v, features: FEATURES});
+  for (const stage of ['empty (cutover step 2)', 'imported (cutover step 5)']) {
+    if (stage.startsWith('imported')) runPsql(stack.dbUrl, snapshotToSql(snapshot));
+    // Row order from an unordered select is not guaranteed, so compare each table as a sorted set.
+    const tables = () => Promise.all(TABLES.map(async table => (await rows(table)).map(row => JSON.stringify(row)).sort()));
+    const before = await tables();
+    const result = await runSmokeCheck(stack.functionUrl);
+    assert.deepEqual(result.checks.map(check => [check.name, check.ok]), [['GET', true], ['OPTIONS', true], ['POST __smoke__', true]], `${stage}: ${JSON.stringify(result.checks)}`);
+    assert.deepEqual(await tables(), before, `${stage}: the smoke check changed no table`);
   }
 });

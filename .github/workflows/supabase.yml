@@ -2,7 +2,8 @@ name: Supabase conformance
 
 # Runs the backend conformance scenarios, over HTTP, against a throwaway local Supabase stack:
 # the migration, RLS, save_config, the PostgREST store and the Deno entry, not just the pure core,
-# plus the import tool's SQL applied with psql and read back through the function.
+# plus the import tool's SQL applied with psql and read back through the function, and the live
+# smoke check (scripts/smoke-check.mjs) run against the served function.
 # It uses only the local stack's printed dev keys: no secrets, never a hosted project.
 # Not part of `npm test`; locally it is `npm run test:supabase` (see scripts/test-supabase.mjs).
 on:
@@ -13,6 +14,7 @@ on:
       - "tests/supabase-stack.test.mjs"
       - "scripts/test-supabase.mjs"
       - "scripts/import-snapshot.mjs"
+      - "scripts/smoke-check.mjs"
       - "src/schema.json"
       - "src/scoring.json"
       - "package.json"
@@ -24,6 +26,7 @@ on:
       - "tests/supabase-stack.test.mjs"
       - "scripts/test-supabase.mjs"
       - "scripts/import-snapshot.mjs"
+      - "scripts/smoke-check.mjs"
       - "src/schema.json"
       - "src/scoring.json"
       - "package.json"

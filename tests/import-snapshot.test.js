@@ -137,6 +137,10 @@ test('round trip: rendered rows and independently parsed SQL both reproduce the 
 test('round trip on the shared synthetic snapshot the real-stack suite imports', async () => {
   const {renderSnapshot} = await load();
   const {snapshotFixture} = await import(path.join(__dirname, 'supabase', 'snapshot-fixture.mjs'));
+  const {schemaProblems} = await import(path.join(__dirname, 'supabase', 'schema-check.mjs'));
+  const schema = JSON.parse(require('node:fs').readFileSync(path.join(__dirname, '..', 'src', 'schema.json'), 'utf8'));
+  const current = schema.properties.version.const;
+  assert.deepEqual(schemaProblems(schema, snapshotFixture({version: current, features: ['categories-v1']})), [], 'the fixture is a schema-valid board, as the function serves it');
   for (const version of [12, 13]) {
     const snap = snapshotFixture({version, features: ['categories-v1']});
     const {sql, rows} = renderSnapshot(snap);
