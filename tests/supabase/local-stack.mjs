@@ -17,6 +17,14 @@ export function parseStatusEnv(text) {
   return vars;
 }
 
+// Throws unless every URL is on loopback. localStack() applies it, and the real-stack suite applies
+// it again to the stack it is handed, before its first reset.
+export function assertLoopback(...urls) {
+  for (const url of urls) {
+    if (!LOOPBACK.has(new URL(url).hostname)) throw new Error(`${url} is not a local stack; the real-stack target only runs against loopback`);
+  }
+}
+
 export function localStack(statusText) {
   const vars = parseStatusEnv(statusText);
   for (const name of ['API_URL', 'ANON_KEY', 'SERVICE_ROLE_KEY']) {
@@ -24,9 +32,7 @@ export function localStack(statusText) {
   }
   const apiUrl = vars.API_URL.replace(/\/+$/, '');
   const functionsUrl = (vars.FUNCTIONS_URL || `${apiUrl}/functions/v1`).replace(/\/+$/, '');
-  for (const url of [apiUrl, functionsUrl]) {
-    if (!LOOPBACK.has(new URL(url).hostname)) throw new Error(`${url} is not a local stack; the real-stack target only runs against loopback`);
-  }
+  assertLoopback(apiUrl, functionsUrl);
   return {apiUrl, functionUrl: `${functionsUrl}/${FUNCTION}`, anonKey: vars.ANON_KEY, serviceKey: vars.SERVICE_ROLE_KEY};
 }
 

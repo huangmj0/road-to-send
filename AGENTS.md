@@ -61,8 +61,8 @@ adding assertions to that file.** `README.md` documents setup and deployment.
 - `npm run test:supabase` runs that real-stack suite; it is **not** part of `npm test`. It needs
   Docker and the Supabase CLI: run `supabase start` and `supabase functions serve` first. It reads
   the stack's URLs and printed dev keys from `supabase status -o env`, refuses anything but loopback,
-  and empties every table between tests. `.github/workflows/supabase.yml` runs it in CI on pushes
-  and pull requests that touch `supabase/`, the conformance tests or the workflow, with no secrets.
+  and empties every table between tests. `.github/workflows/supabase.yml` runs it in CI, with no
+  secrets, on pushes and pull requests that change the paths listed in that workflow.
 - `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html` and the regenerated
   `supabase/functions/road-to-send/contract.generated.json`.
 - `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to
@@ -132,8 +132,8 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
    **Declared exception, scoped to the real-Supabase job:** the assertions in
    `tests/supabase-stack.test.mjs` run only where Docker and the Supabase CLI exist — the
    `supabase.yml` CI job and a maintainer's machine — not under `npm test`, which must keep passing
-   without them. Docker and the Supabase CLI are CI and dev-only tools: neither is an npm
-   dependency, and nothing they provide ships to the crew. The suite is still bound by this rule, and
+   without them. Docker and the Supabase CLI are CI and dev-only tools (see *Dev tooling* under
+   *Not constraints*). The suite is still bound by this rule, and
    a scenario it runs lives in `tests/supabase/scenarios.mjs`, so `npm test` runs it in-process too.
 
 ## Not constraints

@@ -8,15 +8,19 @@
 // itself and forces Access-Control-Allow-Origin on every reply, so the OPTIONS check sends a bare
 // OPTIONS to reach the function. Assertions the in-process target already makes belong in
 // tests/supabase/scenarios.mjs, not here: this file holds only what needs the real stack.
+// The RLS probes accept exactly a permission denial (401/403 with PostgREST code 42501) or, for a
+// read, a 200 with no rows; any other failure fails them. The stack is re-checked for loopback
+// here, not only in the runner, because every test deletes every row.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import {createHttpTransport, createRest, resetDatabase} from './supabase/local-stack.mjs';
+import {assertLoopback, createHttpTransport, createRest, resetDatabase} from './supabase/local-stack.mjs';
 import {scenarios} from './supabase/scenarios.mjs';
 
 const schema = JSON.parse(readFileSync(new URL('../src/schema.json', import.meta.url), 'utf8'));
 if (!process.env.ROAD_TO_SEND_STACK) throw new Error('ROAD_TO_SEND_STACK is not set: run this suite with `npm run test:supabase`.');
 const stack = JSON.parse(process.env.ROAD_TO_SEND_STACK);
+assertLoopback(stack.apiUrl, stack.functionUrl);
 
 const send = createHttpTransport(stack.functionUrl);
 const service = createRest({apiUrl: stack.apiUrl, key: stack.serviceKey});
@@ -26,6 +30,13 @@ const post = body => send({method: 'POST', bodyText: JSON.stringify(body)});
 const v = schema.properties.version.const;
 const CONFIG = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500};
 const TABLES = ['settings', 'participants', 'activities'];
+
+// A permission denial as PostgREST reports one to the anon role: 401 (or 403) and, when there is
+// a body, SQLSTATE 42501 (insufficient_privilege, which also covers an RLS-denied insert).
+function assertDenied(status, body, what) {
+  assert.ok(status === 401 || status === 403, `${what} must be denied with 401 or 403, got ${status}: ${body.slice(0, 200)}`);
+  if (body.trim()) assert.equal(JSON.parse(body).code, '42501', `${what} is denied as a permission error: ${body.slice(0, 200)}`);
+}
 
 async function rows(table) {
   const response = await service.select(table);
@@ -86,7 +97,7 @@ test('RLS: the anon key can neither insert into nor read any table through /rest
   };
   for (const [table, row] of Object.entries(attempts)) {
     const response = await anon.insert(table, row);
-    assert.ok(!response.ok, `anon insert into ${table} must fail, got ${response.status}`);
+    assertDenied(response.status, await response.text(), `anon insert into ${table}`);
     assert.deepEqual(await rows(table), [], `nothing reached ${table}`);
   }
   // Seed through the function, so there is something to hide.
@@ -96,7 +107,8 @@ test('RLS: the anon key can neither insert into nor read any table through /rest
     assert.ok((await rows(table)).length > 0, `${table} holds a row for the service role`);
     const response = await anon.select(table);
     const body = await response.text();
-    assert.ok(!response.ok || JSON.parse(body).length === 0, `anon read of ${table} must return no rows, got ${response.status}: ${body.slice(0, 200)}`);
+    if (response.status === 200) assert.deepEqual(JSON.parse(body), [], `anon read of ${table} returns no rows`);
+    else assertDenied(response.status, body, `anon read of ${table}`);
   }
 });
 
