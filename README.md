@@ -84,7 +84,7 @@ Run every command from a checkout of this repository. The placeholders are `<pro
 - The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), logged in with `supabase login`.
 - Node.js 22 or later, `curl`, and `psql` (the PostgreSQL client). You can paste the import SQL into the project's SQL editor instead of using `psql`.
 - Edit access to the crew's Google Sheet and its Apps Script.
-- About half an hour. Between steps 3 and 4, crew members see an empty board and can't log.
+- About half an hour. Between steps 3 and 4, crew members see an empty board, and nobody should log or save setup.
 
 ### Create the project and apply the migration
 
@@ -128,7 +128,7 @@ curl -fsSL '<app-url>' | grep -o 'SUPPORTED_API_VERSIONS=new Set(\[[0-9,]*\])'
 node scripts/smoke-check.mjs "$FUNCTION_URL"
 ```
 
-All three checks must pass, and GET reports `config not set yet`. The smoke check never writes: it sends a GET, an OPTIONS and a POST of `{"action":"__smoke__"}`, which every backend rejects with `unknown_action`. An empty backend rejects every write with `setup_required` or `invalid_activity`, so nothing can land on it before the import.
+All three checks must pass, and GET reports `config not set yet`. The smoke check never writes: it sends a GET, an OPTIONS and a POST of `{"action":"__smoke__"}`, which every backend rejects with `unknown_action`. Until the import, the function has no setup, so it rejects every logged activity (`invalid_activity`) and every new profile (`setup_required`). Saving setup is the one write it accepts, which is why step 3 asks everyone to hold off.
 
 **3. Freeze the Sheet and start the move.** Redeploy the Apps Script at v13. Paste the script from the app's **Apps Script source** over the old one and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same. Then, in the Sheet's `Settings` tab, add a row with key `movedTo` and the function URL as its value. From now on, the Sheet serves reads but refuses every write with `moved`. Browsers start switching to the function, and they show an empty board until step 4 finishes. Confirm the Sheet is frozen:
 
@@ -136,6 +136,10 @@ All three checks must pass, and GET reports `config not set yet`. The smoke chec
 curl -fsSL '<apps-script-url>' | node -e 'const p=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log("version", p.version, "movedTo", p.movedTo)'
 # expect: version 13 movedTo https://<project-ref>.supabase.co/functions/v1/road-to-send
 ```
+
+Wait at least a minute before step 4. The Sheet checks `movedTo` before it waits up to 10 seconds for its write lock, so a write that was already in flight can still land shortly after the freeze.
+
+Until step 4 finishes, nobody, you included, should save setup or log anything in the app. Nothing would be lost, but a setup save or an early log would put rows on the new backend ahead of the imported history.
 
 **4. Snapshot the Sheet and import it.** The Sheet is frozen now, so the snapshot is final:
 
@@ -145,7 +149,7 @@ node scripts/import-snapshot.mjs < "$WORK/snapshot.json" > "$WORK/import.sql"
 psql '<database-connection-string>' --set ON_ERROR_STOP=1 --file "$WORK/import.sql"
 ```
 
-The import tool stops with a message and writes no SQL if the snapshot has no activities array, has no config, or is not version 12 or 13. The SQL runs as one transaction. It keeps every activity id, timestamp and the feed order, and running it again changes nothing. Without `psql`, paste the contents of `import.sql` into the SQL editor and run it.
+The import tool checks the whole snapshot first. If anything is wrong, it stops with a message and writes no SQL. It stops when the snapshot is not a JSON object or is not version 12 or 13; when it has no activities array, no config or no `timeZone`; when a date is not `YYYY-MM-DD`, the start date is after the trip date, the goal is not a whole number from 50 to 10000, or a crew name is not 1 to 30 characters; and when an activity has an empty id, points that aren't a number, a field that is an object or a list, or the same id as another activity. A value containing a NUL character also stops it. The SQL runs as one transaction. It keeps every activity id, timestamp and the feed order, and running it again changes nothing. Without `psql`, paste the contents of `import.sql` into the SQL editor and run it.
 
 **5. Verify.** Run the smoke check again. GET now reports the crew and the activity count:
 
