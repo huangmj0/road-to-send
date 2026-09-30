@@ -40,7 +40,7 @@ test('the PostgREST store reads ordered rows with the service-role headers', asy
   assert.deepEqual(await store.listActivities(), [{id: 'x', name: 'Zed', type: 'climb', category: 'climb', points: 3, date: '2026-07-02', createdAt: '2026-07-02T10:00:00.000Z', hardestGrade: 'V4', bountyId: '', bountyTitle: '', note: 'n'}]);
   const urls = calls.map(call => call.url);
   assert.ok(urls[0].startsWith('https://proj.supabase.co/rest/v1/settings?'));
-  assert.ok(urls[1].startsWith('https://proj.supabase.co/rest/v1/participants?') && urls[1].includes('order=position.asc'));
+  assert.ok(urls[1].startsWith('https://proj.supabase.co/rest/v1/participants?') && urls[1].includes('order=position.asc,name.asc'));
   assert.ok(urls[2].startsWith('https://proj.supabase.co/rest/v1/activities?') && urls[2].includes('order=seq.asc'));
   for (const call of calls) {
     assert.equal(call.init.headers.apikey, 'service-key');

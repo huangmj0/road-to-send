@@ -42,7 +42,7 @@ export function createPostgrestStore({url, serviceKey, fetch: fetchImpl = fetch}
       return row ? {startDate: row.start_date, tripDate: row.trip_date, goal: row.goal, timeZone: row.time_zone} : null;
     },
     async listParticipants() {
-      return (await getAll('participants?select=name&order=position.asc')).map(row => ({name: row.name}));
+      return (await getAll('participants?select=name&order=position.asc,name.asc')).map(row => ({name: row.name}));
     },
     async listActivities() {
       return (await getAll(`activities?select=${ACTIVITY_COLUMNS}&order=seq.asc`)).map(row => ({
@@ -55,8 +55,7 @@ export function createPostgrestStore({url, serviceKey, fetch: fetchImpl = fetch}
       if (!response.ok) throw failure('rpc/save_config', response);
     },
     async addParticipant(name) {
-      // Appends at max(position)+1. Two registrations racing may share a position; the unique
-      // name index still rejects a duplicate, and roster order stays stable either way.
+      // Read-then-insert may give two racing sign-ups one position: tolerated, since the unique name index blocks duplicates and reads tie-break by name.
       const [last] = await getRows('participants?select=position&order=position.desc&limit=1');
       const response = await send('POST', 'participants', {name, position: last ? last.position + 1 : 0}, 'return=minimal');
       if (response.ok) return true;

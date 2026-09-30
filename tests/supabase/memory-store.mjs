@@ -1,6 +1,6 @@
 // In-memory implementation of the store interface documented in
 // supabase/functions/road-to-send/core.mjs. Like the database it sorts on read: participants by
-// `position`, activities by `seq` (rows without one keep array order, after sorted ones' ties).
+// `position` then name, activities by `seq` (rows without one keep array order, after sorted ones' ties).
 // Writes follow the migration: saveConfig keeps timeZone (UTC for a new row) and rewrites the
 // roster with position = index; participant names are unique case-insensitively; deleting a
 // participant never touches activities.
@@ -12,7 +12,7 @@ export function createMemoryStore({settings = null, participants = [], activitie
   let nextSeq = Math.max(0, ...feed.map(a => a.seq ?? 0)) + 1;
   return {
     async getSettings() { return settings && {...settings}; },
-    async listParticipants() { return byKey(roster, 'position').map(p => ({name: p.name})); },
+    async listParticipants() { return byKey([...roster].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)), 'position').map(p => ({name: p.name})); },
     async listActivities() { return byKey(feed, 'seq').map(({seq, ...activity}) => ({...activity})); },
     async saveConfig({startDate, tripDate, goal, crew}) {
       settings = {startDate, tripDate, goal, timeZone: settings?.timeZone || 'UTC'};

@@ -78,6 +78,27 @@ test('a store failure becomes the server_error envelope, never a stack trace', a
   assert.deepEqual(reply, {version: schema.properties.version.const, ok: false, error: {code: 'server_error', message: 'The request could not be completed', details: []}});
 });
 
+test('saveConfig keeps the stored time zone while replacing dates, goal and crew', async () => {
+  const {handle} = await fn('core.mjs');
+  const {createMemoryStore} = await helper('memory-store.mjs');
+  const store = createMemoryStore({settings: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, timeZone: 'America/Los_Angeles'}, participants: ['Alex', 'Maya']});
+  const at = clock('2026-08-02T06:30:00Z');
+  const saved = await handle({method: 'POST', bodyText: JSON.stringify({action: 'saveConfig', config: {startDate: '2026-08-01', tripDate: '2026-08-31', goal: 750, crew: ['Zed', 'Alex']}})}, store, at);
+  assert.equal(saved.ok, true);
+  const board = await handle({method: 'GET', bodyText: ''}, store, at);
+  assert.deepEqual(board.config, {startDate: '2026-08-01', tripDate: '2026-08-31', goal: 750, crew: [{name: 'Zed'}, {name: 'Alex'}]});
+  assert.equal(board.timeZone, 'America/Los_Angeles');
+  assert.equal(board.serverDate, '2026-08-01', 'serverDate still follows the kept time zone');
+});
+
+test('participants sharing a position are served in name order', async () => {
+  const {handle} = await fn('core.mjs');
+  const {createMemoryStore} = await helper('memory-store.mjs');
+  const store = createMemoryStore({settings: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, timeZone: 'UTC'}, participants: [{name: 'Zed', position: 1}, {name: 'Maya', position: 1}, {name: 'Alex', position: 0}]});
+  const board = await handle({method: 'GET', bodyText: ''}, store, clock('2026-07-13T12:00:00Z'));
+  assert.deepEqual(board.config.crew, [{name: 'Alex'}, {name: 'Maya'}, {name: 'Zed'}]);
+});
+
 test('a store failure on a write becomes the server_error envelope', async () => {
   const {handle, API_VERSION} = await fn('core.mjs');
   const {createMemoryStore} = await helper('memory-store.mjs');
