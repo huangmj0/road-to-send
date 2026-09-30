@@ -1,9 +1,12 @@
 // The HTTP side of the real-Supabase conformance target (npm run test:supabase): where the local
 // stack is, the transport that sends scenarios to the served function, and direct PostgREST access
-// for resetting the database and probing RLS. Test tooling only; nothing here ships.
+// for resetting the database and probing RLS, and psql against the stack's Postgres for applying
+// the import tool's SQL. Test tooling only; nothing here ships.
 //
 // Only a stack on loopback is accepted: resetDatabase() deletes every row, and the target must
 // never reach a hosted project. The keys are the local stack's printed dev keys.
+import {spawnSync} from 'node:child_process';
+
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
 const FUNCTION = 'road-to-send';
 
@@ -27,13 +30,26 @@ export function assertLoopback(...urls) {
 
 export function localStack(statusText) {
   const vars = parseStatusEnv(statusText);
-  for (const name of ['API_URL', 'ANON_KEY', 'SERVICE_ROLE_KEY']) {
+  for (const name of ['API_URL', 'ANON_KEY', 'SERVICE_ROLE_KEY', 'DB_URL']) {
     if (!vars[name]) throw new Error(`\`supabase status -o env\` printed no ${name}; is the local stack running (supabase start)?`);
   }
   const apiUrl = vars.API_URL.replace(/\/+$/, '');
   const functionsUrl = (vars.FUNCTIONS_URL || `${apiUrl}/functions/v1`).replace(/\/+$/, '');
-  assertLoopback(apiUrl, functionsUrl);
-  return {apiUrl, functionUrl: `${functionsUrl}/${FUNCTION}`, anonKey: vars.ANON_KEY, serviceKey: vars.SERVICE_ROLE_KEY};
+  assertLoopback(apiUrl, functionsUrl, vars.DB_URL);
+  return {apiUrl, functionUrl: `${functionsUrl}/${FUNCTION}`, anonKey: vars.ANON_KEY, serviceKey: vars.SERVICE_ROLE_KEY, dbUrl: vars.DB_URL};
+}
+
+// Runs a SQL script against the stack's Postgres as the organizer would in the SQL editor: psql
+// (the postgresql-client package; set PSQL to use another binary) reads it on stdin, connected
+// as the local superuser from DB_URL, and stops at the first error. Throws with psql's stderr.
+export function runPsql(dbUrl, sql, {psql = process.env.PSQL || 'psql', spawn = spawnSync} = {}) {
+  assertLoopback(dbUrl);
+  const run = spawn(psql, [dbUrl, '--no-psqlrc', '--quiet', '--set', 'ON_ERROR_STOP=1'], {input: sql, encoding: 'utf8'});
+  if (run.error) {
+    throw new Error(`could not start ${psql} (${run.error.message}); install postgresql-client or set PSQL to a psql binary`);
+  }
+  if (run.status !== 0) throw new Error(`${psql} exited ${run.status}: ${String(run.stderr || '').slice(0, 2000)}`);
+  return run.stdout;
 }
 
 // The scenarios' transport over HTTP: send({method, bodyText}) -> parsed JSON. POSTs go as the

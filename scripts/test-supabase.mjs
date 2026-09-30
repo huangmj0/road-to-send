@@ -1,6 +1,7 @@
 // npm run test:supabase: the conformance scenarios and the real-stack checks, over HTTP, against a
-// local Supabase stack. Not part of `npm test`: it needs Docker and the Supabase CLI. Start the
-// stack first, from the repository root:
+// local Supabase stack. Not part of `npm test`: it needs Docker and the Supabase CLI, plus psql
+// (postgresql-client, or PSQL=<path>) for the import-tool check. Start the stack first, from the
+// repository root:
 //
 //   supabase start               # applies supabase/migrations
 //   supabase functions serve     # in another terminal; serves supabase/functions/road-to-send

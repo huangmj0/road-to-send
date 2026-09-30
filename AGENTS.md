@@ -40,6 +40,12 @@ local Supabase stack in `tests/supabase-stack.test.mjs` (with `tests/supabase/lo
 adds what only the real stack can prove: CORS through the gateway, RLS against the `anon` key, and
 the unique index under two concurrent sign-ups.
 
+`scripts/import-snapshot.mjs` is the one-shot cutover tool: it reads a Sheet GET snapshot on stdin and
+writes idempotent SQL for that schema to stdout (`tests/import-snapshot.test.js`; the real-stack suite
+also applies its SQL for the synthetic `tests/supabase/snapshot-fixture.mjs` with `psql` and reads it
+back through the function). It is not part of the app; snapshots and the SQL they produce hold crew
+data and are never committed.
+
 **Build exception:** `npm run build` also writes `contract.generated.json` (`{apiVersion, scoring}`)
 from `src/schema.json` and `src/scoring.json`, and `check:generated` fails when it is stale. Scoring
 has one source; the function cannot import from `src/`, so it gets a generated copy. Commit it with
@@ -59,7 +65,8 @@ adding assertions to that file.** `README.md` documents setup and deployment.
   runs it again in a `verify` job that gates the deploy job, which publishes only `index.html` to
   GitHub Pages on pushes to `main`.
 - `npm run test:supabase` runs that real-stack suite; it is **not** part of `npm test`. It needs
-  Docker and the Supabase CLI: run `supabase start` and `supabase functions serve` first. It reads
+  Docker, the Supabase CLI and `psql` (postgresql-client; `PSQL` overrides the binary): run
+  `supabase start` and `supabase functions serve` first. It reads
   the stack's URLs and printed dev keys from `supabase status -o env`, refuses anything but loopback,
   and empties every table between tests. `.github/workflows/supabase.yml` runs it in CI, with no
   secrets, on pushes and pull requests that change the paths listed in that workflow.
