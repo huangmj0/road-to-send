@@ -15,6 +15,21 @@ test('the committed artifact boots in a real DOM', () => {
   assert.notEqual(window.document.querySelector('#leaderRows').innerHTML, '');
 });
 
+test('the committed artifact wires its header and modal buttons', () => {
+  assert.doesNotMatch(html, /\son[a-z]+="/, 'inline handlers cannot reach the bundled closure');
+  const window = new Window({url: 'https://example.test/'});
+  window.document.write(html.replace(/<script>[\s\S]*?<\/script>/, ''));
+  window.eval(script);
+  const click = selector => window.document.querySelector(selector).dispatchEvent(new window.Event('click', {bubbles: true}));
+  const isOpen = id => window.document.querySelector('#' + id).classList.contains('open');
+  click('[data-action="openSetup"]');
+  assert.equal(isOpen('setupModal'), true);
+  click('[data-action="closeModal"][data-modal="setupModal"]');
+  assert.equal(isOpen('setupModal'), false);
+  click('#changeMeBtn');
+  assert.equal(isOpen('identityModal'), true);
+});
+
 test('the committed artifact records a local activity through its form', async () => {
   const now = new Date();
   const day = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
