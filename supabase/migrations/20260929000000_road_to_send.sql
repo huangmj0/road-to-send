@@ -53,7 +53,9 @@ begin
     set start_date = excluded.start_date,
         trip_date = excluded.trip_date,
         goal = excluded.goal;
-  delete from participants;
+  -- `where true`: Supabase preloads pg-safeupdate for PostgREST sessions, and this runs in one
+  -- (called over /rpc); safeupdate rejects a DELETE that has no WHERE clause.
+  delete from participants where true;
   insert into participants (name, position)
   select t.name, (t.ord - 1)::int
   from unnest(coalesce(p_crew, array[]::text[])) with ordinality as t(name, ord);

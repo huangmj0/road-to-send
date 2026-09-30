@@ -1,0 +1,77 @@
+name: Supabase conformance
+
+# Runs the backend conformance scenarios, over HTTP, against a throwaway local Supabase stack:
+# the migration, RLS, save_config, the PostgREST store and the Deno entry, not just the pure core.
+# It uses only the local stack's printed dev keys: no secrets, never a hosted project.
+# Not part of `npm test`; locally it is `npm run test:supabase` (see scripts/test-supabase.mjs).
+on:
+  push:
+    paths:
+      - "supabase/**"
+      - "tests/supabase/**"
+      - "tests/supabase-stack.test.mjs"
+      - "scripts/test-supabase.mjs"
+      - "src/schema.json"
+      - "src/scoring.json"
+      - "package.json"
+      - ".github/workflows/supabase.yml"
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "tests/supabase/**"
+      - "tests/supabase-stack.test.mjs"
+      - "scripts/test-supabase.mjs"
+      - "src/schema.json"
+      - "src/scoring.json"
+      - "package.json"
+      - ".github/workflows/supabase.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v2.1.2
+        with:
+          version: 2.75.0
+      - name: Start the local stack
+        # Only the database, PostgREST, auth and the gateway are needed; edge-runtime is left for
+        # `functions serve`. Migrations in supabase/migrations are applied here.
+        run: supabase start -x studio,imgproxy,realtime,storage-api,logflare,vector,mailpit,supavisor,postgres-meta
+      - name: Serve the function
+        run: |
+          nohup supabase functions serve > "$RUNNER_TEMP/functions-serve.log" 2>&1 &
+          url="$(supabase status -o env | sed -n 's/^API_URL="\(.*\)"$/\1/p')/functions/v1/road-to-send"
+          echo "Function URL: $url"
+          for i in $(seq 1 60); do
+            if grep -q "Serving functions" "$RUNNER_TEMP/functions-serve.log"; then break; fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/functions-serve.log"
+          code=000
+          for i in $(seq 1 60); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
+            if [ "$code" = "200" ]; then echo "The function answered 200 after $i attempt(s)."; exit 0; fi
+            sleep 2
+          done
+          echo "The function never answered 200 (last status $code)."
+          exit 1
+      - name: Run the conformance scenarios against the stack
+        run: npm run test:supabase
+      - name: Diagnostics
+        if: failure()
+        run: |
+          echo "::group::supabase status"; supabase status || true; echo "::endgroup::"
+          echo "::group::functions serve log"; cat "$RUNNER_TEMP/functions-serve.log" || true; echo "::endgroup::"
+          echo "::group::containers"; docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.Status}}' || true; echo "::endgroup::"
+          for name in $(docker ps -a --format '{{.Names}}' | grep -E '^supabase_(edge_runtime|rest|kong|db)_' || true); do
+            echo "::group::docker logs $name"; docker logs --tail 300 "$name" 2>&1 || true; echo "::endgroup::"
+          done
