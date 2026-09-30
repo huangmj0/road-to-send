@@ -53,6 +53,16 @@ assert.ok(pages.includes('needs: verify'),'the pages deploy job waits on the ver
 assert.match(pages,/^\s*run: npm test$/m,'the pages verify job runs npm test before anything deploys');
 assert.ok(!pages.includes('path: .'),'the Pages artifact is a narrowed _site directory, never the repository root (path: .)');
 
+// The real-Supabase job AGENTS.md describes: its own npm script, outside npm test, a pinned CLI
+// action, and no secrets.
+const supabaseJob=readFileSync(at('.github/workflows/supabase.yml'),'utf8');
+const pkg=JSON.parse(readFileSync(at('package.json'),'utf8'));
+assert.equal(pkg.scripts['test:supabase'],'node scripts/test-supabase.mjs','package.json exposes the real-stack suite as npm run test:supabase');
+assert.match(supabaseJob,/^\s*run: npm run test:supabase$/m,'supabase.yml runs npm run test:supabase');
+assert.match(supabaseJob,/uses: supabase\/setup-cli@v\d+\.\d+\.\d+\n\s*with:\n\s*version: \d+\.\d+\.\d+\n/,'supabase.yml pins the setup-cli action and the CLI to exact versions');
+assert.ok(!/secrets\./.test(supabaseJob),'supabase.yml uses only the local stack\'s printed dev keys, never repository secrets');
+assert.ok(!readFileSync(at('scripts/run-tests.mjs'),'utf8').includes('supabase-stack'),'npm test never runs the Docker-only real-stack suite');
+
 // The generated-artifact check is read-only: a stale index.html must keep failing.
 const checkGenerated=readFileSync(at('scripts/check-generated.mjs'),'utf8');
 assert.ok(!checkGenerated.includes('execFileSync'),'scripts/check-generated.mjs compares in memory instead of shelling out to build.mjs');

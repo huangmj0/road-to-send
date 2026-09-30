@@ -4,7 +4,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check:generated": "node scripts/check-generated.mjs",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "test:supabase": "node scripts/test-supabase.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.10",

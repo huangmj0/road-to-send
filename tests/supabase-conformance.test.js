@@ -9,6 +9,9 @@
 // through plain() and build Date inputs inside the context. appsScriptBackend() stubs the
 // Sheet-touching helpers (readConfig, tab, appendActivity...) by reassigning context globals; a
 // helper the Apps Script adds later that reads the Sheet directly will throw there, not diverge.
+// The HTTP-transport test rebuilds index.mjs's Request/Response adaptation around route() by
+// hand (index.mjs calls Deno.serve on import, so it is never imported here); the real entry is
+// exercised only by tests/supabase-stack.test.mjs against a local stack.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
@@ -32,6 +35,46 @@ test('conformance scenarios pass in-process against an empty in-memory store', a
     const send = transport(handle, createMemoryStore(), clock('2026-07-13T12:00:00Z'));
     await assert.doesNotReject(scenario.run({send, schema}), scenario.name);
   }
+});
+
+// The real-stack target (npm run test:supabase) sends these scenarios over HTTP. Here the same
+// HTTP transport runs against route() behind a fetch stub, so a transport bug fails without Docker.
+test('conformance scenarios pass through the HTTP transport against route() behind a fetch stub', async () => {
+  const {route} = await fn('http.mjs');
+  const {createMemoryStore} = await helper('memory-store.mjs');
+  const {createHttpTransport} = await helper('local-stack.mjs');
+  const {scenarios} = await helper('scenarios.mjs');
+  const url = 'http://127.0.0.1:54321/functions/v1/road-to-send';
+  for (const scenario of scenarios) {
+    const store = createMemoryStore(), requests = [];
+    const fetch = async (to, init = {}) => {
+      requests.push({to, method: init.method, type: init.headers?.['Content-Type']});
+      const result = await route({method: init.method || 'GET', bodyText: init.body ?? ''}, store, clock('2026-07-13T12:00:00Z'));
+      return new Response(result.status === 204 ? null : result.body, {status: result.status, headers: result.headers});
+    };
+    await assert.doesNotReject(scenario.run({send: createHttpTransport(url, fetch), schema}), scenario.name);
+    assert.ok(requests.length && requests.every(r => r.to === url), scenario.name);
+    for (const r of requests.filter(r => r.method === 'POST')) assert.equal(r.type, 'text/plain;charset=utf-8', 'POSTs like the browser does');
+  }
+});
+
+test('the HTTP transport reports a non-JSON or non-200 reply with its status and body', async () => {
+  const {createHttpTransport} = await helper('local-stack.mjs');
+  const reply = (status, body, type) => async () => new Response(body, {status, headers: {'Content-Type': type}});
+  const send = fetch => createHttpTransport('http://127.0.0.1:54321/functions/v1/road-to-send', fetch)({method: 'GET', bodyText: ''});
+  await assert.rejects(send(reply(502, 'bad gateway', 'text/plain')), /GET .* 502 .*bad gateway/);
+  await assert.rejects(send(reply(200, '<html>', 'text/html')), /GET .* 200 .*<html>/);
+  await assert.rejects(send(reply(200, 'not json', 'application/json')), /not JSON.*not json/);
+  assert.deepEqual(await send(reply(200, '{"ok":true}', 'application/json; charset=utf-8')), {ok: true});
+});
+
+test('the local stack comes from `supabase status -o env` and must be on loopback', async () => {
+  const {localStack} = await helper('local-stack.mjs');
+  const status = ['API_URL="http://127.0.0.1:54321"', 'ANON_KEY="anon.jwt"', 'SERVICE_ROLE_KEY="service.jwt"', 'DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"', ''].join('\n');
+  assert.deepEqual(localStack(status), {apiUrl: 'http://127.0.0.1:54321', functionUrl: 'http://127.0.0.1:54321/functions/v1/road-to-send', anonKey: 'anon.jwt', serviceKey: 'service.jwt'});
+  assert.equal(localStack(`${status}FUNCTIONS_URL="http://localhost:54321/functions/v1/"\n`).functionUrl, 'http://localhost:54321/functions/v1/road-to-send');
+  assert.throws(() => localStack(status.replace('127.0.0.1:54321', 'proj.supabase.co')), /not a local stack/);
+  assert.throws(() => localStack('API_URL="http://127.0.0.1:54321"\n'), /ANON_KEY/);
 });
 
 test('a seeded store serves activities in insertion order and crew in position order', async () => {

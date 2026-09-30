@@ -1,9 +1,10 @@
-// Backend conformance scenarios, written once and run against every target (in-process today;
-// the real-Supabase stack in a later ticket). Each scenario receives a transport
-// `send({method, bodyText}) -> parsed JSON` and assumes an EMPTY backend at the start, with
-// relative expectations only: ids and timestamps are checked for shape, never for value.
-// Scenarios that need seeded data or an injected clock are in-process only and live in
-// tests/supabase-conformance.test.js.
+// Backend conformance scenarios, written once and run against every target: in-process under
+// `npm test` (tests/supabase-conformance.test.js) and over HTTP against a real local Supabase
+// stack (tests/supabase-stack.test.mjs via `npm run test:supabase`, which empties the tables
+// before each one). Each scenario receives a transport `send({method, bodyText}) -> parsed JSON`
+// and assumes an EMPTY backend at the start, with relative expectations only: ids and timestamps
+// are checked for shape, never for value. Scenarios that need seeded data or an injected clock are
+// in-process only and live in tests/supabase-conformance.test.js.
 import assert from 'node:assert/strict';
 import {SCORING, dailyBounties} from '../../supabase/functions/road-to-send/core.mjs';
 import {schemaProblems} from './schema-check.mjs';

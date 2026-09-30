@@ -35,7 +35,10 @@ top), `http.mjs` (CORS/OPTIONS as a pure `route`), `store.mjs` (PostgREST over `
 (the `Deno.serve` entry) and `contract.generated.json`. Behavior must stay equal to
 `src/apps-script.js`; `tests/supabase-conformance.test.js` and `tests/supabase-function.test.js` hold
 it to that, with the scenarios in `tests/supabase/scenarios.mjs` written once against a
-`send({method, bodyText}) -> json` transport.
+`send({method, bodyText}) -> json` transport. The same scenarios also run over HTTP against a real
+local Supabase stack in `tests/supabase-stack.test.mjs` (with `tests/supabase/local-stack.mjs`), which
+adds what only the real stack can prove: CORS through the gateway, RLS against the `anon` key, and
+the unique index under two concurrent sign-ups.
 
 **Build exception:** `npm run build` also writes `contract.generated.json` (`{apiVersion, scoring}`)
 from `src/schema.json` and `src/scoring.json`, and `check:generated` fails when it is stale. Scoring
@@ -55,6 +58,11 @@ adding assertions to that file.** `README.md` documents setup and deployment.
   before every pull request; `.github/workflows/test.yml` runs the same suite in CI, and `pages.yml`
   runs it again in a `verify` job that gates the deploy job, which publishes only `index.html` to
   GitHub Pages on pushes to `main`.
+- `npm run test:supabase` runs that real-stack suite; it is **not** part of `npm test`. It needs
+  Docker and the Supabase CLI: run `supabase start` and `supabase functions serve` first. It reads
+  the stack's URLs and printed dev keys from `supabase status -o env`, refuses anything but loopback,
+  and empties every table between tests. `.github/workflows/supabase.yml` runs it in CI on pushes
+  and pull requests that touch `supabase/`, the conformance tests or the workflow, with no secrets.
 - `npm run check:generated` is read-only; if it fails, run `npm run build` and commit `index.html` and the regenerated
   `supabase/functions/road-to-send/contract.generated.json`.
 - `python3 -m http.server 8000` serves the repository locally; open `http://localhost:8000/` to
@@ -121,6 +129,12 @@ is arranged to produce it is not a constraint; see *Not constraints* below.
    rather than matched source text — is the encouraged direction, and counts as strengthening it.
    Retiring one requires the feature to be gone and each retired assertion named. An assertion for a
    feature that still exists stays.
+   **Declared exception, scoped to the real-Supabase job:** the assertions in
+   `tests/supabase-stack.test.mjs` run only where Docker and the Supabase CLI exist — the
+   `supabase.yml` CI job and a maintainer's machine — not under `npm test`, which must keep passing
+   without them. Docker and the Supabase CLI are CI and dev-only tools: neither is an npm
+   dependency, and nothing they provide ships to the crew. The suite is still bound by this rule, and
+   a scenario it runs lives in `tests/supabase/scenarios.mjs`, so `npm test` runs it in-process too.
 
 ## Not constraints
 
