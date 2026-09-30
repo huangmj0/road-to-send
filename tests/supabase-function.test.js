@@ -40,7 +40,7 @@ test('the PostgREST store reads ordered rows with the service-role headers', asy
   assert.deepEqual(await store.listActivities(), [{id: 'x', name: 'Zed', type: 'climb', category: 'climb', points: 3, date: '2026-07-02', createdAt: '2026-07-02T10:00:00.000Z', hardestGrade: 'V4', bountyId: '', bountyTitle: '', note: 'n'}]);
   const urls = calls.map(call => call.url);
   assert.ok(urls[0].startsWith('https://proj.supabase.co/rest/v1/settings?'));
-  assert.ok(urls[1].startsWith('https://proj.supabase.co/rest/v1/participants?') && urls[1].includes('order=position.asc'));
+  assert.ok(urls[1].startsWith('https://proj.supabase.co/rest/v1/participants?') && urls[1].includes('order=position.asc,name.asc'));
   assert.ok(urls[2].startsWith('https://proj.supabase.co/rest/v1/activities?') && urls[2].includes('order=seq.asc'));
   for (const call of calls) {
     assert.equal(call.init.headers.apikey, 'service-key');
@@ -71,6 +71,83 @@ test('a non-2xx PostgREST response becomes the server_error envelope at the hand
   const store = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch});
   const reply = await handle({method: 'GET', bodyText: ''}, store, now);
   assert.deepEqual(reply, {version: API_VERSION, ok: false, error: {code: 'server_error', message: 'The request could not be completed', details: []}});
+});
+
+test('the PostgREST store saves setup through the save_config RPC in one call', async () => {
+  const {createPostgrestStore} = await fn('store.mjs');
+  const {fetch, calls} = stubFetch({'/rpc/save_config': {status: 204}});
+  const store = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'service-key', fetch});
+  await store.saveConfig({startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: ['Alex', 'Maya']});
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://proj.supabase.co/rest/v1/rpc/save_config');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].init.headers['Content-Type'], 'application/json');
+  assert.equal(calls[0].init.headers.apikey, 'service-key');
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer service-key');
+  assert.deepEqual(JSON.parse(calls[0].init.body), {p_start: '2026-07-01', p_trip: '2026-07-31', p_goal: 500, p_crew: ['Alex', 'Maya']});
+});
+
+test('the PostgREST store appends a participant at max(position)+1, and at 0 on an empty roster', async () => {
+  const {createPostgrestStore} = await fn('store.mjs');
+  for (const [existing, position] of [[[{position: 4}], 5], [[], 0]]) {
+    const calls = [];
+    const fetch = async (url, init) => {
+      calls.push({url, init});
+      return init.method === 'GET' ? {ok: true, status: 200, json: async () => existing} : {ok: true, status: 201, json: async () => { throw new Error('empty body'); }};
+    };
+    const store = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch});
+    assert.equal(await store.addParticipant('Zed'), true);
+    assert.equal(calls[0].url, 'https://proj.supabase.co/rest/v1/participants?select=position&order=position.desc&limit=1');
+    assert.equal(calls[1].url, 'https://proj.supabase.co/rest/v1/participants');
+    assert.equal(calls[1].init.method, 'POST');
+    assert.equal(calls[1].init.headers.Prefer, 'return=minimal');
+    assert.equal(calls[1].init.headers.apikey, 'k');
+    assert.deepEqual(JSON.parse(calls[1].init.body), {name: 'Zed', position});
+  }
+});
+
+test('a Postgres 23505 on the participant insert becomes duplicate_participant; other failures stay server_error', async () => {
+  const {createPostgrestStore} = await fn('store.mjs');
+  const {handle, API_VERSION} = await fn('core.mjs');
+  const settings = {'/settings': {body: [{start_date: '2026-07-01', trip_date: '2026-07-31', goal: 500, time_zone: 'UTC'}]}};
+  const race = {...settings, '/participants?select=name': {body: [{name: 'Alex'}]}, '/participants?select=position': {body: [{position: 0}]}, '/participants': {status: 409, body: {code: '23505', message: 'duplicate key value violates unique constraint "participants_name_ci"'}}};
+  const store = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch: stubFetch(race).fetch});
+  assert.equal(await store.addParticipant('Maya'), false);
+  const reply = await handle({method: 'POST', bodyText: JSON.stringify({action: 'addParticipant', name: 'Maya'})}, store, now);
+  assert.deepEqual(reply, {version: API_VERSION, ok: false, error: {code: 'duplicate_participant', message: 'That name already exists', details: [{field: 'name', reason: 'must be unique'}]}});
+  for (const failure of [{status: 409, body: {code: '23514'}}, {status: 500, body: {code: '23505'}}]) {
+    const broken = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch: stubFetch({...race, '/participants': failure}).fetch});
+    await assert.rejects(broken.addParticipant('Maya'));
+    assert.equal((await handle({method: 'POST', bodyText: JSON.stringify({action: 'addParticipant', name: 'Maya'})}, broken, now)).error.code, 'server_error');
+  }
+});
+
+test('the PostgREST store inserts an activity as a snake_case row', async () => {
+  const {createPostgrestStore} = await fn('store.mjs');
+  const {fetch, calls} = stubFetch({'/activities': {status: 201}});
+  const store = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch});
+  await store.appendActivity({id: 'u-1', createdAt: '2026-07-13T12:00:00.000Z', name: 'Alex', type: 'bounty', category: 'climb', points: 2, date: '2026-07-13', hardestGrade: '', bountyId: 'b1', bountyTitle: 'Bounty', note: 'n'});
+  assert.equal(calls[0].url, 'https://proj.supabase.co/rest/v1/activities');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].init.headers.Prefer, 'return=minimal');
+  assert.deepEqual(JSON.parse(calls[0].init.body), {id: 'u-1', name: 'Alex', type: 'bounty', category: 'climb', points: 2, date: '2026-07-13', created_at: '2026-07-13T12:00:00.000Z', hardest_grade: '', bounty_id: 'b1', bounty_title: 'Bounty', note: 'n'});
+  const failing = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch: stubFetch({'/activities': {status: 400}}).fetch});
+  await assert.rejects(failing.appendActivity({id: 'u-2'}));
+});
+
+test('the PostgREST store deletes by encoded id and reports whether a row went', async () => {
+  const {createPostgrestStore} = await fn('store.mjs');
+  const {handle, API_VERSION} = await fn('core.mjs');
+  const {fetch, calls} = stubFetch({'/activities?id=eq.a%2Fb%26c': {body: [{id: 'a/b&c'}]}, '/activities?id=eq.gone': {body: []}});
+  const store = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch});
+  assert.equal(await store.deleteActivity('a/b&c'), true);
+  assert.equal(calls[0].url, 'https://proj.supabase.co/rest/v1/activities?id=eq.a%2Fb%26c&select=id');
+  assert.equal(calls[0].init.method, 'DELETE');
+  assert.equal(calls[0].init.headers.Prefer, 'return=representation');
+  assert.equal(calls[0].init.body, undefined);
+  assert.deepEqual(await handle({method: 'POST', bodyText: JSON.stringify({action: 'delete', id: 'gone'})}, store, now), {version: API_VERSION, ok: false, error: {code: 'not_found', message: 'Activity not found'}});
+  const failing = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch: stubFetch({'/activities': {status: 500}}).fetch});
+  assert.equal((await handle({method: 'POST', bodyText: JSON.stringify({action: 'delete', id: 'x'})}, failing, now)).error.code, 'server_error');
 });
 
 test('OPTIONS answers 204 with CORS headers and no body', async () => {
