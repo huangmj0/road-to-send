@@ -10,17 +10,25 @@
 // tests/supabase/scenarios.mjs, not here: this file holds only what needs the real stack.
 // The RLS probes accept exactly a permission denial (401/403 with PostgREST code 42501) or, for a
 // read, a 200 with no rows; any other failure fails them. The stack is re-checked for loopback
-// here, not only in the runner, because every test deletes every row.
+// here, not only in the runner, because every test deletes every row. The import-tool check is
+// the one test that writes around the function: it pipes scripts/import-snapshot.mjs's SQL into
+// psql (postgresql-client; PSQL overrides the binary) as the local postgres superuser from
+// DB_URL, which bypasses RLS the way the Supabase SQL editor does. It cannot live in
+// scenarios.mjs because no in-process target runs SQL; tests/import-snapshot.test.js holds the
+// SQL-free half of it against the same fixture (tests/supabase/snapshot-fixture.mjs).
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import {assertLoopback, createHttpTransport, createRest, resetDatabase} from './supabase/local-stack.mjs';
+import {snapshotToSql} from '../scripts/import-snapshot.mjs';
+import {FEATURES} from '../supabase/functions/road-to-send/core.mjs';
+import {assertLoopback, createHttpTransport, createRest, resetDatabase, runPsql} from './supabase/local-stack.mjs';
 import {scenarios} from './supabase/scenarios.mjs';
+import {snapshotFixture} from './supabase/snapshot-fixture.mjs';
 
 const schema = JSON.parse(readFileSync(new URL('../src/schema.json', import.meta.url), 'utf8'));
 if (!process.env.ROAD_TO_SEND_STACK) throw new Error('ROAD_TO_SEND_STACK is not set: run this suite with `npm run test:supabase`.');
 const stack = JSON.parse(process.env.ROAD_TO_SEND_STACK);
-assertLoopback(stack.apiUrl, stack.functionUrl);
+assertLoopback(stack.apiUrl, stack.functionUrl, stack.dbUrl);
 
 const send = createHttpTransport(stack.functionUrl);
 const service = createRest({apiUrl: stack.apiUrl, key: stack.serviceKey});
@@ -126,4 +134,20 @@ test('two concurrent addParticipant requests differing only in case: exactly one
   const crew = (await send({method: 'GET', bodyText: ''})).config.crew.map(p => p.name.toLowerCase());
   assert.deepEqual(crew, ['alex', ...pairs.map(([a]) => a.toLowerCase())]);
   assert.equal((await rows('participants')).length, pairs.length + 1, 'one row per name in the table itself');
+});
+
+test('import tool: a snapshot applied with psql is served back exactly, and re-running it changes nothing', async () => {
+  await reset();
+  const snapshot = snapshotFixture({version: v, features: FEATURES});
+  const sql = snapshotToSql(snapshot);
+  const counts = {settings: 1, participants: snapshot.config.crew.length, activities: snapshot.activities.length};
+  for (const run of ['first', 'second']) {
+    runPsql(stack.dbUrl, sql);
+    const board = await send({method: 'GET', bodyText: ''});
+    assert.match(board.serverDate, /^\d{4}-\d{2}-\d{2}$/, `${run} import: serverDate`);
+    assert.deepEqual({...board, fetchedAt: '', serverDate: ''}, {...snapshot, fetchedAt: '', serverDate: ''}, `${run} import: GET reproduces the snapshot`);
+    for (const [table, count] of Object.entries(counts)) {
+      assert.equal((await rows(table)).length, count, `${run} import: ${table} row count`);
+    }
+  }
 });

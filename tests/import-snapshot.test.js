@@ -39,6 +39,21 @@ test('emits one transaction: settings upsert, roster in order, activities in ord
   assert.ok(sql.includes("'2026-09-07T16:00:00.000Z'"), 'createdAt is kept verbatim');
 });
 
+test('escapes quotes, backslashes, unicode and newlines in crew names and activity names', async () => {
+  const {renderSnapshot} = await load();
+  const names = ["O'Neil", 'back\\slash', 'Zoë 🧗', 'two\nlines', "''"];
+  const snap = snapshot({
+    config: {startDate: '2026-09-07', tripDate: '2026-11-15', goal: 3000, crew: names.map(name => ({name}))},
+    activities: names.map((name, i) => activity({id: `n${i}`, name})),
+    timeZone: "Pacific/Chatham",
+  });
+  const {sql} = renderSnapshot(snap);
+  const parsed = parseSql(sql);
+  assert.deepEqual(parsed.participants, names.map((name, position) => ({name, position})));
+  assert.deepEqual(parsed.activities, snap.activities);
+  assert.ok(sql.includes("values ('O''Neil', 0)") && sql.includes("values ('''''', 4)"));
+});
+
 test('output is deterministic', async () => {
   const {snapshotToSql} = await load();
   assert.equal(snapshotToSql(snapshot()), snapshotToSql(snapshot()));
@@ -119,6 +134,21 @@ test('round trip: rendered rows and independently parsed SQL both reproduce the 
   assert.deepEqual(parsed.participants, rows.participants);
 });
 
+test('round trip on the shared synthetic snapshot the real-stack suite imports', async () => {
+  const {renderSnapshot} = await load();
+  const {snapshotFixture} = await import(path.join(__dirname, 'supabase', 'snapshot-fixture.mjs'));
+  for (const version of [12, 13]) {
+    const snap = snapshotFixture({version, features: ['categories-v1']});
+    const {sql, rows} = renderSnapshot(snap);
+    const parsed = parseSql(sql);
+    assert.deepEqual(parsed.activities, snap.activities);
+    assert.deepEqual(rows.activities, snap.activities);
+    assert.deepEqual(parsed.settings, {startDate: snap.config.startDate, tripDate: snap.config.tripDate, goal: snap.config.goal, timeZone: snap.timeZone});
+    assert.deepEqual(parsed.participants.map(p => ({name: p.name})), snap.config.crew);
+    assert.deepEqual(parsed.participants.map(p => p.position), snap.config.crew.map((_, i) => i));
+  }
+});
+
 test('raw Sheet cells: numbers and booleans are kept verbatim as text, null is empty', async () => {
   const {renderSnapshot} = await load();
   const snap = snapshot({activities: [
@@ -170,6 +200,10 @@ test('aborts on bad payloads and never returns partial SQL', async () => {
     'null config': snapshot({config: null}),
     'version 11': snapshot({version: 11}),
     'version 14': snapshot({version: 14}),
+    'version as a string': snapshot({version: '13'}),
+    'no version': snapshot({version: undefined}),
+    'activities not an array': snapshot({activities: {a1: activity()}}),
+    'start after trip': snapshot({config: {...crew([]), startDate: '2026-11-16'}}),
     'no time zone': snapshot({timeZone: undefined}),
     'bad goal': snapshot({config: {...crew([]), goal: 5}}),
     'bad date': snapshot({config: {...crew([]), startDate: '9/7'}}),
@@ -187,15 +221,25 @@ test('aborts on bad payloads and never returns partial SQL', async () => {
   }
 });
 
-test('CLI reads stdin, writes SQL to stdout; bad input exits 1 with an empty stdout', () => {
+test('CLI reads stdin, writes SQL to stdout; every abort exits 1 with a message and an empty stdout', () => {
   const ok = spawnSync(process.execPath, [script], {input: JSON.stringify(snapshot())});
   assert.equal(ok.status, 0);
+  assert.equal(ok.stderr.length, 0);
   assert.match(ok.stdout.toString(), /^begin;/);
-  const bad = spawnSync(process.execPath, [script], {input: JSON.stringify(snapshot({config: null}))});
-  assert.equal(bad.status, 1);
-  assert.equal(bad.stdout.length, 0);
-  assert.match(bad.stderr.toString(), /config: null/);
-  const junk = spawnSync(process.execPath, [script], {input: 'not json'});
-  assert.equal(junk.status, 1);
-  assert.equal(junk.stdout.length, 0);
+  const aborts = {
+    'not JSON': ['not json', /not valid JSON/],
+    'empty input': ['', /not valid JSON/],
+    'activities not an array': [JSON.stringify(snapshot({activities: 'none'})), /no activities array/],
+    'null config': [JSON.stringify(snapshot({config: null})), /config: null/],
+    'version 11': [JSON.stringify(snapshot({version: 11})), /Unsupported snapshot version 11/],
+    'version 14': [JSON.stringify(snapshot({version: 14})), /Unsupported snapshot version 14/],
+    'late bad activity': [JSON.stringify(snapshot({activities: [activity(), activity({id: 'b', points: 'lots'})]})), /activities\[1\]\.points/],
+  };
+  for (const [label, [input, message]] of Object.entries(aborts)) {
+    const bad = spawnSync(process.execPath, [script], {input});
+    assert.equal(bad.status, 1, label);
+    assert.equal(bad.stdout.length, 0, `${label}: no SQL on stdout`);
+    assert.match(bad.stderr.toString(), /^import-snapshot: /, label);
+    assert.match(bad.stderr.toString(), message, label);
+  }
 });

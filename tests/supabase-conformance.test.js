@@ -71,10 +71,30 @@ test('the HTTP transport reports a non-JSON or non-200 reply with its status and
 test('the local stack comes from `supabase status -o env` and must be on loopback', async () => {
   const {localStack} = await helper('local-stack.mjs');
   const status = ['API_URL="http://127.0.0.1:54321"', 'ANON_KEY="anon.jwt"', 'SERVICE_ROLE_KEY="service.jwt"', 'DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"', ''].join('\n');
-  assert.deepEqual(localStack(status), {apiUrl: 'http://127.0.0.1:54321', functionUrl: 'http://127.0.0.1:54321/functions/v1/road-to-send', anonKey: 'anon.jwt', serviceKey: 'service.jwt'});
+  assert.deepEqual(localStack(status), {apiUrl: 'http://127.0.0.1:54321', functionUrl: 'http://127.0.0.1:54321/functions/v1/road-to-send', anonKey: 'anon.jwt', serviceKey: 'service.jwt', dbUrl: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'});
   assert.equal(localStack(`${status}FUNCTIONS_URL="http://localhost:54321/functions/v1/"\n`).functionUrl, 'http://localhost:54321/functions/v1/road-to-send');
   assert.throws(() => localStack(status.replace('127.0.0.1:54321', 'proj.supabase.co')), /not a local stack/);
   assert.throws(() => localStack('API_URL="http://127.0.0.1:54321"\n'), /ANON_KEY/);
+  assert.throws(() => localStack(status.replace('127.0.0.1:54322', 'db.proj.supabase.co:5432')), /not a local stack/);
+  assert.throws(() => localStack(status.replace(/DB_URL=.*\n/, '')), /DB_URL/);
+});
+
+// The real-stack import check (tests/supabase-stack.test.mjs) applies generated SQL with psql.
+test('runPsql feeds SQL on stdin to psql, stops on the first error, and refuses a non-loopback database', async () => {
+  const {runPsql} = await helper('local-stack.mjs');
+  const dbUrl = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+  const calls = [];
+  const spawn = result => (cmd, args, options) => { calls.push({cmd, args, options}); return {status: 0, stdout: '', stderr: '', ...result}; };
+  runPsql(dbUrl, 'begin;\ncommit;\n', {spawn: spawn({})});
+  assert.equal(calls[0].cmd, 'psql');
+  assert.deepEqual(calls[0].args, [dbUrl, '--no-psqlrc', '--quiet', '--set', 'ON_ERROR_STOP=1']);
+  assert.equal(calls[0].options.input, 'begin;\ncommit;\n');
+  runPsql(dbUrl, '', {spawn: spawn({}), psql: '/opt/pg/bin/psql'});
+  assert.equal(calls[1].cmd, '/opt/pg/bin/psql');
+  assert.throws(() => runPsql(dbUrl, 'x', {spawn: spawn({status: 3, stderr: 'ERROR:  syntax error'})}), /exited 3.*syntax error/s);
+  assert.throws(() => runPsql(dbUrl, 'x', {spawn: spawn({status: null, error: Object.assign(new Error('spawn psql ENOENT'), {code: 'ENOENT'})})}), /psql.*postgresql-client/);
+  assert.throws(() => runPsql('postgresql://postgres:pw@db.proj.supabase.co:5432/postgres', 'x', {spawn: spawn({})}), /not a local stack/);
+  assert.equal(calls.length, 4, 'a non-loopback database is refused before psql starts');
 });
 
 test('a seeded store serves activities in insertion order and crew in position order', async () => {

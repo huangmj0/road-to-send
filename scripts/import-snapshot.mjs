@@ -53,6 +53,7 @@ export function renderSnapshot(payload) {
       throw new ImportError(`config.${key} must be a YYYY-MM-DD date.`);
     }
   }
+  if (config.startDate > config.tripDate) throw new ImportError('config.startDate must not be after config.tripDate.');
   if (!Number.isInteger(config.goal) || config.goal < 50 || config.goal > 10000) {
     throw new ImportError('config.goal must be an integer from 50 to 10000.');
   }

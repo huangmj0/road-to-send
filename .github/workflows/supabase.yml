@@ -1,7 +1,8 @@
 name: Supabase conformance
 
 # Runs the backend conformance scenarios, over HTTP, against a throwaway local Supabase stack:
-# the migration, RLS, save_config, the PostgREST store and the Deno entry, not just the pure core.
+# the migration, RLS, save_config, the PostgREST store and the Deno entry, not just the pure core,
+# plus the import tool's SQL applied with psql and read back through the function.
 # It uses only the local stack's printed dev keys: no secrets, never a hosted project.
 # Not part of `npm test`; locally it is `npm run test:supabase` (see scripts/test-supabase.mjs).
 on:
@@ -11,6 +12,7 @@ on:
       - "tests/supabase/**"
       - "tests/supabase-stack.test.mjs"
       - "scripts/test-supabase.mjs"
+      - "scripts/import-snapshot.mjs"
       - "src/schema.json"
       - "src/scoring.json"
       - "package.json"
@@ -21,6 +23,7 @@ on:
       - "tests/supabase/**"
       - "tests/supabase-stack.test.mjs"
       - "scripts/test-supabase.mjs"
+      - "scripts/import-snapshot.mjs"
       - "src/schema.json"
       - "src/scoring.json"
       - "package.json"
@@ -42,6 +45,14 @@ jobs:
       - uses: supabase/setup-cli@v2.1.2
         with:
           version: 2.75.0
+      - name: Make sure psql is available
+        # The import-tool check pipes generated SQL into psql against the stack's DB_URL. The
+        # ubuntu-latest image ships PostgreSQL's client; install it if an image ever drops it.
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
+          psql --version
       - name: Start the local stack
         # Only the database, PostgREST, auth and the gateway are needed; edge-runtime is left for
         # `functions serve`. Migrations in supabase/migrations are applied here.
