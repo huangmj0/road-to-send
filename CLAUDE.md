@@ -28,5 +28,5 @@ lands on:
 
 - **Issues, specs, triage** — driven through the `gh` CLI: `docs/agents/issue-tracker.md`.
 - **Triage labels** — the five canonical roles and their label strings: `docs/agents/triage-labels.md`.
-- **Domain terms and decisions** — `CONTEXT.md` and `docs/adr/`, created lazily by `/domain-modeling`:
+- **Domain terms and decisions** — `CONTEXT.md` and `docs/adr/`, created lazily as terms and decisions get resolved:
   `docs/agents/domain.md`.
