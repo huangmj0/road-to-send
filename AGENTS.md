@@ -183,12 +183,13 @@ Issues and specs live as GitHub issues in `huangmj0/road-to-send`. Use the `gh` 
 
 - For multi-issue work, one **map** issue labelled `wayfinder:map` holds Notes, Decisions so far and
   Fog. Each child ticket is a GitHub sub-issue of the map, labelled `wayfinder:<type>` (`research`,
-  `prototype`, `grilling` or `task`). Where sub-issues aren't available, put `Part of #<map>` at the
-  top of the child instead.
+  `prototype`, `grilling` or `task`). Where sub-issues aren't available, add the child to a task
+  list in the map body (that list sets map order) and put `Part of #<map>` at the top of the child.
   - Record blocking with GitHub's native issue dependencies. The fallback is a `Blocked by: #<n>`
     line at the top of the child. A ticket is unblocked once every blocker is closed.
   - The next ticket to work on is the first open, unassigned and unblocked child in map order.
-  - Claim it with `gh issue edit <n> --add-assignee @me`.
+  - Claim it with `gh issue edit <n> --add-assignee @me` as the session's **first write**, before any
+    other change, so no other agent picks the same ticket.
   - Resolve it by commenting the answer, closing it, and appending a pointer to the map's Decisions
     so far.
 
