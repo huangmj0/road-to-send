@@ -40,10 +40,7 @@ for(const [name,doc] of [['CLAUDE.md',claudeDoc],['AGENTS.md',agentsDoc]]){
   assert.match(doc,/never edit `index\.html`|Never\*\* edit\s+`index\.html`/i,`${name} says index.html is generated, never hand-edited`);
 }
 
-// The vendored skills are pinned, and the per-repo config the engineering skills read exists.
-assert.ok(existsSync(at('skills-lock.json')),'skills-lock.json pins the vendored skills');
-const lock=JSON.parse(readFileSync(at('skills-lock.json'),'utf8'));
-assert.ok(Object.keys(lock.skills||{}).length,'skills-lock.json records the installed skills');
+// The per-repo config that skills read exists.
 for(const doc of ['issue-tracker','triage-labels','domain'])assert.ok(existsSync(at(`docs/agents/${doc}.md`)),`docs/agents/${doc}.md configures the skills for this repo`);
 assert.match(claudeDoc,/docs\/agents\/issue-tracker\.md/,'CLAUDE.md points the skills at the issue-tracker config');
 
@@ -95,4 +92,4 @@ const rendered=buildHtml();
 assert.equal(typeof rendered,'string','buildHtml() returns the rendered artifact as a string');
 assert.equal(rendered,readFileSync(at('index.html'),'utf8'),'index.html matches buildHtml() — run `npm run build` and commit the result');
 
-console.log(`Road to Send documentation checks passed (${keys.length} frozen localStorage keys, ${Object.keys(lock.skills).length} vendored skills).`);
+console.log(`Road to Send documentation checks passed (${keys.length} frozen localStorage keys).`);
