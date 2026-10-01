@@ -217,10 +217,3 @@ Use short, imperative commit subjects such as `Fix weekly bounty eligibility`. K
 Pull requests should explain user-visible behavior, identify scoring or API compatibility effects,
 link relevant issues, include screenshots for UI changes, and report `npm test` results. Never commit
 live Apps Script endpoints, shared crew URLs, or sensitive Sheet data.
-
-## Agent skills
-
-This repo uses [Matt Pocock's skills](https://github.com/mattpocock/skills), vendored under
-`.agents/skills/`, pinned by `skills-lock.json`, and exposed to Claude Code through `.claude/skills/`
-symlinks. `CLAUDE.md` records the per-repo configuration they read; `npx skills@latest update`
-refreshes them.

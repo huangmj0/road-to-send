@@ -23,12 +23,10 @@ before you reach it:
 
 ## Per-repo skill configuration
 
-The vendored skills read these repo-specific docs. Reach for the one whose surface a skill's work
+Skills read these repo-specific docs. Reach for the one whose surface a skill's work
 lands on:
 
 - **Issues, specs, triage** — driven through the `gh` CLI: `docs/agents/issue-tracker.md`.
 - **Triage labels** — the five canonical roles and their label strings: `docs/agents/triage-labels.md`.
 - **Domain terms and decisions** — `CONTEXT.md` and `docs/adr/`, created lazily by `/domain-modeling`:
   `docs/agents/domain.md`.
-- **The improvement loop** — Claude plans and reviews, Codex executes, one issue per tick:
-  `docs/loop-prompt.md`.
