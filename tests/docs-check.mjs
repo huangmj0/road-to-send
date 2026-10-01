@@ -5,7 +5,8 @@ import {buildHtml} from '../scripts/build.mjs';
 // TRAP: this suite asserts documented invariants, not behaviour. Everything here holds a
 // statement in a markdown file against the code it describes, so a check only earns its
 // place if drift between the two would actually mislead someone. Assertions about which
-// agent workflow runs on which model used to live here; they went out with the loop.
+// agent workflow runs on which model used to live here; they went out with the loop. CLAUDE.md
+// is a bare @AGENTS.md import, so rules are asserted against AGENTS.md, never restated there.
 
 const at=name=>new URL('../'+name,import.meta.url);
 const agentsDoc=readFileSync(at('AGENTS.md'),'utf8');
@@ -30,19 +31,35 @@ assert.ok(browserSources.length>=1,'src/ holds the bundled browser sources');
 assert.ok(keys.length>=7,'the browser sources read the roadToSend localStorage keys');
 for(const key of keys)assert.ok(frozen.includes(key),`${key} is used in the browser sources but missing from the frozen-key list in AGENTS.md`);
 
-// Both agent surfaces orient a session and point at the authoritative guide rather than
-// restating it — two full copies of the rules is how they drift apart.
+// AGENTS.md is the one guide; CLAUDE.md imports it rather than restating it — two full copies of
+// the rules is how they drift apart. The import must be live: Claude Code ignores an @-import
+// inside a code fence, so a fenced `@AGENTS.md` would load nothing and the warnings below would
+// stop reaching Claude sessions.
 assert.ok(existsSync(at('CLAUDE.md')),'a repo-root CLAUDE.md orients agent sessions');
 const claudeDoc=readFileSync(at('CLAUDE.md'),'utf8');
 assert.match(claudeDoc,/AGENTS\.md/,'CLAUDE.md points at AGENTS.md as the authoritative guide');
-for(const [name,doc] of [['CLAUDE.md',claudeDoc],['AGENTS.md',agentsDoc]]){
-  assert.match(doc,/https:\/\/huangmj0\.github\.io\/road-to-send\//,`${name} warns that the app is live`);
-  assert.match(doc,/never edit `index\.html`|Never\*\* edit\s+`index\.html`/i,`${name} says index.html is generated, never hand-edited`);
-}
+assert.match(claudeDoc,/^@AGENTS\.md$/m,'CLAUDE.md imports AGENTS.md with an @AGENTS.md line');
+assert.ok(!claudeDoc.includes('```'),'CLAUDE.md has no code fence that could disable the @AGENTS.md import');
+assert.match(agentsDoc,/https:\/\/huangmj0\.github\.io\/road-to-send\//,'AGENTS.md warns that the app is live');
+assert.match(agentsDoc,/never edit `index\.html`|Never\*\* edit\s+`index\.html`/i,'AGENTS.md says index.html is generated, never hand-edited');
 
-// The per-repo config that skills read exists.
-for(const doc of ['issue-tracker','triage-labels','domain'])assert.ok(existsSync(at(`docs/agents/${doc}.md`)),`docs/agents/${doc}.md configures the skills for this repo`);
-assert.match(claudeDoc,/docs\/agents\/issue-tracker\.md/,'CLAUDE.md points the skills at the issue-tracker config');
+// The repo conventions that used to live in docs/agents/ are in the guide: the browser/backend
+// contract files, the five triage labels, and
+// where domain terms and decisions are recorded.
+for(const file of ['src/apps-script.js','src/schema.json','src/scoring.json']){
+  assert.ok(existsSync(at(file)),`${file}, a browser/backend contract file, exists`);
+  assert.ok(agentsDoc.includes('`'+file+'`'),`AGENTS.md names ${file} as part of the browser/backend contract`);
+}
+for(const label of ['needs-triage','needs-info','ready-for-agent','ready-for-human','wontfix'])
+  assert.ok(agentsDoc.includes('`'+label+'`'),`AGENTS.md lists the ${label} triage label`);
+assert.ok(agentsDoc.includes('`CONTEXT.md`')&&existsSync(at('CONTEXT.md')),'AGENTS.md points at the CONTEXT.md glossary, which exists');
+assert.ok(agentsDoc.includes('`docs/adr/`'),'AGENTS.md points at docs/adr/ for recorded decisions');
+// One file per decision: a second copy of an ADR under another numbering scheme is how the
+// two drifted apart (one said proposed, the other accepted).
+const adrs=readdirSync(at('docs/adr')).filter(name=>name.endsWith('.md'));
+assert.ok(adrs.every(name=>/^\d{4}-[a-z0-9-]+\.md$/.test(name)),'every ADR is named NNNN-short-title.md');
+const adrNumbers=adrs.map(name=>name.slice(0,4));
+assert.equal(new Set(adrNumbers).size,adrNumbers.length,'each ADR number is used once');
 
 // The live site is only published from a green tree, and only the app is published.
 const pages=readFileSync(at('.github/workflows/pages.yml'),'utf8');
