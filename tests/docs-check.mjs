@@ -38,7 +38,7 @@ for(const key of keys)assert.ok(frozen.includes(key),`${key} is used in the brow
 assert.ok(existsSync(at('CLAUDE.md')),'a repo-root CLAUDE.md orients agent sessions');
 const claudeDoc=readFileSync(at('CLAUDE.md'),'utf8');
 assert.match(claudeDoc,/AGENTS\.md/,'CLAUDE.md points at AGENTS.md as the authoritative guide');
-assert.match(claudeDoc,/^@AGENTS\.md$/m,'CLAUDE.md imports AGENTS.md with an @AGENTS.md line');
+assert.equal(claudeDoc.trim(),'@AGENTS.md','CLAUDE.md is exactly the @AGENTS.md import, so nothing (a ``` or ~~~ fence, restated rules) can disable or duplicate it');
 assert.ok(!claudeDoc.includes('```'),'CLAUDE.md has no code fence that could disable the @AGENTS.md import');
 assert.match(agentsDoc,/https:\/\/huangmj0\.github\.io\/road-to-send\//,'AGENTS.md warns that the app is live');
 assert.match(agentsDoc,/never edit `index\.html`|Never\*\* edit\s+`index\.html`/i,'AGENTS.md says index.html is generated, never hand-edited');
