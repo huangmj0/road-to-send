@@ -69,7 +69,12 @@ assert.equal(new Set(scoring.bounties.map(b=>b.id)).size,scoring.bounties.length
 for(const cat of Object.keys(scoring.categories))assert.ok(scoring.bounties.some(b=>b.category===cat),`the ${cat} bounty pool is not empty`);
 assert.deepEqual(scoring.grades,['V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12','V13','V14','V15','V16','V17']);
 assert.match(script,/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORING\.categories\)/,'browser reads the shared scoring config');
-assert.match(artifactScript,/const SCRIPT=`const SCORING=/,'Apps Script reads the shared scoring config');
+// Retired with the embedded Apps Script (ADR-0004): "Apps Script reads the shared scoring config".
+// The artifact no longer carries the script or the setup dialog's copy button, so guard against both returning.
+assert.doesNotMatch(artifactScript,/const SCRIPT=/,'the artifact no longer embeds the Apps Script source');
+assert.doesNotMatch(artifactScript,/copyScript/,'the artifact has no copy-script action');
+const apiVersion=JSON.parse(readFileSync(new URL('../src/schema.json',import.meta.url),'utf8')).properties.version.const;
+assert.ok(artifactScript.trimStart().startsWith(`const SUPPORTED_API_VERSIONS=new Set([${apiVersion},12]);\n`),'the artifact opens with the supported API versions, current version first');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
 // Saving… was already the label on two buttons (#saveActivityBtn and #saveSetupBtn) before this
 // entry, so the preview branch is the third occurrence — a >=2 guard could never have failed.
@@ -323,7 +328,7 @@ assert.match(stylesheet,/\.activity\{grid-template-columns:40px minmax\(0,1fr\) 
 assert.match(stylesheet,/\.activity>div\{min-width:0;overflow-wrap:anywhere\}/,'feed copy shrinks and wraps an unbroken note without clipping it');
 assert.match(stylesheet,/@media\(max-width:430px\)\{\.activity\{grid-template-columns:38px minmax\(0,1fr\) auto auto\}\}/,'phone feed rows retain the shrinkable note track');
 assert.match(stylesheet,/\.dialog h2\{min-width:0;overflow-wrap:anywhere\}/,'dialog headings can shrink and break long names');
-assert.match(stylesheet,/\.setup-copy pre\{overflow-wrap:anywhere\}/,'setup code breaks an unspaced run without losing its scroll container');
+// Retired with the Apps Script source disclosure (ADR-0004): "setup code breaks an unspaced run without losing its scroll container" (the setup dialog has no code block now).
 // Entry 83: polite status regions keep their semantics but only receive changed text. The
 // companion claim — that the person-card trend wrapper does not duplicate the chart SVG's
 // accessible name — is asserted on the rendered #personTrend element in

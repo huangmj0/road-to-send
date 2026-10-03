@@ -1,8 +1,10 @@
 ---
-status: accepted
+status: superseded by ADR-0004
 ---
 
 # The bounty rotation stays duplicated, and is pinned by a test instead
+
+> Superseded by ADR-0004: the Apps Script is frozen in `legacy/`, so the rotation is now pinned between the browser and the Supabase function's `core.mjs`. The body below is kept as the original record.
 
 `dailyBounties()`, `hashText()`, `bountyById()` and `normalizeCrew()` are implemented twice — once
 in `src/app-core.js` and once in `src/apps-script.js` — in deliberately different code. The rotation

@@ -1,12 +1,23 @@
+// TRAP: this suite loads the FROZEN v13 redirector (legacy/apps-script-v13.js, ADR-0004) through
+// apps-script-harness.js, not the shipped artifact: the build no longer embeds it. The script's
+// scoring and version are literals now, so a change to src/scoring.json or src/schema.json never
+// reaches it and these tests must not follow the contract. Its arrays and objects come from another
+// vm realm, so copy them (Array.from, spread) before deepStrictEqual. Sheet I/O is replaced by
+// hand-built fakes (movedBook) or by reassigning context globals such as participantRecords, and a
+// helper the script reads the Sheet through directly will throw there. Only behavior the deployed
+// redirector still exhibits is tested here. Retired with ADR-0004 (the redirector is already
+// provisioned and frozen, so these paths can no longer run): the whole test 'v9 setup archives prior
+// activity and benchmark sheets exactly once and rewrites to name-only participants', and the
+// fresh-doc half of 'formatSheets runs once while provisioning, then every read and write skips it'
+// (its already-stamped-doc half is kept below).
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const test = require('node:test');
 const vm = require('node:vm');
 const {loadScript} = require('./apps-script-harness.js');
 
-test('embedded v13 Apps Script is syntactically valid and exposes only simple capabilities', () => {
+test('frozen v13 Apps Script is syntactically valid and exposes only simple capabilities', () => {
   const context = loadScript();
-  assert.equal(vm.runInContext('API_VERSION', context), JSON.parse(fs.readFileSync(new URL('../src/schema.json', `file://${__filename}`), 'utf8')).properties.version.const);
+  assert.equal(vm.runInContext('API_VERSION', context), 13, 'the frozen redirector serves version 13, whatever the contract version becomes');
   assert.deepEqual(Array.from(vm.runInContext('FEATURES', context)), ['categories-v1', 'balanced-day-bonus', 'daily-bounties-v3', 'bounty-hunter', 'challenge-window', 'self-registration-v1']);
   assert.doesNotMatch(context.__source, /pullPoints|pullMode|saveBenchmark|durationBand/);
 });
@@ -61,7 +72,7 @@ test('challenge window remains inclusive', () => {
   assert.throws(() => context.validateActivityWindow({date: '2026-08-01'}), error => error.code === 'outside_challenge_window');
 });
 
-test('v9 setup archives prior activity and benchmark sheets exactly once and rewrites to name-only participants', () => {
+test('an already-stamped doc never formats sheets or archives its live data when the redirector reads it', () => {
   const context = loadScript();
   class Sheet {
     constructor(book, name, values = []) { this.book = book; this.name = name; this.values = values.map(row => [...row]); }
@@ -75,63 +86,15 @@ test('v9 setup archives prior activity and benchmark sheets exactly once and rew
       setValue: value => { this.values[row - 1] ||= []; this.values[row - 1][col - 1] = value; },
     }; }
   }
-  const book = {sheets: {}, getSheetByName(name) { return this.sheets[name] || null; }, insertSheet(name) { return this.sheets[name] = new Sheet(this, name); }, getSpreadsheetTimeZone: () => 'UTC'};
-  book.sheets.Activities = new Sheet(book, 'Activities', [['id'], ['old']]);
-  book.sheets.Benchmarks = new Sheet(book, 'Benchmarks', [['id'], ['old-benchmark']]);
-  book.sheets.Settings = new Sheet(book, 'Settings', [['key', 'value']]);
-  book.sheets.Participants = new Sheet(book, 'Participants', [['name'], ['Alex']]);
-  let schema = '8';
-  context.SpreadsheetApp.getActive = () => book;
-  context.PropertiesService = {getDocumentProperties: () => ({getProperty: () => schema, setProperty: (_, value) => { schema = value; }})};
-  context.formatSheets = () => {};
-  context.setup();
-  context.setup();
-  assert.equal(schema, '9');
-  assert.equal(Object.keys(book.sheets).filter(name => name.startsWith('Activities Archive')).length, 1);
-  assert.equal(Object.keys(book.sheets).filter(name => name.startsWith('Benchmarks Archive')).length, 1);
-  assert.deepEqual(book.sheets.Activities.values[0], Array.from(vm.runInContext('ACTIVITY_HEADERS', context)));
-  assert.deepEqual(book.sheets.Participants.values[0], ['name']);
-  assert.equal(book.sheets.Participants.values[1][0], 'Alex');
-});
-
-test('formatSheets runs once while provisioning, then every read and write skips it', () => {
-  const context = loadScript();
-  class Sheet {
-    constructor(book, name, values = []) { this.book = book; this.name = name; this.values = values.map(row => [...row]); }
-    getName() { return this.name; }
-    setName(name) { delete this.book.sheets[this.name]; this.name = name; this.book.sheets[name] = this; }
-    getLastRow() { return this.values.length; }
-    getLastColumn() { return Math.max(0, ...this.values.map(row => row.length)); }
-    appendRow(row) { this.values.push([...row]); }
-    getRange(row, col, rows = 1, cols = 1) { return {
-      getValues: () => Array.from({length: rows}, (_, r) => Array.from({length: cols}, (_, c) => this.values[row - 1 + r]?.[col - 1 + c] ?? '')),
-      setValue: value => { this.values[row - 1] ||= []; this.values[row - 1][col - 1] = value; },
-    }; }
-  }
-  const makeBook = () => ({sheets: {}, getSheetByName(name) { return this.sheets[name] || null; }, insertSheet(name) { return this.sheets[name] = new Sheet(this, name); }, getSpreadsheetTimeZone: () => 'UTC'});
   let formats = 0;
   context.formatSheets = () => { formats += 1; };
-
-  // A brand-new doc: the first setup() provisions and formats once; a second identical setup()
-  // (schema now stamped) is the steady state every doGet/doPost hits and must not format again.
-  const fresh = makeBook();
-  const freshStore = {};
-  context.SpreadsheetApp.getActive = () => fresh;
-  context.PropertiesService = {getDocumentProperties: () => ({getProperty: key => key in freshStore ? freshStore[key] : null, setProperty: (key, value) => { freshStore[key] = value; }})};
-  context.setup();
-  assert.equal(formats, 1, 'the first setup() on an unprovisioned doc formats exactly once');
-  context.setup();
-  context.setup();
-  assert.equal(formats, 1, 'once the schema is stamped, later setup() calls never re-run formatSheets');
-
-  // An already-provisioned doc (the live Sheet after redeploy) never pays for formatSheets at all.
-  formats = 0;
-  const live = makeBook();
+  const live = {sheets: {}, getSheetByName(name) { return this.sheets[name] || null; }, insertSheet(name) { return this.sheets[name] = new Sheet(this, name); }, getSpreadsheetTimeZone: () => 'UTC'};
   live.sheets.Activities = new Sheet(live, 'Activities', [Array.from(vm.runInContext('ACTIVITY_HEADERS', context))]);
   live.sheets.Settings = new Sheet(live, 'Settings', [['key', 'value']]);
   live.sheets.Participants = new Sheet(live, 'Participants', [['name'], ['Alex']]);
   context.SpreadsheetApp.getActive = () => live;
   context.PropertiesService = {getDocumentProperties: () => ({getProperty: () => '9', setProperty: () => {}})};
+  context.setup();
   context.setup();
   assert.equal(formats, 0, 'a doc already stamped at the current schema formats zero times');
   assert.equal(Object.keys(live.sheets).filter(name => name.startsWith('Activities Archive')).length, 0, 'and its live data is never archived');

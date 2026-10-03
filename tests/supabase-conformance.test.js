@@ -1,14 +1,18 @@
 // TRAP: the modules under test are ESM (.mjs) and this file is CommonJS, so everything is loaded
 // with dynamic import() inside async tests, never a top-level require. The function reads
 // `version` from the generated contract, so a stale contract.generated.json (run
-// `npm run build`) fails here as a version mismatch, not as a logic bug. The vm harness for the
-// Apps Script FEATURES come from tests/apps-script-harness.js, shared with backend-script.test.js. Scenarios in
-// tests/supabase/scenarios.mjs must stay valid against an empty real backend: seeded-data and
-// injected-clock cases belong in this file, not there. The parity tests run the Apps Script in a
-// vm realm: its arrays and Dates fail deepStrictEqual against ours on prototype alone, so compare
-// through plain() and build Date inputs inside the context. appsScriptBackend() stubs the
-// Sheet-touching helpers (readConfig, tab, appendActivity...) by reassigning context globals; a
-// helper the Apps Script adds later that reads the Sheet directly will throw there, not diverge.
+// `npm run build`) fails here as a version mismatch, not as a logic bug. The only Apps Script input
+// is FEATURES, read from the frozen v13 redirector (legacy/apps-script-v13.js) through
+// tests/apps-script-harness.js; its arrays come from another vm realm, so copy them with Array.from
+// before deepStrictEqual. Scenarios in tests/supabase/scenarios.mjs must stay valid against an empty
+// real backend: seeded-data and injected-clock cases belong in this file, not there.
+// The golden tests (bottom of the file) assert the core against tests/fixtures/supabase-validation.golden.json,
+// recorded from the frozen script by scripts/capture-validation-golden.mjs (it reads legacy/apps-script-v13.js,
+// so no build is needed); the golden is a fixed record, not a live comparison, so a behavior change in
+// the core fails here until the affected expectations are deliberately edited by hand or the change is
+// reverted. Rerunning the generator only restores the frozen baseline (see AGENTS.md).
+// Inputs come from tests/supabase/parity-inputs.mjs and each fixture entry carries its decoded input,
+// so editing a table without updating the fixture fails on a stale input, not on a vague diff.
 // The HTTP-transport test rebuilds index.mjs's Request/Response adaptation around route() by
 // hand (index.mjs calls Deno.serve on import, so it is never imported here); the real entry is
 // exercised only by tests/supabase-stack.test.mjs against a local stack.
@@ -112,7 +116,7 @@ test('a seeded store serves activities in insertion order and crew in position o
   assert.deepEqual(board.configErrors, []);
 });
 
-test('version comes from schema.json and features equal the Apps Script FEATURES', async () => {
+test('version comes from schema.json and features equal the frozen v13 script FEATURES', async () => {
   const {handle, API_VERSION, FEATURES} = await fn('core.mjs');
   const {createMemoryStore} = await helper('memory-store.mjs');
   const board = await handle({method: 'GET', bodyText: ''}, createMemoryStore(), clock('2026-07-13T12:00:00Z'));
@@ -204,136 +208,91 @@ test('the schema checker rejects payloads that break the contract', async () => 
   assert.ok(schemaProblems(schema, {version: schema.properties.version.const}).length);
 });
 
-// ---- Parity: the same input tables through the Apps Script (vm harness) and the core module ----
+// ---- Golden: the core's validation outcomes against outputs recorded from the Apps Script (frozen v13) ----
 
-// vm objects come from another realm, so deepStrictEqual would reject them on prototype alone;
-// every Apps Script result is compared through a JSON round trip.
-const plain = value => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
-function outcome(run) {
-  try {
-    return {value: plain(run())};
-  } catch (error) {
-    if (!error.code) throw error;
-    return {error: {code: error.code, message: error.message, details: plain(error.details)}};
+const golden = JSON.parse(fs.readFileSync(new URL('./fixtures/supabase-validation.golden.json', `file://${__filename}`), 'utf8'));
+
+// Every fixture entry must still describe the table input it was recorded from, then the core must
+// reproduce the recorded outcome exactly.
+async function checkGolden(entries, inputs, run, label) {
+  const {decode, plain} = await helper('parity-inputs.mjs');
+  assert.equal(entries.length, inputs.length, `${label}: fixture and table have the same number of cases (update the fixture; by hand once expectations diverge from the frozen script)`);
+  for (const [i, input] of inputs.entries()) {
+    assert.deepEqual(decode(entries[i].input), input, `${label}[${i}]: fixture input is stale (update the fixture entry; by hand once expectations diverge from the frozen script)`);
+    assert.deepEqual(plain(await run(input)) ?? null, entries[i].expected, `${label}[${i}]: ${JSON.stringify(input)}`);
   }
 }
 
-const PARITY_DATES = [
-  '2026-07-13', '2026-7-3', ' 2026-07-13 ', '2024-02-29', '2025-02-29', '2026-02-30', '2026-13-01', '2026-00-10', '1900-01-01', '1899-12-31', '2200-12-31', '2201-01-01',
-  '07/13/2026', '7/3/2026', '07-13-2026', '13/07/2026', '02/29/2025', 'July 13, 2026', 'Jul 13 2026', 'july 3, 2026', 'SEPT 9, 2026', 'Sept 31, 2026', 'Foo 3, 2026', 'July 13th, 2026',
-  '2026/07/13', '2026-07-13T00:00:00Z', '20260713', 'tomorrow', '', '   ', null, undefined, 20260713, 0, true,
-];
-const PARITY_GOALS = [49, 50, 10000, 10001, '1,000', 12.5, '12.5', '500', ' 500 ', '1e3', '0x1F4', 'abc', '', null, undefined, -100, '10,001', Infinity, '50.0'];
-const PARITY_CREWS = [
-  ['Alex', 'Maya'], ['Alex', 'alex', 'ALEX ', 'Maya'], ['', '  ', 'Zed', null, undefined, 0, {name: ''}], [{name: ' Maya '}, {nom: 'x'}, 'Maya'],
-  ['x'.repeat(30)], ['x'.repeat(31)], ['Alex', 'y'.repeat(31)], ['', 'z'.repeat(31)], [], 'Alex', null, undefined, {name: 'Alex'}, [42, 'Alex'],
-];
-const PARITY_CONFIGS = [
-  {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: ['Alex']},
-  {startDate: '7/1/2026', tripDate: 'July 31, 2026', goal: '1,000', crew: ['Alex', 'alex', 'Maya']},
-  {startDate: '2026-07-31', tripDate: '2026-07-01', goal: 500, crew: ['Alex']},
-  {startDate: '2026-07-31', tripDate: '2026-07-31', goal: 500, crew: ['Alex']},
-  {startDate: 'soon', tripDate: '2026-02-30', goal: 12.5, crew: []},
-  {startDate: '', tripDate: '', goal: '', crew: ['x'.repeat(31)]},
-  {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 10001, crew: ['Alex']},
-  {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 49, crew: ['Alex']},
-  {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: ['', ' ']},
-  {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: ['Alex', 'x'.repeat(31)]},
-  {}, null, 'config',
-];
-const DAY = '2026-07-13';
-const PARITY_ACTIVITIES = rotation => {
-  const catalog = rotation.catalog, offered = rotation.offered;
-  const offDay = catalog.find(b => !offered.some(o => o.id === b.id));
-  return [
-    {name: 'Alex', type: 'climb', date: DAY},
-    {name: ' alex ', type: 'climb', date: DAY, hardestGrade: 'V17', note: '  top out  ', points: 99, category: 'mobility'},
-    {name: 'Maya', type: 'climb', date: DAY, hardestGrade: 'VB'},
-    {name: 'Maya', type: 'climb', date: DAY, hardestGrade: 'v4'},
-    {name: 'Maya', type: 'exercise', date: '07/13/2026', hardestGrade: 'V4', bountyId: offered[0].id},
-    {name: 'Maya', type: 'mobility', date: 'July 13, 2026'},
-    ...offered.map(b => ({name: 'Alex', type: 'bounty', date: DAY, bountyId: b.id, points: 0})),
-    {name: 'Alex', type: 'bounty', date: DAY, bountyId: 'no-such-bounty'},
-    {name: 'Alex', type: 'bounty', date: DAY},
-    {name: 'Alex', type: 'bounty', date: DAY, bountyId: offDay.id},
-    {name: 'Alex', type: 'bounty', date: '2026-02-30', bountyId: offered[0].id},
-    {name: 'Alex', type: 'run', date: DAY},
-    {name: 'Alex', type: 'Climb', date: DAY},
-    {name: 'Alex', date: DAY},
-    {name: 'Alex', type: 'mobility', date: DAY, note: 'n'.repeat(120)},
-    {name: 'Alex', type: 'mobility', date: DAY, note: 'n'.repeat(121)},
-    {name: 'Alex', type: 'mobility', date: DAY, note: ` ${'n'.repeat(120)} `},
-    {name: 'Alex', type: 'climb', date: 'yesterday', hardestGrade: 'V99', note: 'n'.repeat(121)},
-    {name: 'Alex', type: 'mobility'},
-    {name: 'Nobody', type: 'run', date: 'never'},
-    {name: '', type: 'climb', date: DAY},
-    {type: 'climb', date: DAY},
-    null,
-    {name: 'Alex', type: 'mobility', date: '2026-06-30'},
-    {name: 'Alex', type: 'mobility', date: '2026-07-01'},
-    {name: 'Alex', type: 'mobility', date: '2026-07-31'},
-    {name: 'Alex', type: 'mobility', date: '2026-08-01'},
-  ];
-};
-const PARITY_SETTINGS = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500};
-const PARITY_CREW = ['Alex', 'Maya'];
-
-// The Apps Script with its Sheet I/O replaced: the given config and roster are what it reads,
-// writes land in a sink, and doPost returns the JSON text it would have served.
-function appsScriptBackend({config = null, crew = [], activityIds = []} = {}) {
-  const context = loadScript();
-  const sink = {getLastRow: () => 0, getRange: () => ({clearContent() {}, setValues() {}}), clearContents() {}};
-  context.ContentService = {createTextOutput: text => ({setMimeType: () => text}), MimeType: {JSON: 'json'}};
-  context.LockService = {getDocumentLock: () => ({waitLock() {}, releaseLock() {}})};
-  context.setup = () => {};
-  context.tab = () => sink;
-  context.formatSheets = () => {};
-  context.readConfig = () => ({config: config && {...config, crew: crew.map(name => ({name}))}, errors: [], movedTo: ''});
-  context.participantRecords = () => crew.map(name => ({name}));
-  context.appendActivity = item => item;
-  context.deleteActivity = id => activityIds.includes(id);
-  return context;
-}
-
-test('parity: dates in every accepted format and every invalid one parse identically', async () => {
+test('golden: dates parse to the recorded value or error, leap years and year limits included', async () => {
   const core = await fn('core.mjs');
-  const script = appsScriptBackend();
-  for (const input of PARITY_DATES) assert.deepEqual(outcome(() => core.parseDateValue(input)), outcome(() => script.parseDateValue(input)), JSON.stringify(input));
-  for (const iso of ['2026-07-13T12:00:00Z', '2026-07-13T00:00:00Z', 'not a date']) {
-    const scriptDate = vm.runInContext(`new Date(${JSON.stringify(iso)})`, script);
-    assert.deepEqual(outcome(() => core.parseDateValue(new Date(iso), 'UTC')), outcome(() => script.parseDateValue(scriptDate)), iso);
-  }
+  const inputs = await helper('parity-inputs.mjs');
+  const {outcome} = inputs;
+  await checkGolden(golden.dates, inputs.PARITY_DATES, input => outcome(() => core.parseDateValue(input)), 'dates');
+  await checkGolden(golden.dateObjects, inputs.PARITY_DATE_OBJECTS, iso => outcome(() => core.parseDateValue(new Date(iso), 'UTC')), 'dateObjects');
+  await checkGolden(golden.calendarDates, inputs.PARITY_CALENDAR, ([y, m, d]) => core.calendarDate(y, m, d), 'calendarDates');
   assert.deepEqual(core.parseDateValue(new Date('2026-07-14T06:30:00Z'), 'America/Los_Angeles'), {value: '2026-07-13'}, 'a Date is read in the configured time zone');
-  for (const [y, m, d] of [[2026, 2, 29], [2024, 2, 29], [1899, 1, 1], [2200, 12, 31], ['2026', '07', '13'], [2026.5, 1, 1]]) assert.equal(core.calendarDate(y, m, d), script.calendarDate(y, m, d), `${y}-${m}-${d}`);
+  const dateAt = date => golden.dates[inputs.PARITY_DATES.indexOf(date)].expected.value;
+  assert.deepEqual(dateAt('2024-02-29'), {value: '2024-02-29'}, 'a leap day is accepted');
+  assert.ok(dateAt('2025-02-29').error, 'a non-leap Feb 29 is rejected');
+  assert.ok(dateAt('2200-12-31').value && dateAt('2201-01-01').error, 'the year ceiling is 2200');
+  assert.ok(dateAt('1900-01-01').value && dateAt('1899-12-31').error, 'the year floor is 1900');
 });
 
-test('parity: goals, crews and whole setups validate identically', async () => {
+test('golden: goals, crews and whole setups validate to the recorded outcomes', async () => {
   const core = await fn('core.mjs');
-  const script = appsScriptBackend();
-  for (const input of PARITY_GOALS) assert.deepEqual(outcome(() => core.parseGoal(input)), outcome(() => script.parseGoal(input)), String(input));
-  for (const input of PARITY_CREWS) assert.deepEqual(outcome(() => core.normalizeCrew(input)), outcome(() => script.normalizeCrew(input)), JSON.stringify(input));
-  for (const input of PARITY_CONFIGS) assert.deepEqual(outcome(() => core.validateConfig(input)), outcome(() => script.writeConfig(input)), JSON.stringify(input));
-  assert.deepEqual(core.parseGoal('1,000'), {value: 1000});
-  assert.equal(outcome(() => core.normalizeCrew(['x'.repeat(31)])).error.code, 'invalid_config');
+  const inputs = await helper('parity-inputs.mjs');
+  const {outcome} = inputs;
+  await checkGolden(golden.goals, inputs.PARITY_GOALS, input => outcome(() => core.parseGoal(input)), 'goals');
+  await checkGolden(golden.crews, inputs.PARITY_CREWS, input => outcome(() => core.normalizeCrew(input)), 'crews');
+  await checkGolden(golden.configs, inputs.PARITY_CONFIGS, input => outcome(() => core.validateConfig(input)), 'configs');
+  const goalAt = goal => golden.goals[inputs.PARITY_GOALS.indexOf(goal)].expected.value;
+  assert.deepEqual(goalAt('1,000'), {value: 1000});
+  assert.ok(goalAt(49).error && goalAt(50).value === 50 && goalAt(10000).value === 10000 && goalAt(10001).error, 'goal bounds are 50..10000');
 });
 
-test('parity: activity payloads validate identically, window edges included', async () => {
+test('golden: activity payloads validate to the recorded outcomes, window edges and note lengths included', async () => {
   const core = await fn('core.mjs');
-  const script = appsScriptBackend({config: PARITY_SETTINGS, crew: PARITY_CREW});
-  const tables = PARITY_ACTIVITIES({catalog: core.SCORING.bounties, offered: core.dailyBounties(DAY)});
+  const inputs = await helper('parity-inputs.mjs');
+  const {outcome, DAY, PARITY_CREW, PARITY_SETTINGS} = inputs;
+  const table = inputs.PARITY_ACTIVITIES({catalog: core.SCORING.bounties, offered: core.dailyBounties(DAY)});
   const participants = PARITY_CREW.map(name => ({name}));
-  const results = tables.map(input => {
-    const ours = outcome(() => core.checkWindow(core.validateActivity(input, participants), PARITY_SETTINGS));
-    assert.deepEqual(ours, outcome(() => script.validateActivityWindow(script.validateActivity(input))), JSON.stringify(input));
-    return ours;
-  });
-  const codes = new Set(results.map(r => r.error?.code || 'ok'));
+  await checkGolden(golden.activities, table, input => outcome(() => core.checkWindow(core.validateActivity(input, participants), PARITY_SETTINGS)), 'activities');
+  const codes = new Set(golden.activities.map(c => c.expected.error?.code || 'ok'));
   assert.deepEqual([...codes].sort(), ['invalid_activity', 'ok', 'outside_challenge_window'], 'the table reaches every activity outcome');
+  const noteAt = length => golden.activities[table.findIndex(a => a && a.note === 'n'.repeat(length) && a.type === 'mobility')].expected;
+  assert.ok(noteAt(120).value && noteAt(121).error, 'a note may be 120 characters, not 121');
 });
 
-test('parity: the bounty rotation agrees over 184 consecutive days', async () => {
+test('golden: whole POST requests get the recorded envelopes from the handler', async () => {
+  const {handle, SCORING, dailyBounties} = await fn('core.mjs');
+  const {createMemoryStore} = await helper('memory-store.mjs');
+  const inputs = await helper('parity-inputs.mjs');
+  const {DAY, PARITY_STATES, maskReply} = inputs;
+  const bodies = inputs.PARITY_REQUESTS({catalog: SCORING.bounties, offered: dailyBounties(DAY)});
+  assert.deepEqual(Object.keys(golden.requests), Object.keys(PARITY_STATES));
+  const seen = new Set();
+  for (const [stateName, state] of Object.entries(PARITY_STATES)) {
+    const store = () => createMemoryStore({settings: state.config && {...state.config, timeZone: 'UTC'}, participants: state.crew, activities: state.activityIds.map(id => ({id, name: 'Alex', type: 'climb', category: 'climb', points: 3, date: DAY, createdAt: '2026-07-13T08:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: ''}))});
+    await checkGolden(golden.requests[stateName], bodies, async bodyText => {
+      const reply = await handle({method: 'POST', bodyText}, store(), clock('2026-07-13T12:00:00Z'));
+      if (reply.ok && 'createdAt' in reply) assert.ok(!Number.isNaN(Date.parse(reply.createdAt)) && /\S/.test(reply.id));
+      return maskReply(reply);
+    }, `requests.${stateName}`);
+    for (const c of golden.requests[stateName]) seen.add(c.expected.ok ? 'ok' : c.expected.error.code);
+  }
+  assert.deepEqual([...seen].sort(), ['duplicate_participant', 'invalid_activity', 'invalid_config', 'invalid_delete', 'invalid_json', 'invalid_participant', 'invalid_request', 'not_found', 'ok', 'outside_challenge_window', 'setup_required', 'unknown_action'], 'the request table reaches every write outcome');
+});
+
+// An intended bounty catalog or rotation change (an API bump, constraint 3) records this comparison's
+// 184 days of outputs in the golden fixture and asserts the core against them, and edits them by hand.
+// That moves the assertion onto a recorded surface; it does not retire it (ADR-0004).
+// Kept from the retired 'parity: the bounty rotation agrees over 184 consecutive days' test: the frozen
+// v13 script is now the recorded reference, so the core's full bounty objects, hashText and the empty
+// date edge case stay pinned at their original strength.
+test('golden: the core bounty rotation matches the frozen v13 script over 184 consecutive days, empty date included', async () => {
   const core = await fn('core.mjs');
-  const script = appsScriptBackend();
+  const {plain} = await helper('parity-inputs.mjs');
+  const script = loadScript();
   const cursor = new Date('2026-01-01T12:00:00Z');
   for (let i = 0; i < 184; i++, cursor.setUTCDate(cursor.getUTCDate() + 1)) {
     const day = cursor.toISOString().slice(0, 10);
@@ -343,41 +302,10 @@ test('parity: the bounty rotation agrees over 184 consecutive days', async () =>
   assert.deepEqual(core.dailyBounties(''), plain(script.dailyBounties('')));
 });
 
-test('parity: whole POST requests get the same envelopes from doPost and the handler', async () => {
-  const {handle, SCORING, dailyBounties} = await fn('core.mjs');
-  const {createMemoryStore} = await helper('memory-store.mjs');
-  const states = {
-    empty: {config: null, crew: [], activityIds: []},
-    seeded: {config: PARITY_SETTINGS, crew: PARITY_CREW, activityIds: ['a1']},
-  };
-  const requests = [
-    '', 'not json', '{"a":', 'null', '[]', '5', '"x"', '{}',
-    {action: '__smoke__'}, {action: 1}, {action: 'saveConfig'}, {action: 'saveConfig', config: 'x'},
-    ...PARITY_CONFIGS.filter(c => c && typeof c === 'object').map(config => ({action: 'saveConfig', config})),
-    ...['Zed', ' zed ', 'alex', 'MAYA', '', '  ', null, undefined, 42, 'q'.repeat(30), 'q'.repeat(31)].map(name => ({action: 'addParticipant', name})),
-    ...['a1', ' a1 ', 'a2', '', '   ', null, undefined, 0].map(id => ({action: 'delete', id})),
-    ...PARITY_ACTIVITIES({catalog: SCORING.bounties, offered: dailyBounties(DAY)}).filter(Boolean),
-  ];
-  // Ids and timestamps are generated; they are compared for shape, then masked.
-  const mask = reply => {
-    if (reply.ok && 'createdAt' in reply) {
-      assert.match(reply.id, /\S/);
-      assert.ok(!Number.isNaN(Date.parse(reply.createdAt)));
-      return {...reply, id: '<id>', createdAt: '<createdAt>'};
-    }
-    return reply;
-  };
-  const seen = new Set();
-  for (const [stateName, state] of Object.entries(states)) {
-    for (const request of requests) {
-      const bodyText = typeof request === 'string' ? request : JSON.stringify(request);
-      const script = appsScriptBackend(state);
-      const expected = mask(JSON.parse(script.doPost({postData: {contents: bodyText}})));
-      const store = createMemoryStore({settings: state.config && {...state.config, timeZone: 'UTC'}, participants: state.crew, activities: state.activityIds.map(id => ({id, name: 'Alex', type: 'climb', category: 'climb', points: 3, date: DAY, createdAt: '2026-07-13T08:00:00.000Z', hardestGrade: '', bountyId: '', bountyTitle: '', note: ''}))});
-      const actual = mask(await handle({method: 'POST', bodyText}, store, clock('2026-07-13T12:00:00Z')));
-      assert.deepEqual(actual, expected, `${stateName}: ${bodyText}`);
-      seen.add(expected.ok ? 'ok' : expected.error.code);
-    }
+test('golden: hashText and the daily rotation seed match values recorded from the frozen script', async () => {
+  const core = await fn('core.mjs');
+  for (const [day, hash] of [['2026-01-01', 2742051474], ['2026-07-13', 456467503], ['2026-12-31', 3646867301]]) {
+    assert.equal(core.hashText(`${day}|climb`), hash, day);
+    assert.equal(core.dailyBounties(day).length, 3, day);
   }
-  assert.deepEqual([...seen].sort(), ['duplicate_participant', 'invalid_activity', 'invalid_config', 'invalid_delete', 'invalid_json', 'invalid_participant', 'invalid_request', 'not_found', 'ok', 'outside_challenge_window', 'setup_required', 'unknown_action'], 'the request table reaches every write outcome');
 });

@@ -1,7 +1,8 @@
 // Core of the Road to Send Supabase function: pure request handling, no Deno, no network.
-// A second implementation of the Apps Script wire protocol (src/apps-script.js); the two must
-// stay equal, which the conformance and parity suites enforce. The validation helpers below are
-// ported one for one from the Apps Script, so their messages and details match it exactly.
+// This is the board's implementation of the wire protocol; the only one the crew runs. The old Apps
+// Script is frozen in legacy/apps-script-v13.js as a redirector and is never redeployed. Behavior
+// is pinned by the golden validation fixture (tests/fixtures/supabase-validation.golden.json) and
+// the shared conformance scenarios (tests/supabase/scenarios.mjs).
 //
 // handle({method, bodyText}, store, now) -> Promise<object>, the JSON body to send.
 //   method    'GET' | 'POST' | ...   bodyText  the raw request body as text ('' for GET)

@@ -1,17 +1,13 @@
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-// Loads the Apps Script embedded in the built index.html into a vm context with a fake Sheet
-// environment. Shared by backend-script.test.js and the Supabase conformance suite.
+// Loads the frozen v13 redirector (legacy/apps-script-v13.js, see ADR-0004) into a vm context with a
+// fake Sheet environment. It is read from the legacy file, never from index.html: the build no
+// longer embeds it. Shared by backend-script.test.js, the Supabase conformance suite and
+// scripts/capture-validation-golden.mjs.
 function loadScript() {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  const match = html.match(/const SCRIPT=(`[^`]*`);\nconst SUPPORTED_API_VERSIONS/);
-  assert.ok(match, 'embedded Apps Script was found');
-  const outer = {};
-  vm.createContext(outer);
-  vm.runInContext(`SCRIPT=${match[1]}`, outer);
+  const source = fs.readFileSync(path.join(__dirname, '..', 'legacy', 'apps-script-v13.js'), 'utf8');
   const context = {
     Utilities: {
       getUuid: () => 'uuid-test',
@@ -20,8 +16,8 @@ function loadScript() {
     SpreadsheetApp: {getActive: () => ({getSpreadsheetTimeZone: () => 'UTC'})},
   };
   vm.createContext(context);
-  vm.runInContext(outer.SCRIPT, context);
-  context.__source = outer.SCRIPT;
+  vm.runInContext(source, context);
+  context.__source = source;
   return context;
 }
 
