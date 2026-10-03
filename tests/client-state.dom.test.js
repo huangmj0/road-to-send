@@ -1306,7 +1306,7 @@ const domChecks = `(()=>{
   document.querySelector('#activityNote').value='Different note, same points';
   updateRecordPreview();
   assert.equal(creditWrites,0,'changing only a note leaves the credit preview text node untouched');
-  state.endpoint='https://example.test/exec';state.syncState='error';state.syncDetail='Could not reach the Sheet';state.syncErrorCode='RTS-NETWORK';state.protocolVersion=12;
+  state.endpoint='https://example.test/exec';state.syncState='error';state.syncDetail='Could not reach the shared board';state.syncErrorCode='RTS-NETWORK';state.protocolVersion=12;
   render();
   const detailEl=document.querySelector('#diagnosticDetail'),codeEl=document.querySelector('#diagnosticCode');
   let detailWrites=0,detailText=detailEl.textContent,codeWrites=0,codeText=codeEl.textContent;

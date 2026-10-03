@@ -25,13 +25,9 @@ const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), '
 const read = path => fs.readFileSync(new URL(path, `file://${__filename}`), 'utf8').trimEnd();
 const scoring = JSON.stringify(JSON.parse(read('../src/scoring.json')));
 const apiVersion = String(JSON.parse(read('../src/schema.json')).properties.version.const);
-const appsScript = read('../src/apps-script.js')
-  .replaceAll('__SCORING_CONFIG__', scoring)
-  .replaceAll('__API_VERSION__', apiVersion);
 const source = (read('../src/app-core.js') + '\n' + read('../src/app.js'))
   .replaceAll('__SCORING_CONFIG__', scoring)
-  .replaceAll('__API_VERSION__', apiVersion)
-  .replace('const SCRIPT=__APPS_SCRIPT__;', `const SCRIPT=${JSON.stringify(appsScript)};`);
+  .replaceAll('__API_VERSION__', apiVersion);
 
 function createDom() {
   const window = new Window({url: 'https://example.test/'});

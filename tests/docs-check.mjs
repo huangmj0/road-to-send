@@ -12,10 +12,10 @@ const at=name=>new URL('../'+name,import.meta.url);
 const agentsDoc=readFileSync(at('AGENTS.md'),'utf8');
 // Every browser source the build bundles, not just src/app.js: the split moved keys into
 // src/app-core.js, and a check that reads one file would stop seeing them. Derived from the
-// directory so a further split cannot narrow this again. src/apps-script.js is excluded --
-// it is the backend, and its roadToSendSchema is a Script Property, not a localStorage key.
+// directory so a further split cannot narrow this again. The frozen Apps Script lives in legacy/,
+// outside src/, so every src/*.js is a browser source.
 const browserSources=readdirSync(at('src'))
-  .filter(name=>name.endsWith('.js')&&name!=='apps-script.js')
+  .filter(name=>name.endsWith('.js'))
   .sort();
 const app=browserSources.map(name=>readFileSync(at('src/'+name),'utf8')).join('\n');
 
@@ -46,7 +46,7 @@ assert.match(agentsDoc,/never edit `index\.html`|Never\*\* edit\s+`index\.html`/
 // The repo conventions that used to live in docs/agents/ are in the guide: the browser/backend
 // contract files, the five triage labels, and
 // where domain terms and decisions are recorded.
-for(const file of ['src/apps-script.js','src/schema.json','src/scoring.json']){
+for(const file of ['src/schema.json','src/scoring.json']){
   assert.ok(existsSync(at(file)),`${file}, a browser/backend contract file, exists`);
   assert.ok(agentsDoc.includes('`'+file+'`'),`AGENTS.md names ${file} as part of the browser/backend contract`);
 }
