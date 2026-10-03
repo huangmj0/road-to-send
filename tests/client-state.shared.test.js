@@ -734,3 +734,135 @@ test('a superseded response carrying movedTo is dropped without a redirect or ca
     `,
   });
 });
+
+// A move adopts the destination's own cache: the page shows it while the destination is unreachable,
+// and the old endpoint's board is never written under the destination's keys.
+const OLD_CACHE = {
+  activities: [{id: 'o1', name: 'Alex', type: 'exercise', date: '2026-07-10', createdAt: '1'}],
+  config: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]},
+  meta: {lastSyncedAt: 1000, protocolVersion: 13, serverDate: '2026-07-10', timeZone: 'UTC'},
+};
+const DEST_CACHE = {
+  activities: [{id: 'd1', name: 'Alex', type: 'climb', date: '2026-07-12', createdAt: '2'}, {id: 'd2', name: 'Maya', type: 'mobility', date: '2026-07-12', createdAt: '3'}],
+  config: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 700, crew: [{name: 'Alex'}, {name: 'Maya'}]},
+  meta: {lastSyncedAt: 2000, protocolVersion: 13, serverDate: '2026-07-12', timeZone: 'America/Los_Angeles'},
+};
+function cacheSeed(url, cache) {
+  return Object.fromEntries(Object.entries(cache).map(([kind, value]) => ['roadToSendShared:' + kind + ':' + encodeURIComponent(url), JSON.stringify(value)]));
+}
+const showsDestinationCache = `
+  assert.equal(JSON.stringify(state.logs.map(x=>x.id)),'["d1","d2"]','shows the destination cache');
+  assert.equal(state.config.goal,700);
+  assert.equal(state.config.crew.map(x=>x.name).join(),'Alex,Maya');
+  assert.equal(state.challengeTimeZone,'America/Los_Angeles');
+  assert.equal(state.lastSyncedAt,2000);
+  assert.equal(state.syncState,'stale');
+  assert.equal(document.querySelector('#groupGoal').textContent,'700','the destination cache is rendered');
+  assert.equal(store.get('roadToSendMe'),'Alex','the climber is remembered');
+  for(const kind of ['activities','config','meta'])assert.equal(store.get(cacheKey(kind,'${NEW_URL}')),JSON.stringify(${JSON.stringify(DEST_CACHE)}[kind]),kind+' destination cache is unchanged');
+`;
+
+test('a GET move whose destination is unreachable shows the destination cache, not the old board', async () => {
+  await movedScenario({
+    seed: {...cacheSeed(OLD_URL, OLD_CACHE), ...cacheSeed(NEW_URL, DEST_CACHE)},
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: () => { throw new Error('offline'); },
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      ${showsDestinationCache}
+    `,
+  });
+});
+
+test('a write rejected as moved never caches the old board under the destination and shows the destination cache', async () => {
+  let gets = 0;
+  await movedScenario({
+    seed: {...cacheSeed(OLD_URL, OLD_CACHE), ...cacheSeed(NEW_URL, DEST_CACHE)},
+    backends: {
+      // The page loaded before the organizer set movedTo, so the first GET carries no move.
+      [OLD_URL]: (m, b, board) => m === 'POST' ? movedReply() : (gets++, board(13)),
+      [NEW_URL]: () => { throw new Error('offline'); },
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${OLD_URL}');
+      state.pendingDelete={entry:state.logs[0],index:0,id:'a1',feed:'personal',position:0};
+      await performDelete();
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(fetched().includes('GET ${NEW_URL}'),true,'the destination is fetched');
+      ${showsDestinationCache}
+    `,
+  });
+  assert.equal(gets, 1);
+});
+
+test('a move to a destination without a cache keeps the shown board and the climber until it answers', async () => {
+  await movedScenario({
+    seed: cacheSeed(OLD_URL, OLD_CACHE),
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: () => { throw new Error('offline'); },
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(state.logs.map(x=>x.id).join(),'o1','still shows the board it had');
+      assert.equal(store.get('roadToSendMe'),'Alex','an empty default crew never makes render() forget the climber');
+      assert.equal(store.keys().filter(k=>k.indexOf(encodeURIComponent('${NEW_URL}'))>=0).length,0,'nothing is cached for the destination');
+    `,
+  });
+});
+
+test('a move adopts a partial destination cache, drops the old setup errors, and survives a throwing cache probe', async () => {
+  const partial = cacheSeed(NEW_URL, {config: DEST_CACHE.config});
+  await movedScenario({
+    seed: {...cacheSeed(OLD_URL, OLD_CACHE), ...partial},
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: () => { throw new Error('offline'); },
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(state.config.goal,700,'a config-only destination cache is adopted');
+      assert.equal(state.logs.length,0,'with no cached activities of its own');
+    `,
+  });
+  await movedScenario({
+    seed: {...cacheSeed(OLD_URL, OLD_CACHE), ...cacheSeed(NEW_URL, DEST_CACHE)},
+    backends: {
+      [OLD_URL]: (m, b, board) => m === 'POST' ? movedReply() : board(13),
+      [NEW_URL]: () => { throw new Error('offline'); },
+    },
+    checks: `
+      ${settle}
+      state.configErrors={goal:'Old board goal is invalid.'};
+      followRejectedMove(${JSON.stringify(movedReply())});
+      ${settle}
+      assert.equal(Object.keys(state.configErrors).length,0,'the old board setup errors are dropped');
+      assert.equal(document.querySelector('#configNotice').classList.contains('hide'),true);
+    `,
+  });
+  await movedScenario({
+    seed: cacheSeed(OLD_URL, OLD_CACHE),
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: (m, b, board) => board(13),
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(fetched().includes('GET ${NEW_URL}'),true,'the destination is still fetched');
+      assert.equal(state.syncState,'live');
+    `,
+    // Storage that refuses to read the destination's keys: the cache probe throws, the move goes on.
+    extra: {localStorage: {
+      getItem: key => { if (key.includes(encodeURIComponent(NEW_URL))) throw new Error('denied'); return {roadToSendEndpoint: OLD_URL, roadToSendMe: 'Alex'}[key] ?? null; },
+      setItem() {}, removeItem() {},
+    }},
+  });
+});
