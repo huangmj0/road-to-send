@@ -1,7 +1,9 @@
 // Dev tool: runs every PARITY input through the frozen v13 Apps Script (legacy/apps-script-v13.js, read
 // directly, so no build is needed) and records the normalized outputs in
 // tests/fixtures/supabase-validation.golden.json. tests/supabase-conformance.test.js asserts the
-// Supabase core against that file. Rerun only when an input table or intended behavior changes.
+// Supabase core against that file. It only ever reproduces the frozen v13 baseline, so do not rerun it
+// once any expectation has been edited by hand: an intended behavior change, or a new input row whose
+// expected outcome differs from the frozen script, is recorded by editing the fixture by hand.
 import fs from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';

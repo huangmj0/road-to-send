@@ -1,6 +1,7 @@
 // Input tables shared by scripts/capture-validation-golden.mjs (which records the Apps Script's
 // outputs) and tests/supabase-conformance.test.js (which asserts the Supabase core against them).
-// Changing a table means regenerating tests/fixtures/supabase-validation.golden.json.
+// Changing a table means updating tests/fixtures/supabase-validation.golden.json to match: by hand once
+// any expectation has diverged from the frozen script (see AGENTS.md).
 
 // vm objects come from another realm, so every result is compared through a JSON round trip.
 export const plain = value => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));

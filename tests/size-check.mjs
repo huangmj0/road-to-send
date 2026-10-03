@@ -95,7 +95,7 @@ import { readFileSync } from 'node:fs';
 // again) this brings BUDGET back down, leaving 5238 bytes of headroom for what comes next.
 //
 // Re-baselined 159000 -> 142000 by retiring the Apps Script (ADR-0004): the artifact no longer
-// embeds the script for the setup dialog's copy button, measured 158807 -> 136989 bytes (-21818),
+// embeds the script for the setup dialog's copy button, measured 158807 -> 136943 bytes (-21864),
 // including the move-follow ordering fix and backend-neutral copy. The cap keeps about the same
 // 5000 bytes of headroom as the previous entry rather than banking the whole saving as slack.
 const BUDGET = 142000;

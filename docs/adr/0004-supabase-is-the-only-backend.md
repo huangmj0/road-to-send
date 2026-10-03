@@ -38,6 +38,9 @@ backend no new crew would use.
 - The Apps Script parity suite became a golden fixture
   (`tests/fixtures/supabase-validation.golden.json`, recorded once from the frozen script by
   `scripts/capture-validation-golden.mjs`; later intended changes edit its expectations by hand) plus the shared conformance scenarios.
+- The core's 184-day bounty rotation is still compared live against the frozen script. An intended
+  catalog or rotation change records those outputs in the golden fixture instead and edits them by
+  hand. That moves the assertion; it does not retire it.
 - The rotation agreement test now pins the browser's `dailyBounties()` against the function's
   `core.mjs`, so ADR-0003's two-way pin is retargeted rather than dropped.
 - The artifact is about 22 KB smaller.

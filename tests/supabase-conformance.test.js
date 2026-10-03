@@ -9,9 +9,10 @@
 // The golden tests (bottom of the file) assert the core against tests/fixtures/supabase-validation.golden.json,
 // recorded from the frozen script by scripts/capture-validation-golden.mjs (it reads legacy/apps-script-v13.js,
 // so no build is needed); the golden is a fixed record, not a live comparison, so a behavior change in
-// the core fails here until the golden is deliberately regenerated or the change is reverted.
+// the core fails here until the affected expectations are deliberately edited by hand or the change is
+// reverted. Rerunning the generator only restores the frozen baseline (see AGENTS.md).
 // Inputs come from tests/supabase/parity-inputs.mjs and each fixture entry carries its decoded input,
-// so editing a table without regenerating fails on a stale input, not on a vague diff.
+// so editing a table without updating the fixture fails on a stale input, not on a vague diff.
 // The HTTP-transport test rebuilds index.mjs's Request/Response adaptation around route() by
 // hand (index.mjs calls Deno.serve on import, so it is never imported here); the real entry is
 // exercised only by tests/supabase-stack.test.mjs against a local stack.
@@ -215,9 +216,9 @@ const golden = JSON.parse(fs.readFileSync(new URL('./fixtures/supabase-validatio
 // reproduce the recorded outcome exactly.
 async function checkGolden(entries, inputs, run, label) {
   const {decode, plain} = await helper('parity-inputs.mjs');
-  assert.equal(entries.length, inputs.length, `${label}: fixture and table have the same number of cases (regenerate the fixture)`);
+  assert.equal(entries.length, inputs.length, `${label}: fixture and table have the same number of cases (update the fixture; by hand once expectations diverge from the frozen script)`);
   for (const [i, input] of inputs.entries()) {
-    assert.deepEqual(decode(entries[i].input), input, `${label}[${i}]: fixture input is stale (regenerate the fixture)`);
+    assert.deepEqual(decode(entries[i].input), input, `${label}[${i}]: fixture input is stale (update the fixture entry; by hand once expectations diverge from the frozen script)`);
     assert.deepEqual(plain(await run(input)) ?? null, entries[i].expected, `${label}[${i}]: ${JSON.stringify(input)}`);
   }
 }
@@ -282,6 +283,9 @@ test('golden: whole POST requests get the recorded envelopes from the handler', 
   assert.deepEqual([...seen].sort(), ['duplicate_participant', 'invalid_activity', 'invalid_config', 'invalid_delete', 'invalid_json', 'invalid_participant', 'invalid_request', 'not_found', 'ok', 'outside_challenge_window', 'setup_required', 'unknown_action'], 'the request table reaches every write outcome');
 });
 
+// An intended bounty catalog or rotation change (an API bump, constraint 3) records this comparison's
+// 184 days of outputs in the golden fixture and asserts the core against them, and edits them by hand.
+// That moves the assertion onto a recorded surface; it does not retire it (ADR-0004).
 // Kept from the retired 'parity: the bounty rotation agrees over 184 consecutive days' test: the frozen
 // v13 script is now the recorded reference, so the core's full bounty objects, hashText and the empty
 // date edge case stay pinned at their original strength.
