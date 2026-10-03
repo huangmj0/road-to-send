@@ -9,8 +9,7 @@ const TYPE_ICONS={climb:'climb',exercise:'exercise',mobility:'mobility',bounty:'
 // and changing it never touches the backend contract.
 function glyph(k){return `<svg class="glyph" aria-hidden="true"><use href="#g-${k}"/></svg>`}
 const TITLE_CATEGORIES=[{id:'crusher',title:'Crusher',type:'climb'},{id:'gym-rat',title:'Gym Rat',type:'exercise'},{id:'yogi',title:'Yogi',type:'mobility'}];
-const SCRIPT=__APPS_SCRIPT__;
-const SUPPORTED_API_VERSIONS=new Set([__API_VERSION__,12]);// current version leads (drives the "expects vN" displays); 12 is accepted while the Sheet may still run v12 — v13 only adds the optional movedTo, so a v12 backend's JSON still validates. Drop 12 once every backend is on 13.
+const SUPPORTED_API_VERSIONS=new Set([__API_VERSION__,12]);// current version leads (drives the "expects vN" displays); 12 stays accepted because v13 only adds the optional movedTo, so a v12 backend's JSON still validates. The live crew's backends (the Supabase function and the frozen Sheet redirector) both serve v13, so 12 can go in the next version bump.
 function localDate(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function parseDateOnly(value){const s=String(value||''),m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);if(!m)return null;const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),12);return localDate(d)===s?d:null}
 function windowStart(today,days=7){const d=parseDateOnly(String(today||'').slice(0,10));if(!d)return'';d.setDate(d.getDate()-days+1);return localDate(d)}

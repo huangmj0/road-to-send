@@ -1,6 +1,6 @@
 # Road to Send
 
-A self-contained, mobile-first climbing challenge. The app has three views: **You**, **Record**, and **Crew**. It remembers the selected person on each device, lets new crew members create their own profile, supports temporary proxy recording, and shares data through Google Sheets and Apps Script.
+A self-contained, mobile-first climbing challenge. The app has three views: **You**, **Record**, and **Crew**. It remembers the selected person on each device, lets new crew members create their own profile, supports temporary proxy recording, and shares data through a Supabase backend.
 
 ## Scoring
 
@@ -18,33 +18,35 @@ A **balanced** economy across three categories — you can't win by grinding one
 
 ## Shared setup
 
-GitHub Pages hosts the interface, while a Google Sheet stores shared settings and activity:
+GitHub Pages hosts the interface, while a Supabase Edge Function and Postgres database store shared settings and activity. Each crew deploys its own function and needs a free Supabase project. You need the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), logged in with `supabase login`, and a checkout of this repository.
 
-1. Create a Google Sheet and open **Extensions → Apps Script**.
-2. Open the app’s settings, expand **Apps Script source**, copy it, and replace the editor contents.
-3. Choose **Deploy → New deployment → Web app**. Execute as yourself and allow access to anyone with the link.
-4. Paste the `/exec` deployment URL into the app.
-5. Set the challenge dates and group goal. Participants can join from the identity prompt; organizers can also manage the roster in setup.
-6. Save setup and distribute the copied crew link.
+1. Create a new, empty Supabase project and note its `<project-ref>`.
+2. Link it and apply the migrations. They create the `settings`, `participants` and `activities` tables with row-level security on and no policies, so only the function can reach the data:
 
-The Sheet uses `Settings`, `Participants`, and `Activities` tabs. `Participants` contains a single `name` column; `Activities` contains raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time.
+   ```bash
+   supabase link --project-ref <project-ref>
+   supabase db push
+   ```
 
-### Upgrading to API v13
+3. Deploy the function. `supabase/config.toml` sets `verify_jwt = false`, because browsers call it with a plain `fetch`. If a request is rejected with HTTP 401, deploy again with `--no-verify-jwt`. The function reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which Supabase injects, so there are no secrets to set:
 
-API v13 adds one optional field, `movedTo`. Redeploy the Apps Script (paste the new script over the old one and deploy a new version; the `/exec` URL stays the same) to use it. The browser accepts v13 and v12, so the site and the script can update in either order.
+   ```bash
+   supabase functions deploy road-to-send
+   ```
 
-**Moving the crew board.** Add a row to the `Settings` tab with key `movedTo` and an `https://` URL as the value. Anything that is not an https URL is ignored. While it is set, the Sheet still serves the full board on GET, now including `movedTo`, but refuses every write with error code `moved` and the message "The crew board has moved. Try again." Nothing is written. A browser that sees `movedTo` switches to the new endpoint (once per page load), so old crew links keep working. Keep the Sheet deployed as the redirector.
+4. Check it with `node scripts/smoke-check.mjs https://<project-ref>.supabase.co/functions/v1/road-to-send`. The check never writes.
+5. Open the app's settings and paste the function URL (`https://<project-ref>.supabase.co/functions/v1/road-to-send`) as the shared-board endpoint.
+6. Set the challenge dates and group goal. Participants can join from the identity prompt; organizers can also manage the roster in setup.
+7. Save setup and distribute the copied crew link.
+8. Set the crew's time zone before anyone logs. The board starts in UTC, and the challenge day and daily bounties roll over at midnight in this zone. In the Supabase SQL editor, run `update settings set time_zone = 'America/Los_Angeles' where id = 1;` with your crew's IANA zone. Saving setup again keeps it.
 
-### Earlier upgrade: API v12
+The database uses `settings`, `participants` and `activities` tables. `participants` holds names; `activities` holds raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time. The function is the only implementation of the API; changing the contract (`src/schema.json`, `src/scoring.json` or the function) bumps the API version and means redeploying it with `supabase functions deploy road-to-send`.
 
-Paste the v12 script over the old Apps Script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same.
+Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live endpoint or crew data.
 
-- v12 changes only how the backend works, not the data or the wire format. The Apps Script used to re-provision and re-format every tab on **every** read and write; it now does that formatting once, when a Sheet is first set up, and skips it on every later call. Together with the client no longer reloading the whole `Activities` tab just to confirm one save, logging an activity is markedly faster. An already-set-up Sheet keeps every tab and its data and is never re-archived.
-- Because `src/apps-script.js` is part of the versioned browser/backend contract, the protocol version is bumped even though the JSON is unchanged. The rollout is graceful: the v12 client accepted both a redeployed v12 backend and a not-yet-redeployed v11 one, since their wire format is byte-for-byte identical — there is no outage window, so the site and the script can update in either order. Deploy the v12 script when convenient to pick up the speedup; until you do, clients keep working against v11.
-- Upgrading from v10 or v9 keeps every tab and its data. Upgrading from v8 or earlier renames any existing `Activities` (and leftover `Benchmarks`) tab to a timestamped archive tab exactly once, then a fresh `Activities` tab is created. The redesigned scoring starts clean. Existing `Settings` remain; the `Participants` tab is rewritten to a name-only column (the old `pullMode` column is dropped).
-- v11 was accepted only transitionally, to bridge the v12 rollout. The v13 client accepts v13 and v12 only; v11 and earlier endpoints are rejected, so redeploy the script.
+### Legacy Sheet redirector
 
-Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live Apps Script endpoint or sensitive Sheet data.
+Crews that started on Google Sheets keep their Sheet and its Apps Script deployed at API v13, with a `movedTo` row in the `Settings` tab (key `movedTo`, an `https://` URL as the value; anything else is ignored). The Sheet still serves its frozen board on GET, now including `movedTo`, and refuses every write with error code `moved`. A browser that sees `movedTo` switches to the new endpoint once per page load, before it checks the API version, so old `?sheet=` crew links keep working across future API bumps. **Leave the Sheet deployed and never redeploy it.** The script is no longer offered in the app. `legacy/apps-script-v13.js` is a frozen record of what it runs. Browsers accept API v13 and v12 responses.
 
 ## API v13
 
@@ -70,11 +72,11 @@ Reads return the following (`movedTo` appears only while the organizer has set i
 
 Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 13, ok, ... }` — the full saved activity record, which the app adds to the feed immediately and then reconciles with a background sync; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
 
-A save is confirmed as soon as the Sheet accepts the write, so the only outcomes are **Activity saved** and **Save failed** (safe to retry). The Crew sync control refreshes the shared board on demand.
+A save is confirmed as soon as the backend accepts the write, so the only outcomes are **Activity saved** and **Save failed** (safe to retry). The Crew sync control refreshes the shared board on demand.
 
 ## Moving the shared backend to Supabase
 
-This is the organizer's runbook for moving a crew's shared board from the Google Sheet to a Supabase Edge Function that speaks the same API. The app URL stays the same. Crew members don't have to do anything: each browser follows the Sheet's `movedTo` to the new backend on its next load. Profiles, local logs and caches stay in each browser.
+This is the organizer's runbook, used for the original cutover, for moving a crew's shared board from the Google Sheet to a Supabase Edge Function that speaks the same API. New crews only need "Shared setup" above. The app URL stays the same. Crew members don't have to do anything: each browser follows the Sheet's `movedTo` to the new backend on its next load. Profiles, local logs and caches stay in each browser.
 
 Run every command from a checkout of this repository. The placeholders are `<project-ref>` (your Supabase project's reference id), `<apps-script-url>` (the Sheet's `/exec` URL), `<app-url>` (the GitHub Pages address) and `<database-connection-string>` (from the project's **Connect** dialog). **Snapshots and generated SQL hold crew data.** Write them only to the temporary directory below, which is outside the repository, and never commit them.
 
@@ -130,7 +132,7 @@ node scripts/smoke-check.mjs "$FUNCTION_URL"
 
 All three checks must pass, and GET reports `config not set yet`. The smoke check never writes: it sends a GET, an OPTIONS and a POST of `{"action":"__smoke__"}`, which every backend rejects with `unknown_action`. Until the import, the function has no setup, so it rejects every logged activity (`invalid_activity`) and every new profile (`setup_required`). Saving setup is the one write it accepts, which is why step 3 asks everyone to hold off.
 
-**3. Freeze the Sheet and start the move.** Redeploy the Apps Script at v13. Paste the script from the app's **Apps Script source** over the old one and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same. Then, in the Sheet's `Settings` tab, add a row with key `movedTo` and the function URL as its value. From now on, the Sheet serves reads but refuses every write with `moved`. Browsers start switching to the function, and they show an empty board until step 4 finishes. Confirm the Sheet is frozen:
+**3. Freeze the Sheet and start the move.** This is the one time `legacy/apps-script-v13.js` is deployed: for a crew still on a Sheet, during its cutover. Redeploy the Apps Script at v13. Paste `legacy/apps-script-v13.js` from this repository over the old script and deploy a new version from **Deploy → Manage deployments**. The `/exec` URL stays the same. Then, in the Sheet's `Settings` tab, add a row with key `movedTo` and the function URL as its value. From now on, the Sheet serves reads but refuses every write with `moved`. Browsers start switching to the function, and they show an empty board until step 4 finishes. Confirm the Sheet is frozen:
 
 ```bash
 curl -fsSL '<apps-script-url>' | node -e 'const p=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log("version", p.version, "movedTo", p.movedTo)'
@@ -191,6 +193,6 @@ npm test
 python3 -m http.server 8000
 ```
 
-Open `http://localhost:8000/`. `npm test` verifies the generated artifact, client scoring/state, Apps Script validation and migration, protocol fixtures, shared workflow, accessibility, and required mobile UI hooks.
+Open `http://localhost:8000/`. `npm test` verifies the generated artifact, client scoring/state, the Supabase function's validation (against a golden fixture) and the legacy redirector, protocol fixtures, shared workflow, accessibility, and required mobile UI hooks.
 
-Pushes to `main` are expected to deploy through GitHub Pages. Shared-mode backend changes also require copying and redeploying the embedded Apps Script.
+Pushes to `main` are expected to deploy through GitHub Pages. Shared-mode contract changes also require redeploying the Supabase function (`supabase functions deploy road-to-send`).

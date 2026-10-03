@@ -2,7 +2,7 @@
 
 <!-- User-visible behaviour first. Name the helpers added or reused, and say where the new surface
      sits in the page. Note any scoring or API compatibility effect — there should normally be none,
-     since src/scoring.json, src/schema.json and src/apps-script.js are the coordinated
+     since src/scoring.json, src/schema.json and the Supabase function (supabase/functions/road-to-send/) are the coordinated
      browser/backend contract (see AGENTS.md). -->
 
 ## Tests

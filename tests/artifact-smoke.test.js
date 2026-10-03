@@ -82,3 +82,18 @@ test('the committed artifact renders a shared Sheet response', async () => {
   assert.equal(window.document.querySelector('#totalPoints').textContent, '2');
   assert.match(window.document.querySelector('#syncStatus').textContent, /^Live/);
 });
+
+test('no user-visible text in the committed artifact names Apps Script', () => {
+  const window = new Window({url: 'https://example.test/'});
+  window.document.write(html.replace(/<script>[\s\S]*?<\/script>/, ''));
+  window.eval(script);
+  const seen = [];
+  for (const el of window.document.querySelectorAll('*')) {
+    if (['SCRIPT', 'STYLE'].includes(el.tagName)) continue;
+    for (const node of el.childNodes) if (node.nodeType === 3) seen.push(node.textContent);
+    for (const attr of ['aria-label', 'title', 'placeholder', 'alt', 'aria-description']) if (el.hasAttribute(attr)) seen.push(el.getAttribute(attr));
+  }
+  assert.ok(seen.length > 50, 'the scan reached the rendered text');
+  assert.deepEqual(seen.filter(text => /Apps Script/i.test(text)), []);
+  assert.doesNotMatch(script, /(['"`])[^'"`\n]*Apps Script[^'"`\n]*\1/, 'no string literal in the bundled code shows Apps Script to users');
+});

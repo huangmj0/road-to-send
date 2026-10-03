@@ -88,7 +88,7 @@ test('background sync respects the open date picker and refreshes stale caches',
   await vm.runInNewContext(`${source}\n${syncChecks}`, syncContext, {filename: 'index.html'});
 });
 
-// Entry 55: testConnection()'s outdated-script message used to hard-code "deploy v11", which
+// Entry 55: testConnection()'s outdated-board message used to hard-code "deploy v11", which
 // would quietly go stale the next time the protocol version bumps. It now derives the version
 // from SUPPORTED_API_VERSIONS, the same expression saveSetup() and exportData() already use.
 test('testConnection names the expected protocol version instead of a stale literal', async () => {
@@ -109,7 +109,7 @@ test('testConnection names the expected protocol version instead of a stale lite
     const expectedVersion=[...SUPPORTED_API_VERSIONS][0];
     const ok=await testConnection();
     assert.equal(ok,false,'an unsupported version reports the connection as not usable');
-    assert.equal(document.querySelector('#testResult').textContent,'Outdated Apps Script — deploy v'+expectedVersion,'the outdated-script message names the version this build expects, not a hard-coded literal');
+    assert.equal(document.querySelector('#testResult').textContent,'Outdated board — update it to v'+expectedVersion,'the outdated-board message names the version this build expects, not a hard-coded literal');
   })()`;
   await vm.runInNewContext(`${source}\n${testChecks}`, testContext, {filename: 'index.html'});
 });
@@ -435,7 +435,7 @@ test('the share sheet is tried first, and a dismissed one is not a failure', asy
 // Protocol v13: a backend that answers with movedTo is followed, once per page load.
 const OLD_URL = 'https://old.example.test/exec';
 const NEW_URL = 'https://new.example.test/fn';
-async function movedScenario({endpoint = OLD_URL, search = '', seed = {}, backends, checks}) {
+async function movedScenario({endpoint = OLD_URL, search = '', seed = {}, extra = {}, backends, checks}) {
   const dom = sharedDom();
   const store = new Map(Object.entries(seed));
   if (endpoint) store.set('roadToSendEndpoint', endpoint);
@@ -459,6 +459,7 @@ async function movedScenario({endpoint = OLD_URL, search = '', seed = {}, backen
     },
     localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
     setTimeout() {}, clearTimeout() {},
+    ...extra,
   };
   await vm.runInNewContext(`${source}\n(async()=>{${checks}\n})()`, context, {filename: 'index.html'});
 }
@@ -602,4 +603,134 @@ test('both v12 and v13 payloads load', async () => {
       `,
     });
   }
+});
+
+test('a v13 sheet answering movedTo is followed to the destination board', async () => {
+  await movedScenario({
+    backends: {[OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}), [NEW_URL]: (m, b, board) => board(13)},
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(state.syncState,'live');
+      assert.equal(state.logs.length,1);
+    `,
+  });
+});
+
+test('a redirector answering an unsupported version with movedTo is still followed', async () => {
+  await movedScenario({
+    backends: {[OLD_URL]: (m, b, board) => Object.assign(board(99), {movedTo: NEW_URL}), [NEW_URL]: (m, b, board) => board(13)},
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(state.syncState,'live');
+      assert.equal(state.protocolVersion,13);
+      assert.equal(store.get(cacheKey('activities','${OLD_URL}')),undefined,'nothing from the redirector is cached');
+    `,
+  });
+});
+
+test('an unsupported version without movedTo keeps the version error state', async () => {
+  await movedScenario({
+    backends: {[OLD_URL]: (m, b, board) => board(99)},
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${OLD_URL}');
+      assert.equal(state.syncState,'error');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+    `,
+  });
+});
+
+test('a failed destination fetch leaves an existing destination cache untouched', async () => {
+  const seed = {};
+  for (const kind of ['activities', 'config', 'meta']) seed['roadToSendShared:' + kind + ':' + encodeURIComponent(NEW_URL)] = '"keep-' + kind + '"';
+  await movedScenario({
+    seed,
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: () => {throw new Error('offline')},
+    },
+    checks: `
+      ${settle}
+      for(const kind of ['activities','config','meta'])assert.equal(store.get(cacheKey(kind,'${NEW_URL}')),'"keep-'+kind+'"',kind+' destination cache is unchanged');
+      for(const kind of ['activities','config','meta'])assert.equal(store.get(cacheKey(kind,'${OLD_URL}')),undefined,kind+' old cache is not written');
+      assert.notEqual(state.syncState,'live');
+    `,
+  });
+});
+
+test('an unsupported response carrying movedTo after the hop was used is a version error with nothing cached', async () => {
+  await movedScenario({
+    backends: {
+      [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
+      [NEW_URL]: (m, b, board) => Object.assign(board(99), {movedTo: OLD_URL}),
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+      assert.notEqual(state.syncState,'live');
+      assert.equal(store.keys().filter(k=>k.indexOf('roadToSendShared:')===0).length,0,'nothing is cached');
+    `,
+  });
+});
+
+test('testConnection on an unsupported response with movedTo is not connected and names the destination', async () => {
+  await movedScenario({
+    backends: {[OLD_URL]: (m, b, board) => Object.assign(board(99), {movedTo: NEW_URL})},
+    checks: `
+      ${settle}
+      document.querySelector('#endpoint').value='${OLD_URL}';
+      const ok=await testConnection();
+      const text=document.querySelector('#testResult').textContent;
+      assert.equal(ok,false);
+      assert.equal(text.indexOf('Connected'),-1);
+      assert.ok(text.indexOf('${NEW_URL}')>=0,'names the destination, got '+text);
+    `,
+  });
+});
+
+test('testConnection on a supported v13 redirector with movedTo is not connected and names the destination', async () => {
+  await movedScenario({
+    backends: {[OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL})},
+    checks: `
+      ${settle}
+      document.querySelector('#endpoint').value='${OLD_URL}';
+      const ok=await testConnection();
+      const text=document.querySelector('#testResult').textContent;
+      assert.equal(ok,false);
+      assert.equal(text.indexOf('Connected'),-1);
+      assert.ok(text.indexOf('${NEW_URL}')>=0,'names the destination, got '+text);
+    `,
+  });
+});
+
+test('a superseded response carrying movedTo is dropped without a redirect or cache write', async () => {
+  const waiting = [];
+  let calls = 0;
+  await movedScenario({
+    search: '?sheet=' + encodeURIComponent(OLD_URL),
+    extra: {release: (i, payload) => waiting[i](payload)},
+    backends: {
+      [OLD_URL]: (m, b, board) => ++calls === 1 ? board(13) : new Promise(resolve => waiting.push(resolve)),
+      [NEW_URL]: (m, b, board) => board(13),
+    },
+    checks: `
+      ${settle}
+      const older=loadRemote(),newer=loadRemote();
+      ${settle}
+      release(1,Object.assign({version:13,features:[],activities:[],config:state.config,configErrors:[],serverDate:'2026-07-13',timeZone:'UTC'}));
+      await newer;
+      const snapshot=JSON.stringify(store.keys().map(k=>[k,store.get(k)]));
+      const replacedBefore=replaced().length;
+      release(0,Object.assign({version:13,features:[],activities:[{id:'z',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'9'}],config:state.config,configErrors:[],serverDate:'2026-07-13',timeZone:'UTC'},{movedTo:'${NEW_URL}'}));
+      assert.equal(await older,false);
+      assert.equal(state.endpoint,'${OLD_URL}','no redirect');
+      assert.equal(store.get('roadToSendEndpoint'),'${OLD_URL}','stored endpoint unchanged');
+      assert.equal(replaced().length,replacedBefore,'address bar unchanged');
+      assert.equal(JSON.stringify(store.keys().map(k=>[k,store.get(k)])),snapshot,'no cache write');
+      assert.equal(fetched().includes('GET ${NEW_URL}'),false);
+    `,
+  });
 });

@@ -15,16 +15,22 @@ One member of a crew, identified by name. The person whose data a frozen localSt
 _Avoid_: user, participant, player
 
 **Organizer**:
-The climber who set the crew up and who redeploys the Apps Script backend by hand. Distinct from a
-climber because a backend change only reaches a crew once *its* organizer redeploys.
+The climber who set the crew up and who deploys, and redeploys by hand, the board's Supabase function. Distinct
+from a climber because a backend change only reaches a crew once *its* organizer redeploys.
 _Avoid_: admin, owner, maintainer
 
 **Shared mode**:
-The state in which a crew's board is backed by their Google Sheet, so every climber sees the same
-data and the challenge day follows the Sheet's timezone.
+The state in which a crew's board is backed by the crew's shared-board backend (a Supabase function; the
+old Google Sheet now only redirects), so every climber sees the same data and the challenge day
+follows the backend's timezone.
 _Avoid_: online, connected, endpoint mode
 
 **Local mode**:
-The state in which a board exists only in one browser's localStorage, with no Sheet behind it.
+The state in which a board exists only in one browser's localStorage, with no shared board behind it.
 Deletes are undoable here and not in shared mode.
 _Avoid_: offline, standalone, unconnected
+
+**Redirector**:
+The crew's old Google Sheet, frozen at API v13. It serves its last board with `movedTo` set and
+refuses writes, so old `?sheet=` links lead the browser to the Supabase function.
+_Avoid_: backup, legacy backend

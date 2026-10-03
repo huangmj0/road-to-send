@@ -93,7 +93,12 @@ import { readFileSync } from 'node:fs';
 // add the rest. The 6832 bytes the esbuild closure reserved for this work went almost
 // entirely unused, so per the rule above (a pass landing under its projection lowers the cap
 // again) this brings BUDGET back down, leaving 5238 bytes of headroom for what comes next.
-const BUDGET = 159000;
+//
+// Re-baselined 159000 -> 142000 by retiring the Apps Script (ADR-0004): the artifact no longer
+// embeds the script for the setup dialog's copy button, measured 158807 -> 136989 bytes (-21818),
+// including the move-follow ordering fix and backend-neutral copy. The cap keeps about the same
+// 5000 bytes of headroom as the previous entry rather than banking the whole saving as slack.
+const BUDGET = 142000;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);

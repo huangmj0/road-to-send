@@ -1,0 +1,4221 @@
+{
+  "dates": [
+    {
+      "input": "2026-07-13",
+      "expected": {
+        "value": {
+          "value": "2026-07-13"
+        }
+      }
+    },
+    {
+      "input": "2026-7-3",
+      "expected": {
+        "value": {
+          "value": "2026-07-03"
+        }
+      }
+    },
+    {
+      "input": " 2026-07-13 ",
+      "expected": {
+        "value": {
+          "value": "2026-07-13"
+        }
+      }
+    },
+    {
+      "input": "2024-02-29",
+      "expected": {
+        "value": {
+          "value": "2024-02-29"
+        }
+      }
+    },
+    {
+      "input": "2025-02-29",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "2026-02-30",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "2026-13-01",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "2026-00-10",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "1900-01-01",
+      "expected": {
+        "value": {
+          "value": "1900-01-01"
+        }
+      }
+    },
+    {
+      "input": "1899-12-31",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "2200-12-31",
+      "expected": {
+        "value": {
+          "value": "2200-12-31"
+        }
+      }
+    },
+    {
+      "input": "2201-01-01",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "07/13/2026",
+      "expected": {
+        "value": {
+          "value": "2026-07-13"
+        }
+      }
+    },
+    {
+      "input": "7/3/2026",
+      "expected": {
+        "value": {
+          "value": "2026-07-03"
+        }
+      }
+    },
+    {
+      "input": "07-13-2026",
+      "expected": {
+        "value": {
+          "value": "2026-07-13"
+        }
+      }
+    },
+    {
+      "input": "13/07/2026",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "02/29/2025",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "July 13, 2026",
+      "expected": {
+        "value": {
+          "value": "2026-07-13"
+        }
+      }
+    },
+    {
+      "input": "Jul 13 2026",
+      "expected": {
+        "value": {
+          "value": "2026-07-13"
+        }
+      }
+    },
+    {
+      "input": "july 3, 2026",
+      "expected": {
+        "value": {
+          "value": "2026-07-03"
+        }
+      }
+    },
+    {
+      "input": "SEPT 9, 2026",
+      "expected": {
+        "value": {
+          "value": "2026-09-09"
+        }
+      }
+    },
+    {
+      "input": "Sept 31, 2026",
+      "expected": {
+        "value": {
+          "error": "must be a real calendar date"
+        }
+      }
+    },
+    {
+      "input": "Foo 3, 2026",
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    },
+    {
+      "input": "July 13th, 2026",
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    },
+    {
+      "input": "2026/07/13",
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    },
+    {
+      "input": "2026-07-13T00:00:00Z",
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    },
+    {
+      "input": "20260713",
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    },
+    {
+      "input": "tomorrow",
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    },
+    {
+      "input": "",
+      "expected": {
+        "value": {
+          "error": "is required"
+        }
+      }
+    },
+    {
+      "input": "   ",
+      "expected": {
+        "value": {
+          "error": "is required"
+        }
+      }
+    },
+    {
+      "input": null,
+      "expected": {
+        "value": {
+          "error": "is required"
+        }
+      }
+    },
+    {
+      "input": {
+        "$undefined": true
+      },
+      "expected": {
+        "value": {
+          "error": "is required"
+        }
+      }
+    },
+    {
+      "input": 20260713,
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    },
+    {
+      "input": 0,
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    },
+    {
+      "input": true,
+      "expected": {
+        "value": {
+          "error": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+        }
+      }
+    }
+  ],
+  "dateObjects": [
+    {
+      "input": "2026-07-13T12:00:00Z",
+      "expected": {
+        "value": {
+          "value": "2026-07-13"
+        }
+      }
+    },
+    {
+      "input": "2026-07-13T00:00:00Z",
+      "expected": {
+        "value": {
+          "value": "2026-07-13"
+        }
+      }
+    },
+    {
+      "input": "not a date",
+      "expected": {
+        "value": {
+          "error": "is not a valid date"
+        }
+      }
+    }
+  ],
+  "calendarDates": [
+    {
+      "input": [
+        2026,
+        2,
+        29
+      ],
+      "expected": null
+    },
+    {
+      "input": [
+        2024,
+        2,
+        29
+      ],
+      "expected": "2024-02-29"
+    },
+    {
+      "input": [
+        1899,
+        1,
+        1
+      ],
+      "expected": null
+    },
+    {
+      "input": [
+        2200,
+        12,
+        31
+      ],
+      "expected": "2200-12-31"
+    },
+    {
+      "input": [
+        "2026",
+        "07",
+        "13"
+      ],
+      "expected": "2026-07-13"
+    },
+    {
+      "input": [
+        2026.5,
+        1,
+        1
+      ],
+      "expected": null
+    }
+  ],
+  "goals": [
+    {
+      "input": 49,
+      "expected": {
+        "value": {
+          "error": "must be from 50 to 10,000"
+        }
+      }
+    },
+    {
+      "input": 50,
+      "expected": {
+        "value": {
+          "value": 50
+        }
+      }
+    },
+    {
+      "input": 10000,
+      "expected": {
+        "value": {
+          "value": 10000
+        }
+      }
+    },
+    {
+      "input": 10001,
+      "expected": {
+        "value": {
+          "error": "must be from 50 to 10,000"
+        }
+      }
+    },
+    {
+      "input": "1,000",
+      "expected": {
+        "value": {
+          "value": 1000
+        }
+      }
+    },
+    {
+      "input": 12.5,
+      "expected": {
+        "value": {
+          "error": "must be a whole number"
+        }
+      }
+    },
+    {
+      "input": "12.5",
+      "expected": {
+        "value": {
+          "error": "must be a whole number"
+        }
+      }
+    },
+    {
+      "input": "500",
+      "expected": {
+        "value": {
+          "value": 500
+        }
+      }
+    },
+    {
+      "input": " 500 ",
+      "expected": {
+        "value": {
+          "value": 500
+        }
+      }
+    },
+    {
+      "input": "1e3",
+      "expected": {
+        "value": {
+          "value": 1000
+        }
+      }
+    },
+    {
+      "input": "0x1F4",
+      "expected": {
+        "value": {
+          "value": 500
+        }
+      }
+    },
+    {
+      "input": "abc",
+      "expected": {
+        "value": {
+          "error": "must be a whole number"
+        }
+      }
+    },
+    {
+      "input": "",
+      "expected": {
+        "value": {
+          "error": "is required"
+        }
+      }
+    },
+    {
+      "input": null,
+      "expected": {
+        "value": {
+          "error": "is required"
+        }
+      }
+    },
+    {
+      "input": {
+        "$undefined": true
+      },
+      "expected": {
+        "value": {
+          "error": "is required"
+        }
+      }
+    },
+    {
+      "input": -100,
+      "expected": {
+        "value": {
+          "error": "must be from 50 to 10,000"
+        }
+      }
+    },
+    {
+      "input": "10,001",
+      "expected": {
+        "value": {
+          "error": "must be from 50 to 10,000"
+        }
+      }
+    },
+    {
+      "input": {
+        "$number": "Infinity"
+      },
+      "expected": {
+        "value": {
+          "error": "must be a whole number"
+        }
+      }
+    },
+    {
+      "input": "50.0",
+      "expected": {
+        "value": {
+          "value": 50
+        }
+      }
+    }
+  ],
+  "crews": [
+    {
+      "input": [
+        "Alex",
+        "Maya"
+      ],
+      "expected": {
+        "value": [
+          {
+            "name": "Alex"
+          },
+          {
+            "name": "Maya"
+          }
+        ]
+      }
+    },
+    {
+      "input": [
+        "Alex",
+        "alex",
+        "ALEX ",
+        "Maya"
+      ],
+      "expected": {
+        "value": [
+          {
+            "name": "Alex"
+          },
+          {
+            "name": "Maya"
+          }
+        ]
+      }
+    },
+    {
+      "input": [
+        "",
+        "  ",
+        "Zed",
+        null,
+        {
+          "$undefined": true
+        },
+        0,
+        {
+          "name": ""
+        }
+      ],
+      "expected": {
+        "value": [
+          {
+            "name": "Zed"
+          }
+        ]
+      }
+    },
+    {
+      "input": [
+        {
+          "name": " Maya "
+        },
+        {
+          "nom": "x"
+        },
+        "Maya"
+      ],
+      "expected": {
+        "value": [
+          {
+            "name": "Maya"
+          }
+        ]
+      }
+    },
+    {
+      "input": [
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ],
+      "expected": {
+        "value": [
+          {
+            "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ]
+      }
+    },
+    {
+      "input": [
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ],
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Participant names must be 30 characters or fewer",
+          "details": [
+            {
+              "field": "crew",
+              "reason": "name is too long"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": [
+        "Alex",
+        "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+      ],
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Participant names must be 30 characters or fewer",
+          "details": [
+            {
+              "field": "crew",
+              "reason": "name is too long"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": [
+        "",
+        "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+      ],
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Participant names must be 30 characters or fewer",
+          "details": [
+            {
+              "field": "crew",
+              "reason": "name is too long"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": [],
+      "expected": {
+        "value": []
+      }
+    },
+    {
+      "input": "Alex",
+      "expected": {
+        "value": []
+      }
+    },
+    {
+      "input": null,
+      "expected": {
+        "value": []
+      }
+    },
+    {
+      "input": {
+        "$undefined": true
+      },
+      "expected": {
+        "value": []
+      }
+    },
+    {
+      "input": {
+        "name": "Alex"
+      },
+      "expected": {
+        "value": []
+      }
+    },
+    {
+      "input": [
+        42,
+        "Alex"
+      ],
+      "expected": {
+        "value": [
+          {
+            "name": "Alex"
+          }
+        ]
+      }
+    }
+  ],
+  "configs": [
+    {
+      "input": {
+        "startDate": "2026-07-01",
+        "tripDate": "2026-07-31",
+        "goal": 500,
+        "crew": [
+          "Alex"
+        ]
+      },
+      "expected": {
+        "value": {
+          "startDate": "2026-07-01",
+          "tripDate": "2026-07-31",
+          "goal": 500,
+          "crew": [
+            {
+              "name": "Alex"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "7/1/2026",
+        "tripDate": "July 31, 2026",
+        "goal": "1,000",
+        "crew": [
+          "Alex",
+          "alex",
+          "Maya"
+        ]
+      },
+      "expected": {
+        "value": {
+          "startDate": "2026-07-01",
+          "tripDate": "2026-07-31",
+          "goal": 1000,
+          "crew": [
+            {
+              "name": "Alex"
+            },
+            {
+              "name": "Maya"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "2026-07-31",
+        "tripDate": "2026-07-01",
+        "goal": 500,
+        "crew": [
+          "Alex"
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Invalid challenge settings",
+          "details": [
+            {
+              "field": "challengeStart",
+              "cell": "Settings",
+              "value": "2026-07-31",
+              "reason": "must be on or before the challenge end"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "2026-07-31",
+        "tripDate": "2026-07-31",
+        "goal": 500,
+        "crew": [
+          "Alex"
+        ]
+      },
+      "expected": {
+        "value": {
+          "startDate": "2026-07-31",
+          "tripDate": "2026-07-31",
+          "goal": 500,
+          "crew": [
+            {
+              "name": "Alex"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "soon",
+        "tripDate": "2026-02-30",
+        "goal": 12.5,
+        "crew": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Invalid challenge settings",
+          "details": [
+            {
+              "field": "challengeStart",
+              "cell": "Settings",
+              "value": "soon",
+              "reason": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+            },
+            {
+              "field": "tripDate",
+              "cell": "Settings",
+              "value": "2026-02-30",
+              "reason": "must be a real calendar date"
+            },
+            {
+              "field": "groupGoal",
+              "cell": "Settings",
+              "value": "12.5",
+              "reason": "must be a whole number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "",
+        "tripDate": "",
+        "goal": "",
+        "crew": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Invalid challenge settings",
+          "details": [
+            {
+              "field": "challengeStart",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            },
+            {
+              "field": "tripDate",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            },
+            {
+              "field": "groupGoal",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "2026-07-01",
+        "tripDate": "2026-07-31",
+        "goal": 10001,
+        "crew": [
+          "Alex"
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Invalid challenge settings",
+          "details": [
+            {
+              "field": "groupGoal",
+              "cell": "Settings",
+              "value": "10001",
+              "reason": "must be from 50 to 10,000"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "2026-07-01",
+        "tripDate": "2026-07-31",
+        "goal": 49,
+        "crew": [
+          "Alex"
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Invalid challenge settings",
+          "details": [
+            {
+              "field": "groupGoal",
+              "cell": "Settings",
+              "value": "49",
+              "reason": "must be from 50 to 10,000"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "2026-07-01",
+        "tripDate": "2026-07-31",
+        "goal": 500,
+        "crew": [
+          "",
+          " "
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Add at least one participant",
+          "details": [
+            {
+              "field": "crew",
+              "reason": "is required"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "startDate": "2026-07-01",
+        "tripDate": "2026-07-31",
+        "goal": 500,
+        "crew": [
+          "Alex",
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Participant names must be 30 characters or fewer",
+          "details": [
+            {
+              "field": "crew",
+              "reason": "name is too long"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {},
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Invalid challenge settings",
+          "details": [
+            {
+              "field": "challengeStart",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            },
+            {
+              "field": "tripDate",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            },
+            {
+              "field": "groupGoal",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": null,
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Invalid challenge settings",
+          "details": [
+            {
+              "field": "challengeStart",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            },
+            {
+              "field": "tripDate",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            },
+            {
+              "field": "groupGoal",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": "config",
+      "expected": {
+        "error": {
+          "code": "invalid_config",
+          "message": "Invalid challenge settings",
+          "details": [
+            {
+              "field": "challengeStart",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            },
+            {
+              "field": "tripDate",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            },
+            {
+              "field": "groupGoal",
+              "cell": "Settings",
+              "value": "",
+              "reason": "is required"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "activities": [
+    {
+      "input": {
+        "name": "Alex",
+        "type": "climb",
+        "date": "2026-07-13"
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "climb",
+          "category": "climb",
+          "points": 3,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      }
+    },
+    {
+      "input": {
+        "name": " alex ",
+        "type": "climb",
+        "date": "2026-07-13",
+        "hardestGrade": "V17",
+        "note": "  top out  ",
+        "points": 99,
+        "category": "mobility"
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "climb",
+          "category": "climb",
+          "points": 3,
+          "date": "2026-07-13",
+          "hardestGrade": "V17",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": "top out"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Maya",
+        "type": "climb",
+        "date": "2026-07-13",
+        "hardestGrade": "VB"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "hardestGrade",
+              "reason": "must be V0 through V17"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Maya",
+        "type": "climb",
+        "date": "2026-07-13",
+        "hardestGrade": "v4"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "hardestGrade",
+              "reason": "must be V0 through V17"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Maya",
+        "type": "exercise",
+        "date": "07/13/2026",
+        "hardestGrade": "V4",
+        "bountyId": "dyno-mike"
+      },
+      "expected": {
+        "value": {
+          "name": "Maya",
+          "type": "exercise",
+          "category": "exercise",
+          "points": 2,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Maya",
+        "type": "mobility",
+        "date": "July 13, 2026"
+      },
+      "expected": {
+        "value": {
+          "name": "Maya",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "bounty",
+        "date": "2026-07-13",
+        "bountyId": "dyno-mike",
+        "points": 0
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "bounty",
+          "category": "climb",
+          "points": 2,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "dyno-mike",
+          "bountyTitle": "Dyno-Mike",
+          "note": ""
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "bounty",
+        "date": "2026-07-13",
+        "bountyId": "weighted-wonder",
+        "points": 0
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "bounty",
+          "category": "exercise",
+          "points": 2,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "weighted-wonder",
+          "bountyTitle": "Weighted Wonder",
+          "note": ""
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "bounty",
+        "date": "2026-07-13",
+        "bountyId": "yoga-flow",
+        "points": 0
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "bounty",
+          "category": "mobility",
+          "points": 2,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "yoga-flow",
+          "bountyTitle": "Yoga Flow",
+          "note": ""
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "bounty",
+        "date": "2026-07-13",
+        "bountyId": "no-such-bounty"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "bountyId",
+              "reason": "must be one of today’s bounties"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "bounty",
+        "date": "2026-07-13"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "bountyId",
+              "reason": "must be one of today’s bounties"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "bounty",
+        "date": "2026-07-13",
+        "bountyId": "send-it"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "bountyId",
+              "reason": "is not available on that date"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "bounty",
+        "date": "2026-02-30",
+        "bountyId": "dyno-mike"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "date",
+              "reason": "must be a real calendar date"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "run",
+        "date": "2026-07-13"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "type",
+              "reason": "must be climb, exercise, mobility, or bounty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "Climb",
+        "date": "2026-07-13"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "type",
+              "reason": "must be climb, exercise, mobility, or bounty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "date": "2026-07-13"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "type",
+              "reason": "must be climb, exercise, mobility, or bounty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "mobility",
+        "date": "2026-07-13",
+        "note": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "mobility",
+        "date": "2026-07-13",
+        "note": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "note",
+              "reason": "must be 120 characters or fewer"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "mobility",
+        "date": "2026-07-13",
+        "note": " nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn "
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "climb",
+        "date": "yesterday",
+        "hardestGrade": "V99",
+        "note": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "date",
+              "reason": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+            },
+            {
+              "field": "hardestGrade",
+              "reason": "must be V0 through V17"
+            },
+            {
+              "field": "note",
+              "reason": "must be 120 characters or fewer"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "mobility"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "date",
+              "reason": "is required"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Nobody",
+        "type": "run",
+        "date": "never"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Choose a participant from the Participants tab",
+          "details": [
+            {
+              "field": "name",
+              "reason": "must match a participant"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "",
+        "type": "climb",
+        "date": "2026-07-13"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Choose a participant from the Participants tab",
+          "details": [
+            {
+              "field": "name",
+              "reason": "must match a participant"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "type": "climb",
+        "date": "2026-07-13"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Choose a participant from the Participants tab",
+          "details": [
+            {
+              "field": "name",
+              "reason": "must match a participant"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": null,
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Choose a participant from the Participants tab",
+          "details": [
+            {
+              "field": "name",
+              "reason": "must match a participant"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "mobility",
+        "date": "2026-06-30"
+      },
+      "expected": {
+        "error": {
+          "code": "outside_challenge_window",
+          "message": "Activity date must be from 2026-07-01 through 2026-07-31 (inclusive)",
+          "details": [
+            {
+              "field": "date",
+              "reason": "is outside the challenge window"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "mobility",
+        "date": "2026-07-01"
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-01",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "mobility",
+        "date": "2026-07-31"
+      },
+      "expected": {
+        "value": {
+          "name": "Alex",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-31",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "mobility",
+        "date": "2026-08-01"
+      },
+      "expected": {
+        "error": {
+          "code": "outside_challenge_window",
+          "message": "Activity date must be from 2026-07-01 through 2026-07-31 (inclusive)",
+          "details": [
+            {
+              "field": "date",
+              "reason": "is outside the challenge window"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "requests": {
+    "empty": [
+      {
+        "input": "",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_json",
+            "message": "Request body must be valid JSON",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "not json",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_json",
+            "message": "Request body must be valid JSON",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"a\":",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_json",
+            "message": "Request body must be valid JSON",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "null",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "Request body must be a JSON object",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "[]",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "Request body must be a JSON object",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "5",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "Request body must be a JSON object",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "\"x\"",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "Request body must be a JSON object",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"__smoke__\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "unknown_action",
+            "message": "Unsupported action: __smoke__",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":1}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "unknown_action",
+            "message": "Unsupported action: 1",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":\"x\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "config": {
+            "startDate": "2026-07-01",
+            "tripDate": "2026-07-31",
+            "goal": 500,
+            "crew": [
+              {
+                "name": "Alex"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"7/1/2026\",\"tripDate\":\"July 31, 2026\",\"goal\":\"1,000\",\"crew\":[\"Alex\",\"alex\",\"Maya\"]}}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "config": {
+            "startDate": "2026-07-01",
+            "tripDate": "2026-07-31",
+            "goal": 1000,
+            "crew": [
+              {
+                "name": "Alex"
+              },
+              {
+                "name": "Maya"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-31\",\"tripDate\":\"2026-07-01\",\"goal\":500,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "2026-07-31",
+                "reason": "must be on or before the challenge end"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-31\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "config": {
+            "startDate": "2026-07-31",
+            "tripDate": "2026-07-31",
+            "goal": 500,
+            "crew": [
+              {
+                "name": "Alex"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"soon\",\"tripDate\":\"2026-02-30\",\"goal\":12.5,\"crew\":[]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "soon",
+                "reason": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "2026-02-30",
+                "reason": "must be a real calendar date"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "12.5",
+                "reason": "must be a whole number"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"\",\"tripDate\":\"\",\"goal\":\"\",\"crew\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":10001,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "10001",
+                "reason": "must be from 50 to 10,000"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":49,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "49",
+                "reason": "must be from 50 to 10,000"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"\",\" \"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Add at least one participant",
+            "details": [
+              {
+                "field": "crew",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Participant names must be 30 characters or fewer",
+            "details": [
+              {
+                "field": "crew",
+                "reason": "name is too long"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"Zed\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\" zed \"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"alex\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"MAYA\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"  \"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":null}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":42}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "setup_required",
+            "message": "Challenge setup must be completed before profiles can be created",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\"a1\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "not_found",
+            "message": "Activity not found"
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\" a1 \"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "not_found",
+            "message": "Activity not found"
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\"a2\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "not_found",
+            "message": "Activity not found"
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\"\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_delete",
+            "message": "An activity id is required",
+            "details": [
+              {
+                "field": "id",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\"   \"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_delete",
+            "message": "An activity id is required",
+            "details": [
+              {
+                "field": "id",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":null}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_delete",
+            "message": "An activity id is required",
+            "details": [
+              {
+                "field": "id",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_delete",
+            "message": "An activity id is required",
+            "details": [
+              {
+                "field": "id",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":0}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "not_found",
+            "message": "Activity not found"
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\" alex \",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"V17\",\"note\":\"  top out  \",\"points\":99,\"category\":\"mobility\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Maya\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"VB\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Maya\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"v4\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Maya\",\"type\":\"exercise\",\"date\":\"07/13/2026\",\"hardestGrade\":\"V4\",\"bountyId\":\"dyno-mike\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Maya\",\"type\":\"mobility\",\"date\":\"July 13, 2026\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"dyno-mike\",\"points\":0}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"weighted-wonder\",\"points\":0}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"yoga-flow\",\"points\":0}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"no-such-bounty\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"send-it\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-02-30\",\"bountyId\":\"dyno-mike\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"run\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"Climb\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\" nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn \"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"yesterday\",\"hardestGrade\":\"V99\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Nobody\",\"type\":\"run\",\"date\":\"never\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"\",\"type\":\"climb\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"type\":\"climb\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-06-30\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-01\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-31\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-08-01\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "seeded": [
+      {
+        "input": "",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_json",
+            "message": "Request body must be valid JSON",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "not json",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_json",
+            "message": "Request body must be valid JSON",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"a\":",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_json",
+            "message": "Request body must be valid JSON",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "null",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "Request body must be a JSON object",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "[]",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "Request body must be a JSON object",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "5",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "Request body must be a JSON object",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "\"x\"",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_request",
+            "message": "Request body must be a JSON object",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"__smoke__\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "unknown_action",
+            "message": "Unsupported action: __smoke__",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":1}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "unknown_action",
+            "message": "Unsupported action: 1",
+            "details": []
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":\"x\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "config": {
+            "startDate": "2026-07-01",
+            "tripDate": "2026-07-31",
+            "goal": 500,
+            "crew": [
+              {
+                "name": "Alex"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"7/1/2026\",\"tripDate\":\"July 31, 2026\",\"goal\":\"1,000\",\"crew\":[\"Alex\",\"alex\",\"Maya\"]}}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "config": {
+            "startDate": "2026-07-01",
+            "tripDate": "2026-07-31",
+            "goal": 1000,
+            "crew": [
+              {
+                "name": "Alex"
+              },
+              {
+                "name": "Maya"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-31\",\"tripDate\":\"2026-07-01\",\"goal\":500,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "2026-07-31",
+                "reason": "must be on or before the challenge end"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-31\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "config": {
+            "startDate": "2026-07-31",
+            "tripDate": "2026-07-31",
+            "goal": 500,
+            "crew": [
+              {
+                "name": "Alex"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"soon\",\"tripDate\":\"2026-02-30\",\"goal\":12.5,\"crew\":[]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "soon",
+                "reason": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "2026-02-30",
+                "reason": "must be a real calendar date"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "12.5",
+                "reason": "must be a whole number"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"\",\"tripDate\":\"\",\"goal\":\"\",\"crew\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":10001,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "10001",
+                "reason": "must be from 50 to 10,000"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":49,\"crew\":[\"Alex\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "49",
+                "reason": "must be from 50 to 10,000"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"\",\" \"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Add at least one participant",
+            "details": [
+              {
+                "field": "crew",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Participant names must be 30 characters or fewer",
+            "details": [
+              {
+                "field": "crew",
+                "reason": "name is too long"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"saveConfig\",\"config\":{}}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Invalid challenge settings",
+            "details": [
+              {
+                "field": "challengeStart",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "tripDate",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              },
+              {
+                "field": "groupGoal",
+                "cell": "Settings",
+                "value": "",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"Zed\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "participant": {
+            "name": "Zed"
+          },
+          "config": {
+            "startDate": "2026-07-01",
+            "tripDate": "2026-07-31",
+            "goal": 500,
+            "crew": [
+              {
+                "name": "Alex"
+              },
+              {
+                "name": "Maya"
+              },
+              {
+                "name": "Zed"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\" zed \"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "participant": {
+            "name": "zed"
+          },
+          "config": {
+            "startDate": "2026-07-01",
+            "tripDate": "2026-07-31",
+            "goal": 500,
+            "crew": [
+              {
+                "name": "Alex"
+              },
+              {
+                "name": "Maya"
+              },
+              {
+                "name": "zed"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"alex\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "duplicate_participant",
+            "message": "That name already exists",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must be unique"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"MAYA\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "duplicate_participant",
+            "message": "That name already exists",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must be unique"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_participant",
+            "message": "Enter a name",
+            "details": [
+              {
+                "field": "name",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"  \"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_participant",
+            "message": "Enter a name",
+            "details": [
+              {
+                "field": "name",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":null}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_participant",
+            "message": "Enter a name",
+            "details": [
+              {
+                "field": "name",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_participant",
+            "message": "Enter a name",
+            "details": [
+              {
+                "field": "name",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":42}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "participant": {
+            "name": "42"
+          },
+          "config": {
+            "startDate": "2026-07-01",
+            "tripDate": "2026-07-31",
+            "goal": 500,
+            "crew": [
+              {
+                "name": "Alex"
+              },
+              {
+                "name": "Maya"
+              },
+              {
+                "name": "42"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "participant": {
+            "name": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+          },
+          "config": {
+            "startDate": "2026-07-01",
+            "tripDate": "2026-07-31",
+            "goal": 500,
+            "crew": [
+              {
+                "name": "Alex"
+              },
+              {
+                "name": "Maya"
+              },
+              {
+                "name": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+              }
+            ]
+          },
+          "configErrors": []
+        }
+      },
+      {
+        "input": "{\"action\":\"addParticipant\",\"name\":\"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_config",
+            "message": "Participant names must be 30 characters or fewer",
+            "details": [
+              {
+                "field": "crew",
+                "reason": "name is too long"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\"a1\"}",
+        "expected": {
+          "version": 13,
+          "ok": true,
+          "deleted": "a1"
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\" a1 \"}",
+        "expected": {
+          "version": 13,
+          "ok": true,
+          "deleted": "a1"
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\"a2\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "not_found",
+            "message": "Activity not found"
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\"\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_delete",
+            "message": "An activity id is required",
+            "details": [
+              {
+                "field": "id",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":\"   \"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_delete",
+            "message": "An activity id is required",
+            "details": [
+              {
+                "field": "id",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":null}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_delete",
+            "message": "An activity id is required",
+            "details": [
+              {
+                "field": "id",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_delete",
+            "message": "An activity id is required",
+            "details": [
+              {
+                "field": "id",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"action\":\"delete\",\"id\":0}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "not_found",
+            "message": "Activity not found"
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "climb",
+          "category": "climb",
+          "points": 3,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      },
+      {
+        "input": "{\"name\":\" alex \",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"V17\",\"note\":\"  top out  \",\"points\":99,\"category\":\"mobility\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "climb",
+          "category": "climb",
+          "points": 3,
+          "date": "2026-07-13",
+          "hardestGrade": "V17",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": "top out"
+        }
+      },
+      {
+        "input": "{\"name\":\"Maya\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"VB\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "hardestGrade",
+                "reason": "must be V0 through V17"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Maya\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"v4\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "hardestGrade",
+                "reason": "must be V0 through V17"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Maya\",\"type\":\"exercise\",\"date\":\"07/13/2026\",\"hardestGrade\":\"V4\",\"bountyId\":\"dyno-mike\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Maya",
+          "type": "exercise",
+          "category": "exercise",
+          "points": 2,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      },
+      {
+        "input": "{\"name\":\"Maya\",\"type\":\"mobility\",\"date\":\"July 13, 2026\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Maya",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"dyno-mike\",\"points\":0}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "bounty",
+          "category": "climb",
+          "points": 2,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "dyno-mike",
+          "bountyTitle": "Dyno-Mike",
+          "note": ""
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"weighted-wonder\",\"points\":0}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "bounty",
+          "category": "exercise",
+          "points": 2,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "weighted-wonder",
+          "bountyTitle": "Weighted Wonder",
+          "note": ""
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"yoga-flow\",\"points\":0}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "bounty",
+          "category": "mobility",
+          "points": 2,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "yoga-flow",
+          "bountyTitle": "Yoga Flow",
+          "note": ""
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"no-such-bounty\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "bountyId",
+                "reason": "must be one of today’s bounties"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "bountyId",
+                "reason": "must be one of today’s bounties"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"send-it\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "bountyId",
+                "reason": "is not available on that date"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-02-30\",\"bountyId\":\"dyno-mike\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "date",
+                "reason": "must be a real calendar date"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"run\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "type",
+                "reason": "must be climb, exercise, mobility, or bounty"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"Climb\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "type",
+                "reason": "must be climb, exercise, mobility, or bounty"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "type",
+                "reason": "must be climb, exercise, mobility, or bounty"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "note",
+                "reason": "must be 120 characters or fewer"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\" nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn \"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-13",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"yesterday\",\"hardestGrade\":\"V99\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "date",
+                "reason": "must use YYYY-MM-DD, MM/DD/YYYY, or a named month"
+              },
+              {
+                "field": "hardestGrade",
+                "reason": "must be V0 through V17"
+              },
+              {
+                "field": "note",
+                "reason": "must be 120 characters or fewer"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "date",
+                "reason": "is required"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Nobody\",\"type\":\"run\",\"date\":\"never\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"\",\"type\":\"climb\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"type\":\"climb\",\"date\":\"2026-07-13\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-06-30\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "outside_challenge_window",
+            "message": "Activity date must be from 2026-07-01 through 2026-07-31 (inclusive)",
+            "details": [
+              {
+                "field": "date",
+                "reason": "is outside the challenge window"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-01\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-01",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-31\"}",
+        "expected": {
+          "version": 13,
+          "features": [
+            "categories-v1",
+            "balanced-day-bonus",
+            "daily-bounties-v3",
+            "bounty-hunter",
+            "challenge-window",
+            "self-registration-v1"
+          ],
+          "ok": true,
+          "id": "<id>",
+          "createdAt": "<createdAt>",
+          "name": "Alex",
+          "type": "mobility",
+          "category": "mobility",
+          "points": 1,
+          "date": "2026-07-31",
+          "hardestGrade": "",
+          "bountyId": "",
+          "bountyTitle": "",
+          "note": ""
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-08-01\"}",
+        "expected": {
+          "version": 13,
+          "ok": false,
+          "error": {
+            "code": "outside_challenge_window",
+            "message": "Activity date must be from 2026-07-01 through 2026-07-31 (inclusive)",
+            "details": [
+              {
+                "field": "date",
+                "reason": "is outside the challenge window"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
