@@ -50,7 +50,7 @@ is arranged to produce it is not a constraint. See *Not constraints* below.
    Nothing you ship may drop, rewrite, or re-key that data, and the GitHub Pages URL must not change
    (`index.html` stays at the repository root). `.github/workflows/pages.yml` publishes only from a
    green `npm test`. That gate keeps a broken build off the crew's phones.
-2. **localStorage keys are frozen:** `roadToSendEndpoint`, `roadToSendMe`, `roadToSendLogsV9`,
+2. **localStorage keys are frozen:** `roadToSendEndpoint`, `roadToSendMoves`, `roadToSendMe`, `roadToSendLogsV9`,
    `roadToSendConfigV9`, `roadToSendConfigV8` (read-only migration source — only the existing
    one-time migration writes `roadToSendConfigV9` from it), `roadToSendWeekReview`, and
    `roadToSendShared:{activities|config|meta}:{endpoint}`. Read them; write only shapes existing code
@@ -87,7 +87,7 @@ is arranged to produce it is not a constraint. See *Not constraints* below.
    needs a change that reports what was measured and why. A cap that only ratchets upward stops being
    a guard. There is one stated exception to "no request beyond the configured endpoint": a shared-mode
    browser follows an organizer-set `movedTo` to the new endpoint. The organizer controls the
-   backend that names it (today the old Sheet redirector), the URL must be `https`, and the browser follows it at most once per page load.
+   backend that names it (today the old Sheet redirector), the URL must be `https`, and the browser follows it at most once per page load. A browser also remembers a move only after the destination served a supported board (`roadToSendMoves`), and on later loads resolves an old endpoint straight to that destination without contacting the old one. That resolution only ever reaches an https endpoint the browser already adopted from a `movedTo`, and does not use up the one live follow.
 7. **What the built artifact holds:** exactly **one `<script>`** and exactly **one `<table>`** in
    `index.html` (new visualizations use divs/CSS grid). The built `const SUPPORTED_API_VERSIONS` line
    survives intact. DOM ids stay unique, and every labeled input keeps its `<label for>`.

@@ -46,7 +46,7 @@ Anyone with the crew link can submit or delete entries and change setup. Keep it
 
 ### Legacy Sheet redirector
 
-Crews that started on Google Sheets keep their Sheet and its Apps Script deployed at API v13, with a `movedTo` row in the `Settings` tab (key `movedTo`, an `https://` URL as the value; anything else is ignored). The Sheet still serves its frozen board on GET, now including `movedTo`, and refuses every write with error code `moved`. A browser that sees `movedTo` switches to the new endpoint once per page load, before it checks the API version, so old `?sheet=` crew links keep working across future API bumps. **Leave the Sheet deployed and never redeploy it.** The script is no longer offered in the app. `legacy/apps-script-v13.js` is a frozen record of what it runs. Browsers accept API v13 and v12 responses.
+Crews that started on Google Sheets keep their Sheet and its Apps Script deployed at API v13, with a `movedTo` row in the `Settings` tab (key `movedTo`, an `https://` URL as the value; anything else is ignored). The Sheet still serves its frozen board on GET, now including `movedTo`, and refuses every write with error code `moved`. A browser that sees `movedTo` switches to the new endpoint once per page load, before it checks the API version, so old `?sheet=` crew links keep working across future API bumps. Browsers remember a followed move and skip the Sheet on later loads of an old crew link. **Leave the Sheet deployed and never redeploy it.** The script is no longer offered in the app. `legacy/apps-script-v13.js` is a frozen record of what it runs. Browsers accept API v13 and v12 responses.
 
 ## API v13
 
