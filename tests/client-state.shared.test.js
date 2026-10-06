@@ -467,17 +467,24 @@ const movedReply = (to = NEW_URL) => ({version: 13, ok: false, error: {code: 'mo
 const settle = 'for(let i=0;i<20;i++)await Promise.resolve();';
 
 test('a GET carrying movedTo adopts the new endpoint, caches there, keeps the old cache and rewrites the sheet param', async () => {
+  let releaseDestination;
   await movedScenario({
+    extra: {releaseDestination: () => releaseDestination()},
     search: '?sheet=' + encodeURIComponent(OLD_URL) + '&keep=1',
     seed: {['roadToSendShared:activities:' + encodeURIComponent(OLD_URL)]: '[]'},
     backends: {
       [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
-      [NEW_URL]: (m, b, board) => board(13),
+      [NEW_URL]: (m, b, board) => new Promise(resolve => {releaseDestination = () => resolve(board(13))}),
     },
     checks: `
       ${settle}
       assert.equal(state.endpoint,'${NEW_URL}');
       assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}','the stored endpoint follows the move');
+      assert.equal(store.get('roadToSendMoves'),undefined,'the pending destination GET has not recorded the move');
+      assert.equal(state.syncState,'loading');
+      releaseDestination();
+      ${settle}
+      assert.equal(JSON.parse(store.get('roadToSendMoves'))['${OLD_URL}'],'${NEW_URL}','the followed move is remembered');
       for(const kind of ['activities','config','meta'])assert.notEqual(store.get(cacheKey(kind,'${NEW_URL}')),undefined,kind+' is cached under the new endpoint');
       assert.equal(store.get(cacheKey('activities','${OLD_URL}')),'[]','the old activities cache is byte-for-byte unchanged');
       assert.equal(store.keys().filter(k=>k.endsWith(':'+encodeURIComponent('${OLD_URL}'))).length,1,'no other old endpoint cache key is created');
@@ -535,6 +542,62 @@ test('every POST that answers moved shows the server message and adopts the new 
       `,
     });
   }
+});
+
+test('a late POST move rejection does not remember a move for a different connected endpoint', async () => {
+  const otherUrl = 'https://other.example.test/fn';
+  let releasePost;
+  await movedScenario({
+    extra: {releasePost: () => releasePost()},
+    backends: {
+      [OLD_URL]: (method, body, board) => method === 'POST'
+        ? new Promise(resolve => {releasePost = () => resolve(movedReply())})
+        : board(13),
+      [NEW_URL]: (method, body, board) => board(13),
+    },
+    checks: `
+      ${settle}
+      state.pendingDelete={entry:state.logs[0],index:0,id:'a1',feed:'personal',position:0};
+      const deletion=performDelete();
+      ${settle}
+      assert.equal(fetched().includes('POST ${OLD_URL}'),true,'the pending POST was sent to the original endpoint');
+      state.endpoint='${otherUrl}';
+      writeStore('roadToSendEndpoint',state.endpoint);
+      releasePost();
+      await deletion;
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}','the rejection still follows the move');
+      assert.equal(state.syncState,'live','the destination served a supported board');
+      assert.equal(fetched().includes('GET ${NEW_URL}'),true);
+      const moves=JSON.parse(store.get('roadToSendMoves')||'{}');
+      assert.equal(Object.hasOwn(moves,'${otherUrl}'),false,'the newly connected endpoint never answered with this move');
+    `,
+  });
+});
+
+test('setup at a different URL adopts its move without remembering a move for either origin', async () => {
+  const setupUrl = 'https://setup.example.test/exec';
+  await movedScenario({
+    backends: {
+      [OLD_URL]: (method, body, board) => board(13),
+      [setupUrl]: () => movedReply(),
+      [NEW_URL]: (method, body, board) => board(13),
+    },
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${OLD_URL}');
+      populateSetup();
+      document.querySelector('#endpoint').value='${setupUrl}';
+      await saveSetup();
+      ${settle}
+      assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${OLD_URL}','POST ${setupUrl}','GET ${NEW_URL}']));
+      assert.equal(state.endpoint,'${NEW_URL}','the move is still adopted');
+      assert.equal(state.syncState,'live','the destination served a supported board');
+      const moves=JSON.parse(store.get('roadToSendMoves')||'{}');
+      assert.equal(Object.hasOwn(moves,'${OLD_URL}'),false,'the connected endpoint never answered with this move');
+      assert.equal(Object.hasOwn(moves,'${setupUrl}'),false,'the setup URL was never the connected endpoint');
+    `,
+  });
 });
 
 test('a move is followed at most once per page load, so A to B to A stops after one hop', async () => {
@@ -642,6 +705,27 @@ test('an unsupported version without movedTo keeps the version error state', asy
   });
 });
 
+test('a non-OK destination GET does not remember the followed move', async () => {
+  const fetched = [];
+  await movedScenario({
+    backends: {},
+    extra: {fetch: async url => {
+      const base = String(url).split('?')[0];
+      fetched.push(base);
+      return base === OLD_URL
+        ? {ok: true, json: async () => ({movedTo: NEW_URL})}
+        : {ok: false, json: async () => {throw new Error('non-OK body must not be read')}};
+    }, fetched: () => fetched},
+    checks: `
+      ${settle}
+      assert.equal(JSON.stringify(fetched()),JSON.stringify(['${OLD_URL}','${NEW_URL}']));
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-NETWORK');
+      assert.equal(store.get('roadToSendMoves'),undefined,'a non-OK destination does not record the move');
+    `,
+  });
+});
+
 test('a failed destination fetch leaves an existing destination cache untouched', async () => {
   const seed = {};
   for (const kind of ['activities', 'config', 'meta']) seed['roadToSendShared:' + kind + ':' + encodeURIComponent(NEW_URL)] = '"keep-' + kind + '"';
@@ -656,6 +740,7 @@ test('a failed destination fetch leaves an existing destination cache untouched'
       for(const kind of ['activities','config','meta'])assert.equal(store.get(cacheKey(kind,'${NEW_URL}')),'"keep-'+kind+'"',kind+' destination cache is unchanged');
       for(const kind of ['activities','config','meta'])assert.equal(store.get(cacheKey(kind,'${OLD_URL}')),undefined,kind+' old cache is not written');
       assert.notEqual(state.syncState,'live');
+      assert.equal(store.get('roadToSendMoves'),undefined,'a failed destination does not record the move');
     `,
   });
 });
@@ -671,6 +756,7 @@ test('an unsupported response carrying movedTo after the hop was used is a versi
       assert.equal(state.endpoint,'${NEW_URL}');
       assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
       assert.notEqual(state.syncState,'live');
+      assert.equal(store.get('roadToSendMoves'),undefined,'a failed destination does not record the move');
       assert.equal(store.keys().filter(k=>k.indexOf('roadToSendShared:')===0).length,0,'nothing is cached');
     `,
   });
@@ -864,5 +950,158 @@ test('a move adopts a partial destination cache, drops the old setup errors, and
       getItem: key => { if (key.includes(encodeURIComponent(NEW_URL))) throw new Error('denied'); return {roadToSendEndpoint: OLD_URL, roadToSendMe: 'Alex'}[key] ?? null; },
       setItem() {}, removeItem() {},
     }},
+  });
+});
+
+
+test('an old crew link with a remembered move fetches only the destination and renders its cache while pending', async () => {
+  let release;
+  await movedScenario({
+    search: '?sheet=' + encodeURIComponent(OLD_URL) + '&keep=1',
+    seed: {roadToSendMoves: JSON.stringify({[OLD_URL]: NEW_URL}), ...cacheSeed(OLD_URL, OLD_CACHE), ...cacheSeed(NEW_URL, DEST_CACHE)},
+    extra: {finish: () => release()},
+    backends: {[NEW_URL]: (m, b, board) => new Promise(resolve => {release = () => resolve(board(13));})},
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}');
+      assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${NEW_URL}']));
+      const rewritten=new URL(replaced().filter(u=>u[0]!=='#')[0]);
+      assert.equal(rewritten.searchParams.get('sheet'),'${NEW_URL}');
+      assert.equal(rewritten.searchParams.get('keep'),'1');
+      assert.equal(JSON.stringify(state.logs.map(x=>x.id)),'["d1","d2"]');
+      assert.equal(state.config.goal,700);
+      assert.equal(document.querySelector('#groupGoal').textContent,'700','the destination cache is rendered before the response');
+      for(const kind of ['activities','config','meta'])assert.equal(store.get(cacheKey(kind,'${NEW_URL}')),JSON.stringify(${JSON.stringify(DEST_CACHE)}[kind]));
+      finish();${settle}
+      assert.equal(state.syncState,'live');
+    `,
+  });
+});
+
+test('a remembered move from the stored endpoint fetches only the destination without rewriting the address bar', async () => {
+  await movedScenario({
+    seed: {roadToSendMoves: JSON.stringify({[OLD_URL]: NEW_URL})},
+    backends: {[NEW_URL]: (m, b, board) => board(13)},
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}');
+      assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${NEW_URL}']));
+      assert.equal(replaced().filter(u=>u[0]!=='#').length,0);
+    `,
+  });
+});
+
+test('remembered move chains stop at the destination, before repeats, and after five hops', async () => {
+  const mid = 'https://mid.example.test/fn';
+  const chain = Array.from({length: 7}, (_, i) => 'https://chain' + i + '.example.test/fn');
+  const cases = [
+    {moves: {[OLD_URL]: mid, [mid]: NEW_URL}, destination: NEW_URL},
+    {moves: {[OLD_URL]: NEW_URL, [NEW_URL]: OLD_URL}, destination: NEW_URL},
+    {moves: {[OLD_URL]: OLD_URL}, destination: OLD_URL},
+    {moves: Object.fromEntries([OLD_URL, ...chain].slice(0, -1).map((url, i) => [url, chain[i]])), destination: chain[4]},
+  ];
+  for (const {moves, destination} of cases) {
+    await movedScenario({
+      search: '?sheet=' + encodeURIComponent(OLD_URL),
+      seed: {roadToSendMoves: JSON.stringify(moves)},
+      backends: {[destination]: (m, b, board) => board(13)},
+      checks: `
+        ${settle}
+        assert.equal(state.endpoint,'${destination}');
+        assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${destination}']));
+        assert.equal(store.get('roadToSendMoves'),${JSON.stringify(JSON.stringify(moves))},'resolution does not change the move record');
+      `,
+    });
+  }
+});
+
+test('malformed and invalid remembered moves leave the old crew link and live follow working', async () => {
+  const invalid = ['{bad', 'null', '[]', '"url"', '42', JSON.stringify({[OLD_URL]: 'http://new.example.test/fn'}), JSON.stringify({[OLD_URL]: 'not a URL'}), JSON.stringify({[OLD_URL]: 7}), JSON.stringify({'http://old.example.test/exec': NEW_URL})];
+  for (const moves of invalid) {
+    await movedScenario({
+      search: '?sheet=' + encodeURIComponent(OLD_URL),
+      seed: {roadToSendMoves: moves},
+      backends: {[OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}), [NEW_URL]: (m, b, board) => board(13)},
+      checks: `
+        ${settle}
+        assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${OLD_URL}','GET ${NEW_URL}']));
+        assert.equal(state.endpoint,'${NEW_URL}');
+        assert.equal(state.syncState,'live');
+        assert.equal(JSON.parse(store.get('roadToSendMoves'))['${OLD_URL}'],'${NEW_URL}');
+      `,
+    });
+  }
+});
+
+test('a remembered move keeps the origin cache and saved climber while an uncached destination is pending and after failure', async () => {
+  let reject;
+  await movedScenario({
+    search: '?sheet=' + encodeURIComponent(OLD_URL),
+    seed: {roadToSendMoves: JSON.stringify({[OLD_URL]: NEW_URL}), ...cacheSeed(OLD_URL, OLD_CACHE)},
+    extra: {fail: () => reject(new Error('offline'))},
+    backends: {[NEW_URL]: () => new Promise((resolve, fail) => {reject = fail;})},
+    checks: `
+      ${settle}
+      const check=()=>{
+        assert.equal(state.endpoint,'${NEW_URL}');
+        assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}');
+        assert.equal(state.me,'Alex');
+        assert.equal(store.get('roadToSendMe'),'Alex');
+        assert.equal(state.logs[0].id,'o1');
+        assert.equal(state.config.crew[0].name,'Alex');
+        assert.equal(document.querySelector('#groupGoal').textContent,'500');
+        assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${NEW_URL}']));
+        for(const kind of ['activities','config','meta']){
+          assert.equal(store.get(cacheKey(kind,'${OLD_URL}')),JSON.stringify(${JSON.stringify(OLD_CACHE)}[kind]),'origin cache is unchanged');
+          assert.equal(store.get(cacheKey(kind,'${NEW_URL}')),undefined,'destination cache is not written');
+        }
+      };
+      check();
+      assert.equal(state.syncState,'loading');
+      fail();${settle}
+      assert.equal(state.syncState,'stale');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-NETWORK');
+      render();check();
+    `,
+  });
+});
+
+test('a remembered resolution leaves one live move available from the adopted destination', async () => {
+  const finalUrl = 'https://final.example.test/fn';
+  await movedScenario({
+    search: '?sheet=' + encodeURIComponent(OLD_URL),
+    seed: {roadToSendMoves: JSON.stringify({[OLD_URL]: NEW_URL})},
+    backends: {[NEW_URL]: (m, b, board) => Object.assign(board(13), {movedTo: finalUrl}), [finalUrl]: (m, b, board) => Object.assign(board(13), {movedTo: OLD_URL})},
+    checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${finalUrl}');
+      assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${NEW_URL}','GET ${finalUrl}']));
+      assert.equal(JSON.parse(store.get('roadToSendMoves'))['${NEW_URL}'],'${finalUrl}');
+      assert.equal(state.syncState,'live');
+    `,
+  });
+});
+
+test('recording a followed move retains only the ten most recent valid origins', async () => {
+  const entries = Array.from({length: 10}, (_, i) => ['https://previous' + i + '.example.test/fn', NEW_URL]);
+  entries.splice(4, 0, [OLD_URL, 'https://outdated.example.test/fn']);
+  await movedScenario({
+    seed: {roadToSendMoves: JSON.stringify(Object.fromEntries(entries))},
+    endpoint: NEW_URL,
+    backends: {[NEW_URL]: (m, b, board) => board(13)},
+    checks: `
+      ${settle}
+      state.endpoint='${OLD_URL}';
+      assert.equal(followMove('${NEW_URL}'),true);
+      assert.equal(store.get('roadToSendMoves'),${JSON.stringify(JSON.stringify(Object.fromEntries(entries)))},'adoption leaves the record unchanged');
+      assert.equal(await loadRemote(),true);
+      const moves=Object.entries(JSON.parse(store.get('roadToSendMoves')));
+      assert.equal(moves.length,10);
+      assert.equal(moves[0][0],'https://previous1.example.test/fn','the oldest origin was evicted');
+      assert.equal(moves[9][0],'${OLD_URL}','a repeated origin becomes the most recent');
+      assert.equal(moves[9][1],'${NEW_URL}');
+    `,
   });
 });
