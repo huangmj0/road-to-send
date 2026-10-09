@@ -100,10 +100,10 @@
     /* Bounty tiles: full-width rows with the reward on the display face, and a claimed tile that
        recedes to a sage tick — a done thing should stop competing with the two still on offer. */
     .bounty-list{grid-template-columns:1fr}
-    button.bounty{grid-template-columns:34px minmax(0,1fr) auto;grid-template-areas:"i b p";align-items:center;gap:12px;min-height:0;padding:13px 14px;border:1px solid var(--line-strong);border-radius:16px;background:var(--card)}
+    button.bounty{grid-template-columns:34px minmax(0,1fr) auto;grid-template-areas:"i b p";align-items:center;gap:12px;min-height:44px;padding:13px 14px;border:1px solid var(--line-strong);border-radius:16px;background:var(--card)}
     button.bounty>.bounty-cat{grid-area:i;width:32px;height:32px;border-radius:11px;border-color:transparent;background:var(--orange-wash);color:var(--orange-ink);font-size:0}
     button.bounty>div{grid-area:b}button.bounty>.pts{grid-area:p;align-self:center;font:800 25px var(--head);color:var(--orange-ink)}
-    button.bounty.done{background:var(--wash);box-shadow:none;border-color:var(--line-soft)}
+    button.bounty:disabled{cursor:default}button.bounty:disabled:hover{transform:none}button.bounty.done{background:var(--wash);box-shadow:none;border-color:var(--line-soft)}
     button.bounty.done>.bounty-cat{background:var(--green-solid);color:#f2f6ec}
     button.bounty.done>div strong{color:var(--muted)}button.bounty.done>.pts{color:var(--green)}
     /* Dates leave the rows and become day headings. The rail runs down the gutter at 19px and the

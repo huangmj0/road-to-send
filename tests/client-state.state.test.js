@@ -1032,6 +1032,8 @@ const checks = `(()=>{
   assert.equal(creditPreviewCopy({type:'climb',hasTarget:true,inWindow:true,base:3,credit:0,reason:'already logged'}),CAT_LABELS.climb+' already logged today · earns 0 more','a repeat category keeps its wording');
   assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'',base:0,credit:0,reason:''}),'Choose one of today’s bounties.','an unchosen bounty keeps its wording');
   assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'century-club',base:3,credit:0,reason:'weekly cap'}),'Weekly bounty cap reached · bragging rights only','an over-cap bounty keeps its wording');
+  assert.equal(creditPreviewCopy({type:'bounty',claimed:true,hasTarget:true,inWindow:true,bountyId:'send-it',base:3,credit:3}),'That bounty is already claimed on that date.','a claimed bounty explains why Save is disabled');
+  assert.equal(creditPreviewCopy({saving:true,type:'bounty',claimed:true}),'Saving…','saving still takes precedence over a changed claim state');
   assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'send-it',base:3,credit:3,reason:''}),'Bounty! +3 toward your week','a credited bounty keeps its wording');
   assert.equal(creditPreviewCopy({type:'climb',hasTarget:false,inWindow:true,base:3,credit:3,reason:''}),'Choose who you are to save this.','no target explains why Save is dead');
   const outCopy=creditPreviewCopy({type:'climb',hasTarget:true,inWindow:false,base:3,credit:3,reason:'',startDate:'2026-07-01',tripDate:'2026-07-31'});

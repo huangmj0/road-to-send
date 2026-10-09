@@ -12,7 +12,7 @@ A **balanced** economy across three categories — you can't win by grinding one
   - 🧘 **Mobility** — **1 point** (mobility, stretching, prehab, or intentional recovery).
 - Logging a category a second time the same day earns **0** more (it still shows in the feed). This diminishing return is what keeps the game balanced.
 - **Balanced Day bonus: +2** when you log all three categories in one day. A full balanced day is **8 points** (3 + 2 + 1 + 2).
-- **Rotating daily bounties:** each day surfaces **three** bounties (one per category), chosen deterministically from the date so everyone sees the same set. Each has a fun name, a one-line description, and **1–3 points** by difficulty. Claim from that day's offering.
+- **Rotating daily bounties:** each day surfaces **three** bounties (one per category), chosen deterministically from the date so everyone sees the same set. Each has a fun name, a one-line description, and **1–3 points** by difficulty. Claim from that day's offering. The browser prevents the same climber from claiming the same bounty twice on one challenge date, including proxy recording; existing entries keep their credit.
 - **Weekly bounty cap:** the first **6 bounty points** each week (Monday–Sunday) count toward your score. You can keep claiming past the cap — those claims score **0** but still count toward the **🏹 Bounty Hunter** tag, awarded to whoever completes the most bounties that week (bragging rights, ties shared).
 - Everyone appears together in one leaderboard. Deleting an entry recomputes credit for the rest of that day/week.
 
@@ -42,11 +42,15 @@ GitHub Pages hosts the interface, while a Supabase Edge Function and Postgres da
 
 The database uses `settings`, `participants` and `activities` tables. `participants` holds names; `activities` holds raw activity details (category, points, grade/bounty/note), while the app deterministically applies the daily-category, balanced-day, and weekly-bounty rules at render time. The function is the only implementation of the API; changing the contract (`src/schema.json`, `src/scoring.json` or the function) bumps the API version and means redeploying it with `supabase functions deploy road-to-send`.
 
+Shared requests time out after 15 seconds. If an activity save cannot be confirmed, the browser refreshes the board and asks the climber to check their feed before saving again; explicit server rejections remain safe to retry. Browsers without signal composition keep a supplied caller signal.
+
+Shared mode keeps the current crew endpoint in the page URL so adding it to your Home Screen opens the same board. On iOS, the Home Screen app has separate storage from Safari, so climbers pick their name once more there; the identity dialog includes a passive tip. The install icon is an inline 180×180 PNG.
+
 Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live endpoint or crew data.
 
 ### Legacy Sheet redirector
 
-Crews that started on Google Sheets keep their Sheet and its Apps Script deployed at API v13, with a `movedTo` row in the `Settings` tab (key `movedTo`, an `https://` URL as the value; anything else is ignored). The Sheet still serves its frozen board on GET, now including `movedTo`, and refuses every write with error code `moved`. A browser that sees `movedTo` switches to the new endpoint once per page load, before it checks the API version, so old `?sheet=` crew links keep working across future API bumps. Browsers remember a followed move and skip the Sheet on later loads of an old crew link. **Leave the Sheet deployed and never redeploy it.** The script is no longer offered in the app. `legacy/apps-script-v13.js` is a frozen record of what it runs. Browsers accept API v13 and v12 responses.
+Crews that started on Google Sheets keep their Sheet and its Apps Script deployed at API v13, with a `movedTo` row in the `Settings` tab (key `movedTo`, an `https://` URL as the value; anything else is ignored). The Sheet still serves its frozen board on GET, now including `movedTo`, and refuses every write with error code `moved`. A browser that sees `movedTo` switches to the new endpoint once per page load, before it checks the API version, so old `?sheet=` crew links keep working across future API bumps. Browsers remember a followed move and skip the Sheet on later loads of an old crew link. Saving setup successfully at an origin URL clears its remembered move; choosing **Use local mode** clears every remembered move on that device. **Leave the Sheet deployed and never redeploy it.** The script is no longer offered in the app. `legacy/apps-script-v13.js` is a frozen record of what it runs. Browsers accept API v13 and v12 responses.
 
 ## API v13
 

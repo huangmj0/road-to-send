@@ -210,6 +210,14 @@ const domChecks = `(()=>{
   const bountyRadio=document.querySelector('input[name="activityType"][value="bounty"]');
   const claimSelect=document.querySelector('#bountySelect'),claimDateBox=document.querySelector('#dateFields');
   bountyRadio.checked=false;claimSelect.value='';claimDateBox.classList.remove('hide');
+  const claimedButton=todayBounties.querySelector('[data-claim-bounty="'+claimId+'"]');
+  assert.equal(claimedButton.disabled,true,'the already claimed Today button is disabled');
+  assert.match(claimedButton.getAttribute('aria-label'),/claimed today/,'its accessible name explains the claimed state');
+  claimedButton.dispatchEvent(new Event('click',{bubbles:true}));
+  assert.equal(bountyRadio.checked,false,'a delegated click on a disabled claim does not prefill the form');
+  claimBounty(claimId);
+  assert.equal(bountyRadio.checked,false,'direct prefill also refuses an already claimed bounty');
+  state.logs=[];render();
   claimBounty(claimId);
   assert.equal(bountyRadio.checked,true,'claiming a bounty selects the Bounty activity type');
   assert.equal(claimSelect.value,claimId,'claiming a bounty preselects it in the Record dropdown');
@@ -1395,4 +1403,78 @@ const domChecks = `(()=>{
 
 test('the rendered page reflects the state the app is in', () => {
   vm.runInNewContext(`${source}\n${domChecks}`, domContext, {filename: 'index.html'});
+});
+
+test('bounty claims are blocked per recording target and challenge date without changing existing credit', async () => {
+  const window = createDom();
+  const store = new Map();
+  const context = {
+    assert, URL, URLSearchParams, window, document: window.document, Event: window.Event,
+    location: {search: '', href: 'https://example.test/', hash: ''}, history: {replaceState() {}},
+    localStorage: {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout() {}, clearTimeout() {},
+    fetch() {throw Error('a duplicate must never reach the shared board')},
+  };
+  await vm.runInNewContext(`${source}\n(async()=>{
+    const today=challengeToday(),start=parseDateOnly(today),prior=new Date(start);
+    prior.setDate(prior.getDate()-1);const yesterday=localDate(prior);
+    state.config={startDate:yesterday,tripDate:today,goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+    state.me='Alex';state.recordingFor='Maya';
+    const id=dailyBounties(today)[0].id;
+    state.logs=[{id:'first',name:'mAyA',type:'bounty',bountyId:id,date:today,createdAt:'1'}];
+    render();
+    const select=document.querySelector('#bountySelect'),radio=document.querySelector('input[name="activityType"][value="bounty"]');
+    // happy-dom caches :checked after a property-only change; update attributes too.
+    const chooseBounty=()=>{for(const input of document.querySelectorAll('input[name="activityType"]')){input.checked=input===radio;input.toggleAttribute('checked',input===radio)}};
+    chooseBounty();updateRecordPreview();
+    let option=select.querySelector('option[value="'+id+'"]');
+    assert.equal(option.disabled,true,'a proxy target claim disables its option');
+    assert.match(option.textContent,/ · claimed$/,'the claimed label stays visible');
+    const buttons=[...document.querySelectorAll('#todayBounties [data-claim-bounty]')];
+    assert.equal(buttons.length,3);
+    for(const button of buttons)assert.equal(button.disabled,false,'Today tiles on the You tab describe the signed-in climber, not the proxy target');
+    claimBounty(id);
+    assert.equal(document.querySelector('#toast').textContent,'That bounty is already claimed on that date.','a tile tap still refuses a claim the proxy target already holds');
+    select.value=id;updateRecordPreview();
+    assert.equal(document.querySelector('#saveActivityBtn').disabled,true,'a selected claimed option cannot be saved');
+    assert.equal(document.querySelector('#creditPreview').textContent,'That bounty is already claimed on that date.');
+    await submitActivity({preventDefault(){}});
+    assert.equal(state.logs.length,1,'forcing the disabled value still cannot create a duplicate');
+    assert.equal(state.saving,false);
+    assert.equal(document.querySelector('#toast').textContent,'That bounty is already claimed on that date.');
+    // The same guard runs before a shared write, even if a stale form retained the selection.
+    state.endpoint='https://board.example.test/fn';select.value=id;
+    await submitActivity({preventDefault(){}});
+    assert.equal(state.logs.length,1);
+    assert.equal(document.querySelector('#toast').textContent,'That bounty is already claimed on that date.');
+    state.endpoint='';
+    state.recordingFor='Alex';render();updateRecordPreview();
+    assert.equal(select.querySelector('option[value="'+id+'"]').disabled,false,'another climber can claim the same bounty');
+    assert.equal(document.querySelector('#todayBounties [data-claim-bounty="'+id+'"]').disabled,false);
+    select.value=id;await submitActivity({preventDefault(){}});
+    assert.equal(state.logs.length,2,'the other climber can save a claim');
+    assert.equal(state.logs[1].name,'Alex');
+    // Choose an earlier date with an offering actually containing the same id.
+    let otherDay='';
+    for(let offset=1;offset<=400;offset++){
+      const day=new Date(start);day.setDate(day.getDate()-offset);const date=localDate(day);
+      if(dailyBounties(date).some(b=>b.id===id)){otherDay=date;break}
+    }
+    assert.ok(otherDay,'the bounty is also offered on another date');
+    state.config.startDate=otherDay;state.recordingFor='Maya';render();
+    document.querySelector('#dateFields').classList.remove('hide');document.querySelector('#activityDate').value=otherDay;
+    chooseBounty();updateRecordPreview();
+    assert.equal(select.querySelector('option[value="'+id+'"]').disabled,false,'another challenge date stays available');
+    select.value=id;await submitActivity({preventDefault(){}});
+    assert.equal(state.logs.length,3,'the proxy target can claim it on another date');
+    assert.equal(state.logs[2].name,'Maya');assert.equal(state.logs[2].date,otherDay);
+    // Existing duplicates keep their original scoring implementation and weekly cap behavior.
+    const base=bountyById(id).points;
+    state.logs=[{id:'old1',name:'Alex',type:'bounty',bountyId:id,date:today,createdAt:'1'},
+      {id:'old2',name:'Alex',type:'bounty',bountyId:id,date:today,createdAt:'2'}];
+    const credit=computeCredits(state.logs);
+    assert.equal(credit.info.get('old1').credit,base);
+    assert.equal(credit.info.get('old2').credit,Math.min(base,SCORING.weeklyBountyCap-base));
+    render();assert.equal(state.logs.length,2,'rendering keeps existing duplicate entries');
+  })()`, context);
 });

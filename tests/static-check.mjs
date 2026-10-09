@@ -380,3 +380,20 @@ assert.match(html,/<div class="card-head"><h2>Leaderboard<\/h2><div class="leade
 // Cells now size to their own content (auto flex-basis) so the longer message gets more room.
 assert.match(stylesheet,/\.meta-strip>div\{flex:auto;padding:11px 14px;min-width:0\}/,'meta-strip cells size to their own content instead of splitting evenly');
 console.log('Road to Send static accessibility and UX checks passed.');
+
+// Home Screen assets stay inline and retain the existing SVG favicon.
+const touchIcon=html.match(/<link[^>]+rel="apple-touch-icon"[^>]+sizes="180x180"[^>]+href="data:image\/png;base64,([^"]+)"/);
+assert.ok(touchIcon,'iOS gets an inline 180x180 PNG touch icon');
+const touchPng=Buffer.from(touchIcon[1],'base64');
+assert.deepEqual([...touchPng.subarray(0,8)],[137,80,78,71,13,10,26,10],'the touch icon is a PNG');
+assert.equal(touchPng.readUInt32BE(16),180,'the PNG width is 180 pixels');
+assert.equal(touchPng.readUInt32BE(20),180,'the PNG height is 180 pixels');
+assert.ok(touchPng.length<3000,'the touch icon stays below 3 KB');
+for(const [name,content] of [['apple-mobile-web-app-capable','yes'],['mobile-web-app-capable','yes'],['apple-mobile-web-app-title','Road to Send'],['apple-mobile-web-app-status-bar-style','default']]) {
+  assert.match(html,new RegExp('<meta[^>]+name="'+name+'"[^>]+content="'+content+'"'),'Home Screen metadata: '+name);
+}
+const identityModal=html.slice(html.indexOf('<div id="identityModal"'),html.indexOf('<div id="proxyModal"'));
+assert.match(identityModal,/<p class="hint">Tip: add this page to your Home Screen so the app keeps your board and name\. You'll pick your name once more there\.<\/p>/,'the passive install tip stays inside the identity modal and explains choosing a name again');
+assert.equal((html.match(/Tip: add this page to your Home Screen/g)||[]).length,1,'there is one install tip');
+assert.doesNotMatch(html.slice(html.indexOf('<div id="setupModal"')),/Home Screen/,'setup has no install tip');
+assert.match(stylesheet,/button\.bounty\{[^}]*min-height:44px/,'Today bounty buttons retain a 44px minimum height');
