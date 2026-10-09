@@ -170,7 +170,7 @@ test('live smoke check: passes against the empty and the imported backend, and w
 });
 
 
-test('organizer imports preserve existing duplicate bounty claims and new writes still reject duplicates', async () => {
+test('organizer imports preserve editable historical duplicate bounty claims and reject moving back onto a claim', async () => {
   await reset();
   const snapshot=snapshotFixture({version:v,features:FEATURES});
   const bounty=dailyBounties('2026-07-13')[0];
@@ -182,6 +182,15 @@ test('organizer imports preserve existing duplicate bounty claims and new writes
   runPsql(stack.dbUrl,snapshotToSql(snapshot));
   assert.deepEqual((await send({method:'GET',bodyText:''})).activities,snapshot.activities);
   const changed=await post({action:'update',id:claim.id,note:'edit'});
-  assert.equal(changed.error.code,'duplicate_bounty');
+  assert.equal(changed.ok,true);
+  snapshot.activities[snapshot.activities.length-2]={...claim,note:'edit'};
+  assert.deepEqual((await send({method:'GET',bodyText:''})).activities,snapshot.activities,'only the stored note changes');
+  const other=dailyBounties(claim.date)[1];
+  const moved=await post({action:'update',id:'historical-duplicate',bountyId:other.id});
+  assert.equal(moved.ok,true);
+  snapshot.activities[snapshot.activities.length-1]={...snapshot.activities.at(-1),bountyId:other.id,bountyTitle:other.title,category:other.category,points:other.points};
+  assert.deepEqual((await send({method:'GET',bodyText:''})).activities,snapshot.activities);
+  const conflict=await post({action:'update',id:'historical-duplicate',bountyId:claim.bountyId});
+  assert.equal(conflict.error.code,'duplicate_bounty');
   assert.deepEqual((await send({method:'GET',bodyText:''})).activities,snapshot.activities);
 });

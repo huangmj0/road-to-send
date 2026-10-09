@@ -1512,8 +1512,13 @@ test('Edit is restricted to the own feed at v14 or local mode and Escape restore
     assert.equal(document.querySelector('#hardestGrade').value,'V4');assert.equal(document.querySelector('#recordingName').textContent,'Alex');
     assert.equal(document.querySelector('#recordForm [data-action="openProxy"]').classList.contains('hide'),true,'the climber name cannot be edited');
     assert.equal(document.activeElement.name,'activityType','focus moves inside the sheet');
-    // A sync re-renders the underlying row while the sheet is open.
-    render();keyboard('Escape');
+    // A shared refresh replaces the underlying objects while the sheet is open.
+    const previewBefore=document.querySelector('#creditPreview').textContent;
+    assert.equal(previewBefore,'Counts in full · +3 today');
+    state.logs=state.logs.map(x=>({...x}));
+    assert.notEqual(state.logs[0],state.editing.entry);
+    render();assert.equal(document.querySelector('#creditPreview').textContent,previewBefore,'shared edits still match the refreshed row by id');
+    keyboard('Escape');
     assert.equal(document.querySelector('#editModal').classList.contains('open'),false);
     assert.equal(document.querySelector('#recordForm').parentElement.id,'recordFormHome');
     assert.equal(document.querySelector('#activityNote').value,'Create draft');
@@ -1558,9 +1563,68 @@ test('local edits preserve the V9 entry identity update feed scores and exclude 
     assert.equal(state.logs.length,1);assert.equal(state.logs[0].note,'Claim detail');assert.equal(state.logs[0].bountyId,b.id);
     assert.equal(state.logs[0].createdAt,'1');
     state.logs.push({...state.logs[0],id:'other-claim'});render();openEdit(0,document.querySelector('#personalActivity [data-edit]'));
-    assert.equal(document.querySelector('#saveActivityBtn').disabled,true,'a different existing claim still blocks duplicates');
+    const before=JSON.stringify(state.logs),unchanged=JSON.stringify(state.logs[1]);
+    const duplicateOption=document.querySelector('#bountySelect option[value="'+b.id+'"]');
+    assert.ok(duplicateOption);assert.equal(duplicateOption.disabled,false,'an unchanged historical duplicate claim stays available');
+    assert.equal(duplicateOption.textContent.includes(' · claimed'),false);
+    assert.equal(document.querySelector('#saveActivityBtn').disabled,false,'an unchanged historical duplicate claim can be saved');
+    document.querySelector('#activityNote').value='Historical detail';updateRecordPreview();
+    await submitActivity({preventDefault(){}});
+    assert.equal(document.querySelector('#toast').textContent,'Entry updated.');
+    assert.equal(state.logs.length,2,'existing duplicate rows stay intact');
+    const expected=JSON.parse(before);expected[0].note='Historical detail';
+    assert.equal(JSON.stringify(state.logs),JSON.stringify(expected),'only the edited historical claim note changes');
+    assert.equal(JSON.stringify(state.logs[1]),unchanged);
+    assert.deepEqual(JSON.parse(store.get('roadToSendLogsV9')),expected);
+    state.logs.push({id:'third-entry',name:'Alex',type:'exercise',date,createdAt:'3',note:'Keep'});
+    render();openEdit(2,document.querySelector('#personalActivity [data-edit="2"]'));
+    const beforeConflict=JSON.stringify(state.logs);
+    document.querySelector('input[name="activityType"][value="bounty"]').checked=true;updateRecordPreview();
+    const blockedOption=document.querySelector('#bountySelect option[value="'+b.id+'"]');
+    assert.ok(blockedOption);assert.equal(blockedOption.disabled,true,'moving another entry onto the claim stays blocked');
+    assert.match(blockedOption.textContent,/ · claimed$/);
+    document.querySelector('#bountySelect').value=b.id;updateRecordPreview();
+    assert.equal(document.querySelector('#saveActivityBtn').disabled,true);
     await submitActivity({preventDefault(){}});
     assert.equal(document.querySelector('#toast').textContent,'That bounty is already claimed on that date.');
-    assert.equal(state.logs.length,2,'existing duplicate rows stay intact');
+    assert.equal(JSON.stringify(state.logs),beforeConflict,'the blocked submit changes no entry');
+    assert.deepEqual(JSON.parse(store.get('roadToSendLogsV9')),expected,'the blocked submit leaves storage unchanged');
+  })()`,context);
+});
+
+test('a local note edit changes only the selected id-less V9 entry and keeps its id absent', async () => {
+  const dom=createDom(),store=new Map();
+  const context={...domContext,window:dom,document:dom.document,store,
+    localStorage:{getItem:key=>store.get(key)||null,setItem:(key,value)=>store.set(key,String(value)),removeItem:key=>store.delete(key)},
+  };
+  await vm.runInNewContext(source+`\n(async()=>{
+    state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+    state.me='Alex';state.recordingFor='Alex';state.endpoint='';
+    const date='2026-07-13';
+    const base={name:'Alex',date,hardestGrade:'',bountyId:'',bountyTitle:''};
+    state.logs=[{...base,type:'exercise',category:'exercise',points:2,createdAt:'first',note:'First'},
+      {...base,type:'mobility',category:'mobility',points:1,createdAt:'second',note:'Second'},
+      {...base,id:'identified',type:'climb',category:'climb',points:3,hardestGrade:'V4',createdAt:'third',note:'Third'}];
+    persistLocal();
+    const original=JSON.parse(store.get('roadToSendLogsV9')),before=state.logs.map(x=>JSON.stringify(x));
+    const meterBefore=computeCredits(state.logs).dayMeter.get('alex|'+date);
+    render();openEdit(1,document.querySelector('#personalActivity [data-edit="1"]'));
+    document.querySelector('#activityNote').value='Edited second';updateRecordPreview();
+    assert.equal(document.querySelector('#saveActivityBtn').disabled,false);
+    assert.equal(document.querySelector('#recordMeter').getAttribute('aria-label'),meterBefore+' of '+DAILY_MAX+' points after this activity','the preview replaces only the selected id-less row');
+    assert.equal(Number(document.querySelector('#rawPreview').textContent),1);
+    await submitActivity({preventDefault(){}});
+    assert.equal(document.querySelector('#toast').textContent,'Entry updated.');
+    assert.equal(state.logs.length,3);
+    assert.equal(JSON.stringify(state.logs[0]),before[0],'the other id-less entry stays byte-identical');
+    assert.equal(JSON.stringify(state.logs[2]),before[2],'the identified entry stays byte-identical');
+    assert.equal(Object.hasOwn(state.logs[1],'id'),false,'editing adds no id key in memory');
+    original[1].note='Edited second';
+    assert.equal(JSON.stringify(state.logs),JSON.stringify(original),'only the selected note changes in memory');
+    const persisted=JSON.parse(store.get('roadToSendLogsV9'));
+    assert.equal(persisted.length,3);
+    assert.equal(Object.hasOwn(persisted[1],'id'),false,'editing adds no persisted id key');
+    assert.equal(JSON.stringify(persisted[0]),before[0]);assert.equal(JSON.stringify(persisted[2]),before[2]);
+    assert.deepEqual(persisted,original,'only the selected note changes in V9 storage');
   })()`,context);
 });

@@ -271,16 +271,28 @@ test('core updates preserve imported ids timestamps names and entries removed fr
   assert.equal((await handle({method:'POST',bodyText:JSON.stringify({action:'update',id:original.id})},racing,now)).error.code,'not_found');
 });
 
-test('existing duplicate bounty rows survive reads while new conflicting writes are rejected', async () => {
+test('historical duplicate bounty claims remain editable while moving onto a claim is rejected', async () => {
   const {handle,dailyBounties} = await fn('core.mjs');
   const {createMemoryStore} = await import(new URL('./supabase/memory-store.mjs', `file://${__filename}`));
-  const bounty=dailyBounties('2026-07-13')[0];
+  const [bounty,other]=dailyBounties('2026-07-13');
   const row={id:'old1',name:'Alex',type:'bounty',category:bounty.category,points:bounty.points,date:'2026-07-13',createdAt:'old',hardestGrade:'',bountyId:bounty.id,bountyTitle:bounty.title,note:''};
   const rows=[row,{...row,id:'old2',name:'aLEX'}];
   const store=createMemoryStore({participants:['Alex'],activities:rows});
   assert.deepEqual((await handle({method:'GET'},store,now)).activities,rows);
   const reply=await handle({method:'POST',bodyText:JSON.stringify({action:'update',id:'old1',note:'edit'})},store,now);
-  assert.equal(reply.error.code,'duplicate_bounty');assert.deepEqual(await store.listActivities(),rows);
+  assert.equal(reply.ok,true);
+  rows[0]={...row,note:'edit'};
+  assert.deepEqual(await store.listActivities(),rows,'only the historical claim note changes');
+  const moved=await handle({method:'POST',bodyText:JSON.stringify({action:'update',id:'old2',bountyId:other.id})},store,now);
+  assert.equal(moved.ok,true);
+  rows[1]={...rows[1],bountyId:other.id,bountyTitle:other.title,category:other.category,points:other.points};
+  assert.deepEqual(await store.listActivities(),rows);
+  const conflict=await handle({method:'POST',bodyText:JSON.stringify({action:'update',id:'old2',bountyId:bounty.id})},store,now);
+  assert.equal(conflict.error.code,'duplicate_bounty');
+  assert.deepEqual(await store.listActivities(),rows,'a rejected move changes no row');
+  const create=await handle({method:'POST',bodyText:JSON.stringify({...row,id:'22222222-2222-4222-8222-222222222222'})},store,now);
+  assert.equal(create.error.code,'duplicate_bounty');
+  assert.deepEqual(await store.listActivities(),rows,'a rejected insert changes no row');
 });
 
 test('an ignored PostgREST insert returns the winning row rather than the retried request fields', async () => {

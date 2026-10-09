@@ -43,7 +43,7 @@ export function createMemoryStore({settings = null, participants = [], activitie
       const existing = feed.find(a => a.id === id);
       if (!existing) return null;
       const updated = {...existing, ...fields, id, createdAt: existing.createdAt};
-      checkBounty(updated);
+      if (!(updated.type === existing.type && updated.name.toLowerCase() === existing.name.toLowerCase() && updated.date === existing.date && updated.bountyId === existing.bountyId)) checkBounty(updated);
       Object.assign(existing, updated);
       const {seq, ...row} = updated;
       return row;
