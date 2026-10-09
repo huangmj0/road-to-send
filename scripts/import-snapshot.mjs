@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 export class ImportError extends Error {}
 
-const ACCEPTED_VERSIONS = [12, 13];
+const ACCEPTED_VERSIONS = [12, 13, 14];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Standard-conforming string literal: only the single quote needs escaping. Backslashes,
@@ -67,7 +67,7 @@ export function renderSnapshot(payload) {
     participants: [],
     activities: [],
   };
-  const lines = ['begin;', 'set local standard_conforming_strings = on;', ''];
+  const lines = ['begin;', 'set local standard_conforming_strings = on;', "set local road_to_send.importing = 'true';", ''];
   lines.push(
     'insert into settings (id, start_date, trip_date, goal, time_zone)',
     `values (1, ${lit(config.startDate)}, ${lit(config.tripDate)}, ${config.goal}, ${lit(payload.timeZone)})`,

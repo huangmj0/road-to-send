@@ -1188,3 +1188,17 @@ const checks = `(()=>{
 test('scoring, totals, pace and share text behave as the app expects', () => {
   vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
 });
+
+test('UUID fallback uses secure random bytes with v4 and variant bits when randomUUID is unavailable', () => {
+  let calls=0;
+  const fallback={...context,crypto:{getRandomValues:bytes=>{calls++;bytes.fill(255);bytes[0]=calls;return bytes}}};
+  vm.runInNewContext(source+`\n(()=>{
+    const first=newActivityId(),second=newActivityId();
+    assert.match(first,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.notEqual(first,second,'separate new entries have separate request identities');
+    const fields={name:'Alex',type:'climb',date:'2026-07-13',note:'same'};
+    const id=createIdFor(fields);assert.equal(createIdFor(fields),id,'unchanged draft retains its UUID');
+    assert.notEqual(createIdFor({...fields,note:'changed'}),id,'changing the draft creates a new identity');
+  })()`,fallback);
+  assert.equal(calls,4,'each new identity obtains secure random bytes once');
+});
