@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://huangmj0.github.io/road-to-send/schema/v13.json",
-  "title": "Road to Send protocol v13",
+  "$id": "https://huangmj0.github.io/road-to-send/schema/v14.json",
+  "title": "Road to Send protocol v14",
   "type": "object",
   "required": ["version", "features", "activities", "config"],
   "properties": {
-    "version": { "const": 13 },
+    "version": { "const": 14 },
     "features": { "type": "array", "items": { "type": "string" } },
     "activities": { "type": "array", "items": { "$ref": "#/$defs/activity" } },
     "config": { "anyOf": [{ "$ref": "#/$defs/settings" }, { "type": "null" }] },
@@ -16,6 +16,38 @@
     "movedTo": { "type": "string", "pattern": "^https://" }
   },
   "$defs": {
+    "createRequest": {
+      "description": "POST without action creates an activity. Optional client UUID is reused on retries; omitted id is minted by the server. Same id/name/type/date/bountyId returns the existing row (including its original note and grade); different content returns conflict. Category and points are derived by the server.",
+      "type": "object",
+      "required": ["name", "type", "date"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" },
+        "name": { "$ref": "#/$defs/activity/properties/name" },
+        "type": { "$ref": "#/$defs/activity/properties/type" },
+        "date": { "type": "string" },
+        "hardestGrade": { "$ref": "#/$defs/activity/properties/hardestGrade" },
+        "bountyId": { "$ref": "#/$defs/activity/properties/bountyId" },
+        "note": { "$ref": "#/$defs/activity/properties/note" }
+      }
+    },
+    "updateRequest": {
+      "description": "POST update edits type (and derived category/points), date, hardestGrade, bountyId and note; omitted fields retain their values. Name, id, createdAt and feed order are preserved. Imported non-UUID ids remain editable. Applies create validation, challenge window and bounty-date checks; returns the full activity as create does.",
+      "type": "object",
+      "required": ["action", "id"],
+      "properties": {
+        "action": { "const": "update" },
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "$ref": "#/$defs/activity/properties/type" },
+        "date": { "type": "string" },
+        "hardestGrade": { "$ref": "#/$defs/activity/properties/hardestGrade" },
+        "bountyId": { "$ref": "#/$defs/activity/properties/bountyId" },
+        "note": { "$ref": "#/$defs/activity/properties/note" }
+      }
+    },
+    "writeErrorCode": {
+      "description": "invalid_activity includes field details (including malformed create UUID); outside_challenge_window rejects out-of-window dates; conflict rejects an id belonging to different create content; not_found rejects an unknown update/delete id; duplicate_bounty rejects the same climber (case-insensitive), date and bountyId, excluding the edited entry. Existing duplicates are not changed.",
+      "enum": ["invalid_activity", "outside_challenge_window", "conflict", "not_found", "duplicate_bounty", "invalid_json", "invalid_request", "unknown_action", "invalid_config", "setup_required", "invalid_participant", "duplicate_participant", "invalid_delete", "server_error"]
+    },
     "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
     "participant": {
       "type": "object",

@@ -104,7 +104,13 @@ import { readFileSync } from 'node:fs';
 // uncertain-save reconciliation. Keeping the current endpoint in the Home Screen launch URL
 // and explaining iOS's separate name storage also contribute. This measured cap leaves only
 // 510 bytes of margin; the next budget entry re-measures rather than assuming more growth.
-const BUDGET = 142600;
+// Re-baselined 142600 -> 147500 on 2026-10-09 for API v14: measured 146943 bytes,
+// up 4839 from the 142104-byte branch baseline. Stable client UUIDs and retry identities,
+// the shared/local update flow and reconciliation, and the accessible edit sheet (reusing
+// the Record form) account for the growth; feed action styling and focus restoration add
+// the remainder. Scoring and the bounty catalog are unchanged. This leaves 557 bytes of
+// margin, close to the previous 496; the next budget entry re-measures rather than assuming.
+const BUDGET = 147500;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);

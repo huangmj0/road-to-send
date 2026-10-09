@@ -1638,6 +1638,26 @@
           ]
         }
       }
+    },
+    {
+      "input": {
+        "name": "Alex",
+        "type": "climb",
+        "date": "2026-07-13",
+        "id": "forged"
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_activity",
+          "message": "Invalid activity",
+          "details": [
+            {
+              "field": "id",
+              "reason": "must be a UUID"
+            }
+          ]
+        }
+      }
     }
   ],
   "requests": {
@@ -1645,7 +1665,7 @@
       {
         "input": "",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_json",
@@ -1657,7 +1677,7 @@
       {
         "input": "not json",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_json",
@@ -1669,7 +1689,7 @@
       {
         "input": "{\"a\":",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_json",
@@ -1681,7 +1701,7 @@
       {
         "input": "null",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_request",
@@ -1693,7 +1713,7 @@
       {
         "input": "[]",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_request",
@@ -1705,7 +1725,7 @@
       {
         "input": "5",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_request",
@@ -1717,7 +1737,7 @@
       {
         "input": "\"x\"",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_request",
@@ -1729,7 +1749,7 @@
       {
         "input": "{}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -1746,7 +1766,7 @@
       {
         "input": "{\"action\":\"__smoke__\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "unknown_action",
@@ -1758,7 +1778,7 @@
       {
         "input": "{\"action\":1}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "unknown_action",
@@ -1770,7 +1790,7 @@
       {
         "input": "{\"action\":\"saveConfig\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -1801,7 +1821,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":\"x\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -1832,7 +1852,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -1858,7 +1878,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"7/1/2026\",\"tripDate\":\"July 31, 2026\",\"goal\":\"1,000\",\"crew\":[\"Alex\",\"alex\",\"Maya\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -1887,7 +1907,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-31\",\"tripDate\":\"2026-07-01\",\"goal\":500,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -1906,7 +1926,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-31\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -1932,7 +1952,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"soon\",\"tripDate\":\"2026-02-30\",\"goal\":12.5,\"crew\":[]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -1963,7 +1983,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"\",\"tripDate\":\"\",\"goal\":\"\",\"crew\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -1994,7 +2014,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":10001,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -2013,7 +2033,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":49,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -2032,7 +2052,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"\",\" \"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -2049,7 +2069,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -2066,7 +2086,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -2097,7 +2117,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"Zed\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2109,7 +2129,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\" zed \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2121,7 +2141,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"alex\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2133,7 +2153,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"MAYA\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2145,7 +2165,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2157,7 +2177,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"  \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2169,7 +2189,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":null}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2181,7 +2201,7 @@
       {
         "input": "{\"action\":\"addParticipant\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2193,7 +2213,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":42}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2205,7 +2225,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2217,7 +2237,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "setup_required",
@@ -2229,7 +2249,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\"a1\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "not_found",
@@ -2240,7 +2260,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\" a1 \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "not_found",
@@ -2251,7 +2271,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\"a2\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "not_found",
@@ -2262,7 +2282,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\"\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_delete",
@@ -2279,7 +2299,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\"   \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_delete",
@@ -2296,7 +2316,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":null}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_delete",
@@ -2313,7 +2333,7 @@
       {
         "input": "{\"action\":\"delete\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_delete",
@@ -2330,7 +2350,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":0}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "not_found",
@@ -2341,7 +2361,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2358,7 +2378,7 @@
       {
         "input": "{\"name\":\" alex \",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"V17\",\"note\":\"  top out  \",\"points\":99,\"category\":\"mobility\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2375,7 +2395,7 @@
       {
         "input": "{\"name\":\"Maya\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"VB\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2392,7 +2412,7 @@
       {
         "input": "{\"name\":\"Maya\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"v4\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2409,7 +2429,7 @@
       {
         "input": "{\"name\":\"Maya\",\"type\":\"exercise\",\"date\":\"07/13/2026\",\"hardestGrade\":\"V4\",\"bountyId\":\"dyno-mike\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2426,7 +2446,7 @@
       {
         "input": "{\"name\":\"Maya\",\"type\":\"mobility\",\"date\":\"July 13, 2026\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2443,7 +2463,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"dyno-mike\",\"points\":0}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2460,7 +2480,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"weighted-wonder\",\"points\":0}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2477,7 +2497,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"yoga-flow\",\"points\":0}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2494,7 +2514,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"no-such-bounty\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2511,7 +2531,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2528,7 +2548,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"send-it\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2545,7 +2565,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-02-30\",\"bountyId\":\"dyno-mike\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2562,7 +2582,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"run\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2579,7 +2599,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"Climb\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2596,7 +2616,7 @@
       {
         "input": "{\"name\":\"Alex\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2613,7 +2633,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2630,7 +2650,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2647,7 +2667,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\" nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2664,7 +2684,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"yesterday\",\"hardestGrade\":\"V99\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2681,7 +2701,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2698,7 +2718,7 @@
       {
         "input": "{\"name\":\"Nobody\",\"type\":\"run\",\"date\":\"never\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2715,7 +2735,7 @@
       {
         "input": "{\"name\":\"\",\"type\":\"climb\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2732,7 +2752,7 @@
       {
         "input": "{\"type\":\"climb\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2749,7 +2769,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-06-30\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2766,7 +2786,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-01\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2783,7 +2803,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-31\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2800,7 +2820,24 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-08-01\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Choose a participant from the Participants tab",
+            "details": [
+              {
+                "field": "name",
+                "reason": "must match a participant"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"id\":\"forged\"}",
+        "expected": {
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2819,7 +2856,7 @@
       {
         "input": "",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_json",
@@ -2831,7 +2868,7 @@
       {
         "input": "not json",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_json",
@@ -2843,7 +2880,7 @@
       {
         "input": "{\"a\":",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_json",
@@ -2855,7 +2892,7 @@
       {
         "input": "null",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_request",
@@ -2867,7 +2904,7 @@
       {
         "input": "[]",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_request",
@@ -2879,7 +2916,7 @@
       {
         "input": "5",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_request",
@@ -2891,7 +2928,7 @@
       {
         "input": "\"x\"",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_request",
@@ -2903,7 +2940,7 @@
       {
         "input": "{}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -2920,7 +2957,7 @@
       {
         "input": "{\"action\":\"__smoke__\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "unknown_action",
@@ -2932,7 +2969,7 @@
       {
         "input": "{\"action\":1}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "unknown_action",
@@ -2944,7 +2981,7 @@
       {
         "input": "{\"action\":\"saveConfig\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -2975,7 +3012,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":\"x\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3006,7 +3043,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3032,7 +3069,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"7/1/2026\",\"tripDate\":\"July 31, 2026\",\"goal\":\"1,000\",\"crew\":[\"Alex\",\"alex\",\"Maya\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3061,7 +3098,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-31\",\"tripDate\":\"2026-07-01\",\"goal\":500,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3080,7 +3117,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-31\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3106,7 +3143,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"soon\",\"tripDate\":\"2026-02-30\",\"goal\":12.5,\"crew\":[]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3137,7 +3174,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"\",\"tripDate\":\"\",\"goal\":\"\",\"crew\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3168,7 +3205,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":10001,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3187,7 +3224,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":49,\"crew\":[\"Alex\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3206,7 +3243,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"\",\" \"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3223,7 +3260,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{\"startDate\":\"2026-07-01\",\"tripDate\":\"2026-07-31\",\"goal\":500,\"crew\":[\"Alex\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3240,7 +3277,7 @@
       {
         "input": "{\"action\":\"saveConfig\",\"config\":{}}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3271,7 +3308,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"Zed\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3306,7 +3343,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\" zed \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3341,7 +3378,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"alex\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "duplicate_participant",
@@ -3358,7 +3395,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"MAYA\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "duplicate_participant",
@@ -3375,7 +3412,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_participant",
@@ -3392,7 +3429,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"  \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_participant",
@@ -3409,7 +3446,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":null}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_participant",
@@ -3426,7 +3463,7 @@
       {
         "input": "{\"action\":\"addParticipant\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_participant",
@@ -3443,7 +3480,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":42}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3478,7 +3515,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3513,7 +3550,7 @@
       {
         "input": "{\"action\":\"addParticipant\",\"name\":\"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_config",
@@ -3530,7 +3567,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\"a1\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": true,
           "deleted": "a1"
         }
@@ -3538,7 +3575,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\" a1 \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": true,
           "deleted": "a1"
         }
@@ -3546,7 +3583,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\"a2\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "not_found",
@@ -3557,7 +3594,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\"\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_delete",
@@ -3574,7 +3611,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":\"   \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_delete",
@@ -3591,7 +3628,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":null}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_delete",
@@ -3608,7 +3645,7 @@
       {
         "input": "{\"action\":\"delete\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_delete",
@@ -3625,7 +3662,7 @@
       {
         "input": "{\"action\":\"delete\",\"id\":0}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "not_found",
@@ -3636,7 +3673,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3662,7 +3699,7 @@
       {
         "input": "{\"name\":\" alex \",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"V17\",\"note\":\"  top out  \",\"points\":99,\"category\":\"mobility\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3688,7 +3725,7 @@
       {
         "input": "{\"name\":\"Maya\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"VB\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3705,7 +3742,7 @@
       {
         "input": "{\"name\":\"Maya\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"hardestGrade\":\"v4\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3722,7 +3759,7 @@
       {
         "input": "{\"name\":\"Maya\",\"type\":\"exercise\",\"date\":\"07/13/2026\",\"hardestGrade\":\"V4\",\"bountyId\":\"dyno-mike\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3748,7 +3785,7 @@
       {
         "input": "{\"name\":\"Maya\",\"type\":\"mobility\",\"date\":\"July 13, 2026\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3774,7 +3811,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"dyno-mike\",\"points\":0}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3800,7 +3837,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"weighted-wonder\",\"points\":0}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3826,7 +3863,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"yoga-flow\",\"points\":0}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3852,7 +3889,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"no-such-bounty\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3869,7 +3906,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3886,7 +3923,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-07-13\",\"bountyId\":\"send-it\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3903,7 +3940,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"bounty\",\"date\":\"2026-02-30\",\"bountyId\":\"dyno-mike\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3920,7 +3957,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"run\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3937,7 +3974,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"Climb\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3954,7 +3991,7 @@
       {
         "input": "{\"name\":\"Alex\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -3971,7 +4008,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -3997,7 +4034,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -4014,7 +4051,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-13\",\"note\":\" nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn \"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -4040,7 +4077,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"yesterday\",\"hardestGrade\":\"V99\",\"note\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -4065,7 +4102,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -4082,7 +4119,7 @@
       {
         "input": "{\"name\":\"Nobody\",\"type\":\"run\",\"date\":\"never\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -4099,7 +4136,7 @@
       {
         "input": "{\"name\":\"\",\"type\":\"climb\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -4116,7 +4153,7 @@
       {
         "input": "{\"type\":\"climb\",\"date\":\"2026-07-13\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "invalid_activity",
@@ -4133,7 +4170,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-06-30\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "outside_challenge_window",
@@ -4150,7 +4187,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-01\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -4176,7 +4213,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-07-31\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "features": [
             "categories-v1",
             "balanced-day-bonus",
@@ -4202,7 +4239,7 @@
       {
         "input": "{\"name\":\"Alex\",\"type\":\"mobility\",\"date\":\"2026-08-01\"}",
         "expected": {
-          "version": 13,
+          "version": 14,
           "ok": false,
           "error": {
             "code": "outside_challenge_window",
@@ -4211,6 +4248,23 @@
               {
                 "field": "date",
                 "reason": "is outside the challenge window"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "input": "{\"name\":\"Alex\",\"type\":\"climb\",\"date\":\"2026-07-13\",\"id\":\"forged\"}",
+        "expected": {
+          "version": 14,
+          "ok": false,
+          "error": {
+            "code": "invalid_activity",
+            "message": "Invalid activity",
+            "details": [
+              {
+                "field": "id",
+                "reason": "must be a UUID"
               }
             ]
           }

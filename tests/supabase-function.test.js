@@ -124,12 +124,16 @@ test('a Postgres 23505 on the participant insert becomes duplicate_participant; 
 
 test('the PostgREST store inserts an activity as a snake_case row', async () => {
   const {createPostgrestStore} = await fn('store.mjs');
-  const {fetch, calls} = stubFetch({'/activities': {status: 201}});
+  const row = {id:'u-1',created_at:'2026-07-13T12:00:00.000Z',name:'Alex',type:'bounty',category:'climb',points:2,date:'2026-07-13',hardest_grade:'',bounty_id:'b1',bounty_title:'Bounty',note:'n'};
+  const {fetch, calls} = stubFetch({'/activities?on_conflict':{status:201},'/activities?id=eq.u-1':{body:[row]}});
   const store = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch});
-  await store.appendActivity({id: 'u-1', createdAt: '2026-07-13T12:00:00.000Z', name: 'Alex', type: 'bounty', category: 'climb', points: 2, date: '2026-07-13', hardestGrade: '', bountyId: 'b1', bountyTitle: 'Bounty', note: 'n'});
-  assert.equal(calls[0].url, 'https://proj.supabase.co/rest/v1/activities');
+  const saved = await store.appendActivity({id: 'u-1', createdAt: '2026-07-13T12:00:00.000Z', name: 'Alex', type: 'bounty', category: 'climb', points: 2, date: '2026-07-13', hardestGrade: '', bountyId: 'b1', bountyTitle: 'Bounty', note: 'n'});
+  assert.equal(calls[0].url, 'https://proj.supabase.co/rest/v1/activities?on_conflict=id');
   assert.equal(calls[0].init.method, 'POST');
-  assert.equal(calls[0].init.headers.Prefer, 'return=minimal');
+  assert.equal(calls[0].init.headers.Prefer, 'resolution=ignore-duplicates,return=minimal');
+  assert.equal(calls[1].init.method,'GET');
+  assert.ok(calls[1].url.includes('activities?id=eq.u-1&select=id,name,type,category,points,date,created_at'));
+  assert.equal(saved.id,'u-1');assert.equal(saved.createdAt,row.created_at);assert.equal(saved.bountyId,'b1');
   assert.deepEqual(JSON.parse(calls[0].init.body), {id: 'u-1', name: 'Alex', type: 'bounty', category: 'climb', points: 2, date: '2026-07-13', created_at: '2026-07-13T12:00:00.000Z', hardest_grade: '', bounty_id: 'b1', bounty_title: 'Bounty', note: 'n'});
   const failing = createPostgrestStore({url: 'https://proj.supabase.co', serviceKey: 'k', fetch: stubFetch({'/activities': {status: 400}}).fetch});
   await assert.rejects(failing.appendActivity({id: 'u-2'}));
@@ -224,4 +228,68 @@ test('check:generated fails on a stale contract and passes on a current one', as
   } finally {
     fs.rmSync(dir, {recursive: true, force: true});
   }
+});
+
+
+test('the PostgREST store patches editable fields without sending id createdAt or seq', async () => {
+  const {createPostgrestStore} = await fn('store.mjs');
+  const row={id:'old/id',name:'Alex',type:'exercise',category:'exercise',points:2,date:'2026-07-13',created_at:'original',hardest_grade:'',bounty_id:'',bounty_title:'',note:'edit'};
+  const {fetch,calls}=stubFetch({'/activities?id=eq.old%2Fid':{body:[row]}});
+  const store=createPostgrestStore({url:'https://proj.supabase.co',serviceKey:'k',fetch});
+  const entry={id:'forged',createdAt:'forged',seq:99,name:'Alex',type:'exercise',category:'exercise',points:2,date:'2026-07-13',hardestGrade:'',bountyId:'',bountyTitle:'',note:'edit'};
+  const saved=await store.updateActivity('old/id',entry);
+  assert.equal(calls[0].init.method,'PATCH');assert.equal(calls[0].init.headers.Prefer,'return=representation');
+  assert.ok(calls[0].url.includes('/activities?id=eq.old%2Fid&select='));
+  const body=JSON.parse(calls[0].init.body);
+  assert.deepEqual(body,{name:'Alex',type:'exercise',category:'exercise',points:2,date:'2026-07-13',hardest_grade:'',bounty_id:'',bounty_title:'',note:'edit'});
+  assert.equal(saved.id,'old/id');assert.equal(saved.createdAt,'original');
+  const missing=createPostgrestStore({url:'https://proj.supabase.co',serviceKey:'k',fetch:stubFetch({'/activities':{body:[]}}).fetch});
+  assert.equal(await missing.getActivity('gone'),null);assert.equal(await missing.updateActivity('gone',entry),null);
+});
+
+test('the PostgREST store maps only the duplicate-bounty trigger error on creates and updates', async () => {
+  const {createPostgrestStore} = await fn('store.mjs');
+  for (const failure of [{status:409,body:{code:'PT409',message:'duplicate_bounty'}},{status:409,body:{code:'23505',message:'other unique constraint'}},{status:500,body:{code:'PT409',message:'duplicate_bounty'}},{status:409,body:{code:'PT409',message:'other'}}]) {
+    const store=createPostgrestStore({url:'https://proj.supabase.co',serviceKey:'k',fetch:stubFetch({'/activities':failure}).fetch});
+    for (const operation of [()=>store.appendActivity({id:'x'}),()=>store.updateActivity('x',{})]) {
+      await assert.rejects(operation(),error=>failure.status===409&&failure.body.code==='PT409'&&failure.body.message==='duplicate_bounty'?error.code==='duplicate_bounty':error.code===undefined);
+    }
+  }
+});
+
+test('core updates preserve imported ids timestamps names and entries removed from the roster', async () => {
+  const {handle} = await fn('core.mjs');
+  const {createMemoryStore} = await import(new URL('./supabase/memory-store.mjs', `file://${__filename}`));
+  const original={id:'sheet-imported-id',name:'Former Climber',type:'climb',category:'climb',points:3,date:'2026-07-13',createdAt:'old timestamp',hardestGrade:'V4',bountyId:'',bountyTitle:'',note:''};
+  const store=createMemoryStore({participants:['Alex'],activities:[original]});
+  const reply=await handle({method:'POST',bodyText:JSON.stringify({action:'update',id:original.id,name:'Alex',createdAt:'new',note:'edited'})},store,now);
+  assert.equal(reply.ok,true);assert.equal(reply.name,original.name);assert.equal(reply.id,original.id);assert.equal(reply.createdAt,original.createdAt);
+  assert.deepEqual(await store.listActivities(),[{...original,note:'edited'}]);
+  const failing={...store,updateActivity:async()=>{throw Error('secret')}};
+  assert.equal((await handle({method:'POST',bodyText:JSON.stringify({action:'update',id:original.id,note:'next'})},failing,now)).error.code,'server_error');
+  const racing={...store,updateActivity:async()=>null};
+  assert.equal((await handle({method:'POST',bodyText:JSON.stringify({action:'update',id:original.id})},racing,now)).error.code,'not_found');
+});
+
+test('existing duplicate bounty rows survive reads while new conflicting writes are rejected', async () => {
+  const {handle,dailyBounties} = await fn('core.mjs');
+  const {createMemoryStore} = await import(new URL('./supabase/memory-store.mjs', `file://${__filename}`));
+  const bounty=dailyBounties('2026-07-13')[0];
+  const row={id:'old1',name:'Alex',type:'bounty',category:bounty.category,points:bounty.points,date:'2026-07-13',createdAt:'old',hardestGrade:'',bountyId:bounty.id,bountyTitle:bounty.title,note:''};
+  const rows=[row,{...row,id:'old2',name:'aLEX'}];
+  const store=createMemoryStore({participants:['Alex'],activities:rows});
+  assert.deepEqual((await handle({method:'GET'},store,now)).activities,rows);
+  const reply=await handle({method:'POST',bodyText:JSON.stringify({action:'update',id:'old1',note:'edit'})},store,now);
+  assert.equal(reply.error.code,'duplicate_bounty');assert.deepEqual(await store.listActivities(),rows);
+});
+
+test('an ignored PostgREST insert returns the winning row rather than the retried request fields', async () => {
+  const {createPostgrestStore} = await fn('store.mjs');
+  const row={id:'existing',name:'Alex',type:'climb',category:'climb',points:3,date:'2026-07-13',created_at:'original',hardest_grade:'V4',bounty_id:'',bounty_title:'',note:'first'};
+  const {fetch,calls}=stubFetch({'/activities?on_conflict=id':{status:201},'/activities?id=eq.existing':{body:[row]}});
+  const store=createPostgrestStore({url:'https://proj.supabase.co',serviceKey:'k',fetch});
+  const saved=await store.appendActivity({id:'existing',name:'Alex',type:'climb',category:'climb',points:3,date:'2026-07-13',createdAt:'retry',hardestGrade:'V5',bountyId:'',bountyTitle:'',note:'retry'});
+  assert.equal(calls.length,2);assert.equal(calls[0].init.method,'POST');assert.equal(calls[1].init.method,'GET');
+  assert.equal(calls[0].init.headers.Prefer,'resolution=ignore-duplicates,return=minimal');
+  assert.equal(saved.createdAt,'original');assert.equal(saved.note,'first');assert.equal(saved.hardestGrade,'V4');
 });

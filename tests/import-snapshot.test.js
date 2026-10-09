@@ -141,7 +141,7 @@ test('round trip on the shared synthetic snapshot the real-stack suite imports',
   const schema = JSON.parse(require('node:fs').readFileSync(path.join(__dirname, '..', 'src', 'schema.json'), 'utf8'));
   const current = schema.properties.version.const;
   assert.deepEqual(schemaProblems(schema, snapshotFixture({version: current, features: ['categories-v1']})), [], 'the fixture is a schema-valid board, as the function serves it');
-  for (const version of [12, 13]) {
+  for (const version of [12, 13, 14]) {
     const snap = snapshotFixture({version, features: ['categories-v1']});
     const {sql, rows} = renderSnapshot(snap);
     const parsed = parseSql(sql);
@@ -210,7 +210,7 @@ test('aborts on bad payloads and never returns partial SQL', async () => {
     'no activities': snapshot({activities: undefined}),
     'null config': snapshot({config: null}),
     'version 11': snapshot({version: 11}),
-    'version 14': snapshot({version: 14}),
+    'version 15': snapshot({version: 15}),
     'version as a string': snapshot({version: '13'}),
     'no version': snapshot({version: undefined}),
     'activities not an array': snapshot({activities: {a1: activity()}}),
@@ -245,7 +245,7 @@ test('CLI reads stdin, writes SQL to stdout; every abort exits 1 with a message 
     'activities not an array': [JSON.stringify(snapshot({activities: 'none'})), /no activities array/],
     'null config': [JSON.stringify(snapshot({config: null})), /config: null/],
     'version 11': [JSON.stringify(snapshot({version: 11})), /Unsupported snapshot version 11/],
-    'version 14': [JSON.stringify(snapshot({version: 14})), /Unsupported snapshot version 14/],
+    'version 15': [JSON.stringify(snapshot({version: 15})), /Unsupported snapshot version 15/],
     'duplicate activity ids': [JSON.stringify(snapshot({activities: [activity({id: 'x1'}), activity({id: "o'k"}), activity({id: 'x1'}), activity({id: "o'k"}), activity({id: 'x1'})]})), /duplicate activity id.*"x1".*"o'k"/],
     'late bad activity': [JSON.stringify(snapshot({activities: [activity(), activity({id: 'b', points: 'lots'})]})), /activities\[1\]\.points/],
   };
@@ -256,4 +256,12 @@ test('CLI reads stdin, writes SQL to stdout; every abort exits 1 with a message 
     assert.match(bad.stderr.toString(), /^import-snapshot: /, label);
     assert.match(bad.stderr.toString(), message, label);
   }
+});
+
+test('snapshot SQL preserves historical duplicate bounty claims for the organizer import', async () => {
+  const {snapshotToSql} = await load();
+  const claims = [activity({id:'b1',type:'bounty',bountyId:'bounty'}),activity({id:'b2',type:'bounty',bountyId:'bounty'})];
+  const sql = snapshotToSql(snapshot({version:14,activities:claims}));
+  assert.match(sql,/set local road_to_send\.importing = 'true';/);
+  assert.deepEqual(parseSql(sql).activities,claims);
 });

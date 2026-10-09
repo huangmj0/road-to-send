@@ -23,7 +23,7 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {snapshotToSql} from '../scripts/import-snapshot.mjs';
 import {runSmokeCheck} from '../scripts/smoke-check.mjs';
-import {FEATURES} from '../supabase/functions/road-to-send/core.mjs';
+import {FEATURES, dailyBounties} from '../supabase/functions/road-to-send/core.mjs';
 import {assertLoopback, createHttpTransport, createRest, resetDatabase, runPsql} from './supabase/local-stack.mjs';
 import {scenarios} from './supabase/scenarios.mjs';
 import {snapshotFixture} from './supabase/snapshot-fixture.mjs';
@@ -167,4 +167,21 @@ test('live smoke check: passes against the empty and the imported backend, and w
     assert.deepEqual(result.checks.map(check => [check.name, check.ok]), [['GET', true], ['OPTIONS', true], ['POST __smoke__', true]], `${stage}: ${JSON.stringify(result.checks)}`);
     assert.deepEqual(await tables(), before, `${stage}: the smoke check changed no table`);
   }
+});
+
+
+test('organizer imports preserve existing duplicate bounty claims and new writes still reject duplicates', async () => {
+  await reset();
+  const snapshot=snapshotFixture({version:v,features:FEATURES});
+  const bounty=dailyBounties('2026-07-13')[0];
+  const claim={id:'historical-claim',name:'Alex',type:'bounty',category:bounty.category,points:bounty.points,date:'2026-07-13',createdAt:'2026-07-13T01:00:00.000Z',hardestGrade:'',bountyId:bounty.id,bountyTitle:bounty.title,note:''};
+  snapshot.activities.push(claim,{...claim,id:'historical-duplicate',name:claim.name.toUpperCase()});
+  runPsql(stack.dbUrl,snapshotToSql(snapshot));
+  const board=await send({method:'GET',bodyText:''});
+  assert.deepEqual(board.activities,snapshot.activities);
+  runPsql(stack.dbUrl,snapshotToSql(snapshot));
+  assert.deepEqual((await send({method:'GET',bodyText:''})).activities,snapshot.activities);
+  const changed=await post({action:'update',id:claim.id,note:'edit'});
+  assert.equal(changed.error.code,'duplicate_bounty');
+  assert.deepEqual((await send({method:'GET',bodyText:''})).activities,snapshot.activities);
 });

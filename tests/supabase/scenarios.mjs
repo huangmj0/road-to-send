@@ -1,3 +1,4 @@
+// TRAP: every scenario starts empty; use only synthetic requests and compare server timestamps relatively.
 // Backend conformance scenarios, written once and run against every target: in-process under
 // `npm test` (tests/supabase-conformance.test.js) and over HTTP against a real local Supabase
 // stack (tests/supabase-stack.test.mjs via `npm run test:supabase`, which empties the tables
@@ -166,9 +167,10 @@ export const scenarios = [
     async run({send, schema}) {
       await setup(send);
       const date = '2026-07-13', [bounty] = dailyBounties(date);
-      const climb = assertActivityReply(schema, await post(send, {name: 'alex', type: 'climb', date, hardestGrade: 'V5', note: '  sent it  ', points: 99, category: 'mobility', id: 'mine', createdAt: 'then'}),
+      const climb = assertActivityReply(schema, await post(send, {name: 'alex', type: 'climb', date, hardestGrade: 'V5', note: '  sent it  ', points: 99, category: 'mobility', id: '00000000-0000-4000-8000-000000000001', createdAt: 'then'}),
         {name: 'Alex', type: 'climb', category: 'climb', points: 3, date, hardestGrade: 'V5', bountyId: '', bountyTitle: '', note: 'sent it'});
-      assert.notEqual(climb.id, 'mine');
+      assert.equal(climb.id, '00000000-0000-4000-8000-000000000001');
+      assert.notEqual(climb.createdAt, 'then', 'submitted createdAt is still ignored');
       const exercise = assertActivityReply(schema, await post(send, {name: 'Maya', type: 'exercise', date: '07/14/2026', hardestGrade: 'V5', bountyId: bounty.id}),
         {name: 'Maya', type: 'exercise', category: 'exercise', points: 2, date: '2026-07-14', hardestGrade: '', bountyId: '', bountyTitle: '', note: ''});
       const mobility = assertActivityReply(schema, await post(send, {name: 'Maya', type: 'mobility', date: 'Jul 15 2026'}),
@@ -238,6 +240,118 @@ export const scenarios = [
       assert.deepEqual(board.config, {startDate: START, tripDate: TRIP, goal: 600, crew: [{name: 'Alex'}]});
       assert.deepEqual(board.activities.map(x => [x.id, x.name]), [[logged.id, 'Maya']]);
       assert.equal((await post(send, {name: 'Maya', type: 'climb', date: START})).error.code, 'invalid_activity', 'a removed participant can no longer log');
+    },
+  },
+
+  {
+    name: 'idempotent creates return the original row and conflicting ids cannot change it',
+    async run({send, schema}) {
+      await setup(send);
+      const body={id:'ABCDEF12-3456-4789-ABCD-123456789ABC',name:'Alex',type:'climb',date:START,hardestGrade:'V4',note:'first'};
+      const first=await post(send,body);
+      assert.equal(first.ok,true);
+      assert.equal(first.id,body.id.toLowerCase());
+      const retry=await post(send,{...body,name:'alex',note:'ignored on retry',hardestGrade:'V5'});
+      assert.deepEqual(retry,first,'same entry returns its original details and timestamp');
+      for (const change of [{name:'Maya'},{type:'exercise'},{date:TRIP}]) {
+        assert.equal((await post(send,{...body,...change})).error.code,'conflict');
+      }
+      for (const id of ['',null,42,'mine','00000000-0000-0000-0000-00000000000x',{}]) {
+        const bad=await post(send,{...body,id});
+        assert.equal(bad.error.code,'invalid_activity');
+        assert.deepEqual(bad.error.details,[{field:'id',reason:'must be a UUID'}]);
+      }
+      const old=await post(send,{name:'Alex',type:'exercise',date:START});
+      assert.match(old.id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      const board=await get(send);assertConforms(schema,board);
+      assert.equal(board.activities.length,2);
+      assert.deepEqual(board.activities[0],Object.fromEntries(WIRE_ACTIVITY_KEYS.map(k=>[k,first[k]])));
+    },
+  },
+  {
+    name: 'update edits activity fields while keeping name id createdAt and insertion order',
+    async run({send,schema}) {
+      await setup(send);
+      const first=await post(send,{name:'Alex',type:'climb',date:START,hardestGrade:'V4',note:'original'});
+      const second=await post(send,{name:'Alex',type:'mobility',date:START});
+      const updated=await post(send,{action:'update',id:first.id,name:'Maya',createdAt:'forged',type:'exercise',date:TRIP,hardestGrade:'V5',note:' edited ',points:99,category:'climb'});
+      assertActivityReply(schema,updated,{name:'Alex',type:'exercise',category:'exercise',points:2,date:TRIP,hardestGrade:'',bountyId:'',bountyTitle:'',note:'edited'});
+      assert.equal(updated.id,first.id);assert.equal(updated.createdAt,first.createdAt);
+      const partial=await post(send,{action:'update',id:first.id,note:'partial'});
+      assert.equal(partial.type,'exercise');assert.equal(partial.date,TRIP);assert.equal(partial.note,'partial');
+      const board=await get(send);assertConforms(schema,board);
+      assert.deepEqual(board.activities.map(x=>x.id),[first.id,second.id]);
+      assert.deepEqual(board.activities[0],Object.fromEntries(WIRE_ACTIVITY_KEYS.map(k=>[k,partial[k]])));
+      assert.equal((await post(send,{action:'update',id:'unknown',type:'climb',date:START})).error.code,'not_found');
+    },
+  },
+  {
+    name: 'update reuses field validation challenge-window boundaries and bounty-date validation',
+    async run({send}) {
+      await setup(send);
+      const saved=await post(send,{name:'Alex',type:'climb',date:START});
+      const update=fields=>post(send,{action:'update',id:saved.id,...fields});
+      for (const fields of [{type:'run'},{date:'2026-02-30'},{hardestGrade:'VB'},{note:'x'.repeat(121)},{type:'bounty',bountyId:'unknown'}]) {
+        assert.equal((await update(fields)).error.code,'invalid_activity');
+      }
+      const offered=dailyBounties(START).map(b=>b.id),offDay=SCORING.bounties.find(b=>!offered.includes(b.id));
+      const bad=await update({type:'bounty',bountyId:offDay.id});
+      assert.deepEqual(bad.error.details,[{field:'bountyId',reason:'is not available on that date'}]);
+      for (const date of ['2026-06-30','2026-08-01']) assert.equal((await update({date})).error.code,'outside_challenge_window');
+      assert.equal((await update({date:START})).ok,true);
+      assert.equal((await update({date:TRIP})).ok,true);
+      const board=await get(send);
+      assert.equal(board.activities.length,1);assert.equal(board.activities[0].note,'');
+    },
+  },
+  {
+    name: 'duplicate bounty creates and updates reject other claims but allow an idempotent retry and self edit',
+    async run({send}) {
+      await setup(send);
+      const date='2026-07-13',[a,b]=dailyBounties(date);
+      const first=await post(send,{name:'Alex',type:'bounty',date,bountyId:a.id});
+      assert.equal(first.ok,true);
+      assert.deepEqual(await post(send,{id:first.id,name:'alex',type:'bounty',date,bountyId:a.id}),first);
+      const duplicate=await post(send,{name:'aLeX',type:'bounty',date,bountyId:a.id});
+      assert.equal(duplicate.error.code,'duplicate_bounty');
+      assert.equal((await post(send,{action:'update',id:first.id,note:'self edit'})).ok,true);
+      const other=await post(send,{name:'Alex',type:'bounty',date,bountyId:b.id});
+      assert.equal((await post(send,{action:'update',id:other.id,bountyId:a.id})).error.code,'duplicate_bounty');
+      assert.equal((await post(send,{id:first.id,name:'Alex',type:'bounty',date,bountyId:b.id})).error.code,'conflict');
+      assert.equal((await post(send,{name:'Maya',type:'bounty',date,bountyId:a.id})).ok,true);
+      const board=await get(send);assert.equal(board.activities.length,3);
+      assert.equal(board.activities.find(x=>x.id===other.id).bountyId,b.id);
+    },
+  },
+  {
+    name: 'concurrent retries insert once and competing bounty claims have one winner',
+    async run({send}) {
+      await setup(send);
+      const date='2026-07-13',[bounty]=dailyBounties(date);
+      const body={id:'00000000-0000-4000-8000-000000000002',name:'Alex',type:'bounty',date,bountyId:bounty.id};
+      const retries=await Promise.all([post(send,body),post(send,body)]);
+      assert.equal(retries[0].ok,true);assert.deepEqual(retries[1],retries[0]);
+      const claims=await Promise.all([post(send,{name:'Maya',type:'bounty',date,bountyId:bounty.id}),post(send,{name:'maya',type:'bounty',date,bountyId:bounty.id})]);
+      assert.equal(claims.filter(x=>x.ok).length,1,JSON.stringify(claims));
+      assert.equal(claims.find(x=>!x.ok).error.code,'duplicate_bounty');
+      assert.equal((await get(send)).activities.length,2);
+    },
+  },
+
+  {
+    name: 'concurrent updates competing for the same bounty have one winner',
+    async run({send}) {
+      await setup(send);
+      const date='2026-07-13',bounty=dailyBounties(date)[0];
+      const a=await post(send,{name:'Alex',type:'exercise',date});
+      const b=await post(send,{name:'Alex',type:'mobility',date});
+      const replies=await Promise.all([a,b].map(row=>post(send,{action:'update',id:row.id,type:'bounty',bountyId:bounty.id})));
+      assert.equal(replies.filter(x=>x.ok).length,1,JSON.stringify(replies));
+      assert.equal(replies.find(x=>!x.ok).error.code,'duplicate_bounty');
+      const board=await get(send);
+      assert.equal(board.activities.length,2);
+      assert.equal(board.activities.filter(x=>x.type==='bounty').length,1);
+      assert.deepEqual(board.activities.map(x=>[x.id,x.createdAt]),[a,b].map(x=>[x.id,x.createdAt]));
     },
   },
 ];

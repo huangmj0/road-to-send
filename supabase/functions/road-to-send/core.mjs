@@ -15,7 +15,10 @@
 //                                     settings (keeping timeZone) and replaces the roster in order
 //               addParticipant(name) -> true once appended at the end of the roster, false when
 //                                     the name already exists (case-insensitively)
-//               appendActivity(activity) appends a validated activity (with id and createdAt)
+//               appendActivity(activity) atomically inserts unless id exists, returns stored row
+//               getActivity(id) -> activity | null
+//               updateActivity(id, fields) -> updated activity | null (preserves id/createdAt/seq)
+//               writes may throw code duplicate_bounty when the database guard rejects a claim
 //               deleteActivity(id) -> true when a row was deleted, false when none matched
 //             store.mjs is the PostgREST implementation and tests/supabase/memory-store.mjs the
 //             in-memory one.
@@ -158,6 +161,7 @@ export function validateActivity(d, participants, timeZone = 'UTC') {
   const participant = canonicalParticipant(d && d.name, participants);
   const type = String((d && d.type) || ''), date = parseDateValue(d && d.date, timeZone), hardestGrade = String((d && d.hardestGrade) || '');
   const note = String((d && d.note) || '').trim(), bountyId = String((d && d.bountyId) || ''), errors = [];
+  if (d && Object.hasOwn(d, 'id') && (typeof d.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(d.id))) errors.push({field: 'id', reason: 'must be a UUID'});
   if (!ACTIVITY_TYPES.includes(type)) errors.push({field: 'type', reason: 'must be climb, exercise, mobility, or bounty'});
   if (date.error) errors.push({field: 'date', reason: date.error});
   if (type === 'climb' && hardestGrade && !GRADES.includes(hardestGrade)) errors.push({field: 'hardestGrade', reason: 'must be V0 through V17'});
@@ -234,9 +238,31 @@ async function deleteActivity(rawId, store) {
 async function appendActivity(d, store, now) {
   const [settings, participants] = await Promise.all([store.getSettings(), store.listParticipants()]);
   const activity = checkWindow(validateActivity(d, participants, settings?.timeZone || 'UTC'), settings);
-  const item = {id: crypto.randomUUID(), createdAt: now().toISOString(), ...activity};
-  await store.appendActivity(item);
+  const item = {id: d.id ? d.id.toLowerCase() : crypto.randomUUID(), createdAt: now().toISOString(), ...activity};
+  // The store inserts ON CONFLICT (id) DO NOTHING then reads the winning row. No check-then-insert.
+  const saved = await store.appendActivity(item);
+  if (!['name', 'type', 'date', 'bountyId'].every(key => saved[key] === item[key])) apiError('conflict', 'That activity id belongs to a different entry', [{field: 'id', reason: 'already used by a different entry'}]);
+  return activityReply(saved);
+}
+
+function activityReply(item) {
   return {version: API_VERSION, features: FEATURES, ok: true, ...item};
+}
+
+async function updateActivity(d, store) {
+  // Imported ids need not be UUIDs. Only newly submitted create ids have that requirement.
+  if (typeof d.id !== 'string' || !d.id.trim()) apiError('invalid_activity', 'Invalid activity', [{field: 'id', reason: 'is required'}]);
+  const existing = await store.getActivity(d.id);
+  if (!existing) apiError('not_found', 'Activity not found');
+  const [settings, participants] = await Promise.all([store.getSettings(), store.listParticipants()]);
+  // Keep the original spelling and allow editing historical entries after roster removal.
+  const roster = participants.filter(p => p.name.toLowerCase() !== existing.name.toLowerCase()).concat([{name: existing.name}]);
+  const {id, ...fields} = d;
+  const {id: existingId, ...original} = existing;
+  const activity = checkWindow(validateActivity({...original, ...fields, name: existing.name}, roster, settings?.timeZone || 'UTC'), settings);
+  const saved = await store.updateActivity(id, activity);
+  if (!saved) apiError('not_found', 'Activity not found');
+  return activityReply(saved);
 }
 
 async function write(bodyText, store, now) {
@@ -250,6 +276,7 @@ async function write(bodyText, store, now) {
   if (d.action === 'saveConfig') return saveConfig(d.config || {}, store);
   if (d.action === 'addParticipant') return addParticipant(d.name, store);
   if (d.action === 'delete') return deleteActivity(d.id, store);
+  if (d.action === 'update') return updateActivity(d, store);
   if (d.action) apiError('unknown_action', `Unsupported action: ${String(d.action)}`);
   return appendActivity(d, store, now);
 }
@@ -261,6 +288,7 @@ export async function handle({method, bodyText}, store, now) {
     return errorEnvelope('invalid_request', 'Unsupported request method');
   } catch (error) {
     if (error instanceof ApiError) return errorEnvelope(error.code, error.message, error.details);
+    if (error.code === 'duplicate_bounty') return errorEnvelope('duplicate_bounty', 'That bounty is already claimed on that date.', [{field: 'bountyId', reason: 'already claimed by this climber on this date'}]);
     return errorEnvelope('server_error', 'The request could not be completed');
   }
 }

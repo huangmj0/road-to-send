@@ -5,6 +5,8 @@
 // which PostgREST answers with 409), reported as addParticipant() -> false.
 const PAGE = 1000; // Supabase caps a PostgREST response at 1000 rows by default; page past it.
 const ACTIVITY_COLUMNS = 'id,name,type,category,points,date,created_at,hardest_grade,bounty_id,bounty_title,note';
+const activityFromRow = row => ({id: row.id, name: row.name, type: row.type, category: row.category, points: row.points, date: row.date, createdAt: row.created_at, hardestGrade: row.hardest_grade, bountyId: row.bounty_id, bountyTitle: row.bounty_title, note: row.note});
+const activityFields = activity => ({name: activity.name, type: activity.type, category: activity.category, points: activity.points, date: activity.date, hardest_grade: activity.hardestGrade, bounty_id: activity.bountyId, bounty_title: activity.bountyTitle, note: activity.note});
 
 export function createPostgrestStore({url, serviceKey, fetch: fetchImpl = fetch}) {
   const base = `${String(url).replace(/\/+$/, '')}/rest/v1`;
@@ -36,6 +38,18 @@ export function createPostgrestStore({url, serviceKey, fetch: fetchImpl = fetch}
     }
   }
 
+  async function getActivity(id) {
+    const [row] = await getRows(`activities?id=eq.${encodeURIComponent(id)}&select=${ACTIVITY_COLUMNS}`);
+    return row ? activityFromRow(row) : null;
+  }
+
+  async function activityFailure(path, response) {
+    let error;
+    try { error = await response.json(); } catch {}
+    if (response.status === 409 && error?.code === 'PT409' && error.message === 'duplicate_bounty') throw Object.assign(new Error('Duplicate bounty'), {code: 'duplicate_bounty'});
+    throw failure(path, response);
+  }
+
   return {
     async getSettings() {
       const [row] = await getRows('settings?select=start_date,trip_date,goal,time_zone&id=eq.1');
@@ -45,11 +59,9 @@ export function createPostgrestStore({url, serviceKey, fetch: fetchImpl = fetch}
       return (await getAll('participants?select=name&order=position.asc,name.asc')).map(row => ({name: row.name}));
     },
     async listActivities() {
-      return (await getAll(`activities?select=${ACTIVITY_COLUMNS}&order=seq.asc`)).map(row => ({
-        id: row.id, name: row.name, type: row.type, category: row.category, points: row.points, date: row.date,
-        createdAt: row.created_at, hardestGrade: row.hardest_grade, bountyId: row.bounty_id, bountyTitle: row.bounty_title, note: row.note,
-      }));
+      return (await getAll(`activities?select=${ACTIVITY_COLUMNS}&order=seq.asc`)).map(activityFromRow);
     },
+    getActivity,
     async saveConfig({startDate, tripDate, goal, crew}) {
       const response = await send('POST', 'rpc/save_config', {p_start: startDate, p_trip: tripDate, p_goal: goal, p_crew: crew}, 'return=minimal');
       if (!response.ok) throw failure('rpc/save_config', response);
@@ -63,12 +75,19 @@ export function createPostgrestStore({url, serviceKey, fetch: fetchImpl = fetch}
       throw failure('participants', response);
     },
     async appendActivity(activity) {
-      const row = {
-        id: activity.id, name: activity.name, type: activity.type, category: activity.category, points: activity.points, date: activity.date,
-        created_at: activity.createdAt, hardest_grade: activity.hardestGrade, bounty_id: activity.bountyId, bounty_title: activity.bountyTitle, note: activity.note,
-      };
-      const response = await send('POST', 'activities', row, 'return=minimal');
-      if (!response.ok) throw failure('activities', response);
+      const row = {id: activity.id, created_at: activity.createdAt, ...activityFields(activity)};
+      const response = await send('POST', 'activities?on_conflict=id', row, 'resolution=ignore-duplicates,return=minimal');
+      if (!response.ok) await activityFailure('activities', response);
+      const saved = await getActivity(activity.id);
+      if (!saved) throw new Error('Inserted activity was not found');
+      return saved;
+    },
+    async updateActivity(id, activity) {
+      const path = `activities?id=eq.${encodeURIComponent(id)}&select=${ACTIVITY_COLUMNS}`;
+      const response = await send('PATCH', path, activityFields(activity), 'return=representation');
+      if (!response.ok) await activityFailure(path, response);
+      const [row] = await response.json();
+      return row ? activityFromRow(row) : null;
     },
     async deleteActivity(id) {
       const path = `activities?id=eq.${encodeURIComponent(id)}&select=id`;
