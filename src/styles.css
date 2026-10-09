@@ -130,3 +130,5 @@
        the gap between first and fifth is a length rather than a subtraction the reader performs. */
     #leaderTable tbody tr{background-image:linear-gradient(90deg,var(--green) 0 var(--bar,0%),transparent var(--bar,0%));background-repeat:no-repeat;background-size:100% 2px;background-position:0 100%}
     tr.me{background-color:var(--me-row)}
+
+    #crewRecapCard .text-btn{min-width:44px;min-height:44px}#crewRecapToggle{font:inherit;text-align:left}.recap-climber{border-top:1px solid var(--line-soft);margin-top:16px;padding-top:8px;overflow-wrap:anywhere}#crewRecapContent .records-value{overflow-wrap:anywhere}
