@@ -380,3 +380,10 @@ assert.match(html,/<div class="card-head"><h2>Leaderboard<\/h2><div class="leade
 // Cells now size to their own content (auto flex-basis) so the longer message gets more room.
 assert.match(stylesheet,/\.meta-strip>div\{flex:auto;padding:11px 14px;min-width:0\}/,'meta-strip cells size to their own content instead of splitting evenly');
 console.log('Road to Send static accessibility and UX checks passed.');
+
+assert.match(html, /id="crewRecapCard" class="card hide"/, 'Challenge recap starts hidden on cold load');
+assert.match(html, /id="crewRecapToggle"[^>]*type="button"[^>]*aria-expanded="true"[^>]*aria-controls="crewRecapContent"/, 'recap has a real, expanded button controlling its content');
+assert.match(html, /id="crewRecapContent" class="hide"><\/div>/, 'recap starts without teaser content');
+assert.ok(html.indexOf('id="crewRecapCard"') > html.indexOf('id="crew"'), 'recap belongs to the Crew tab');
+assert.ok(html.indexOf('id="crewRecapCard"') < html.indexOf('class="card group-card"'), 'recap precedes the group goal near the top');
+assert.match(html, /#crewRecapCard \.text-btn\{min-width:44px;min-height:44px\}/, 'recap toggle and Share retain 44px touch targets');

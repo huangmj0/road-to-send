@@ -1186,3 +1186,85 @@ const checks = `(()=>{
 test('scoring, totals, pace and share text behave as the app expects', () => {
   vm.runInNewContext(`${source}\n${checks}`, context, {filename: 'index.html'});
 });
+
+// These cases use fresh VM state, independent of the large scenario above.
+function recapState(checks) {
+  vm.runInNewContext(source + '\n' + `
+    state.config={startDate:'2026-07-06',tripDate:'2026-07-19',goal:100,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'},{name:'Dee'}]};
+    state.logs=[
+      {id:'a1',name:'Alex',type:'climb',hardestGrade:'V4',date:'2026-07-06'},
+      {id:'a2',name:'Alex',type:'exercise',date:'2026-07-06'},
+      {id:'a3',name:'Alex',type:'mobility',date:'2026-07-06'},
+      {id:'a4',name:'Alex',type:'climb',hardestGrade:'V8',date:'2026-07-06',createdAt:'later'},
+      {id:'a5',name:'Alex',type:'climb',date:'2026-07-13'},
+      {id:'a6',name:'Alex',type:'exercise',date:'2026-07-13'},
+      {id:'a7',name:'Alex',type:'mobility',date:'2026-07-13'},
+      {id:'b1',name:'Bo',type:'exercise',date:'2026-07-07'},
+      {id:'c1',name:'Cy',type:'climb',hardestGrade:'V17',date:'2026-07-20'},
+      ...Array.from({length:4},(_,i)=>({id:'claim'+i,name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:i%2?'Zeta':'Alpha',date:'2026-07-06',createdAt:String(i)})),
+      {id:'late-claim',name:'Alex',type:'bounty',bountyId:'send-it',date:'2026-07-20'}
+    ];
+  ` + checks, {...context}, {filename: 'crew-recap-state'});
+}
+
+test('Challenge recap appears strictly after the trip date, including a goal already reached', () => {
+  recapState(`
+    const runs=state.creditRuns;
+    for(const day of ['2026-07-05','2026-07-06','2026-07-19','invalid'])assert.equal(crewRecapModel(day),null);
+    assert.equal(state.creditRuns,runs,'no credit work before the challenge ends');
+    assert.ok(crewRecapModel('2026-07-20'));
+    state.config={...state.config,goal:1};
+    assert.equal(paceInfo(100,state.config,'2026-07-19').state,'met');
+    assert.equal(crewRecapModel('2026-07-19'),null);
+    assert.ok(crewRecapModel('2026-07-20'),'reaching the goal does not hide the ended recap');
+    state.config={...state.config,startDate:'bad'};
+    assert.equal(crewRecapModel('2026-07-20'),null);
+  `);
+});
+
+test('Challenge recap uses credited totals and positive goal copy without a shortfall', () => {
+  recapState(`
+    const model=crewRecapModel('2026-07-20'),credits=computeCredits(state.logs);
+    assert.equal(model.total,24);
+    assert.equal(model.summary,'24 points together over 2 weeks');
+    assert.deepEqual(model.climbers.map(row=>row.name),['Alex','Bo']);
+    assert.equal(model.climbers[0].total,credits.totals.get('alex'));
+    assert.equal(model.balancedDays,2,'bounty points do not inflate balanced days');
+    assert.equal(model.bounties,4,'capped claims count, outside-challenge claims do not');
+    assert.equal(crewRecapSummary(null),'');
+    assert.doesNotMatch(crewRecapSummary(model),/short|didn't|missed|0 pts/i);
+    for(const goal of [24,20]){
+      state.config={...state.config,goal};
+      const met=crewRecapModel('2026-07-20');
+      assert.equal(met.summary,'24 points together · goal '+goal);
+      assert.doesNotMatch(crewRecapSummary(met),/short|didn't|missed|0 pts/i);
+    }
+  `);
+});
+
+test('Challenge recap records best credited day, graded sends, bounty counts and deterministic ties', () => {
+  recapState(`
+    const model=crewRecapModel('2026-07-20'),alex=model.climbers[0],bo=model.climbers[1];
+    assert.deepEqual(alex.bestDay,{date:'2026-07-06',points:14},'best day includes capped bounty credit and balanced bonus');
+    assert.deepEqual(alex.bounty,{title:'Alpha',count:2},'equal claim counts use title order');
+    assert.equal(alex.hardest,'V8','a second climb can carry the hardest send without additional credit');
+    assert.deepEqual(model.hardest,{name:'Alex',grade:'V8'});
+    assert.deepEqual(model.pyramid,[{grade:'V8',count:1},{grade:'V4',count:1}]);
+    assert.equal('hardest' in bo,false);
+    assert.equal('bounty' in bo,false);
+    const original=JSON.stringify(model);
+    state.logs=[...state.logs].reverse();
+    assert.equal(JSON.stringify(crewRecapModel('2026-07-20')),original,'source order does not change highlights');
+    state.logs=[
+      {id:'tie-b',name:'Bo',type:'climb',hardestGrade:'V6',date:'2026-07-07'},
+      {id:'tie-a2',name:'Alex',type:'climb',hardestGrade:'V6',date:'2026-07-08'},
+      {id:'tie-a1',name:'Alex',type:'climb',hardestGrade:'V6',date:'2026-07-06'},
+      {id:'tie-b2',name:'Bo',type:'climb',hardestGrade:'V6',date:'2026-07-09'}
+    ];
+    const ties=crewRecapModel('2026-07-20');
+    assert.deepEqual(ties.climbers.map(row=>row.name),['Alex','Bo'],'equal overall points use name order');
+    assert.deepEqual(ties.climbers[0].bestDay,{date:'2026-07-06',points:3},'equal best days use the earliest date');
+    assert.deepEqual(ties.hardest,{name:'Alex',grade:'V6'},'equal hardest sends use name order');
+    assert.deepEqual(ties.pyramid,[{grade:'V6',count:4}]);
+  `);
+});

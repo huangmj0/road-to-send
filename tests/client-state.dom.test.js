@@ -1396,3 +1396,175 @@ const domChecks = `(()=>{
 test('the rendered page reflects the state the app is in', () => {
   vm.runInNewContext(`${source}\n${domChecks}`, domContext, {filename: 'index.html'});
 });
+
+function recapDom(navigator = {}) {
+  const window = createDom(), store = new Map();
+  const sandbox = vm.createContext({
+    ...domContext, window, document: window.document, Event: window.Event, navigator,
+    localStorage: {
+      getItem: key => store.get(key) ?? null,
+      setItem: (key, value) => store.set(key, String(value)),
+      removeItem: key => store.delete(key),
+    },
+  });
+  vm.runInContext(source, sandbox);
+  vm.runInContext(`
+    const recapDay=challengeToday(),recapShift=n=>{const d=parseDateOnly(recapDay);d.setDate(d.getDate()+n);return localDate(d)};
+    state.config={startDate:recapShift(-14),tripDate:recapShift(-1),goal:100,crew:[{name:'Alex'},{name:'Bo'},{name:'Cy'}]};
+    state.me='Alex';state.recordingFor='Alex';
+    state.logs=[
+      {id:'recap-c',name:'Alex',type:'climb',hardestGrade:'V6',date:recapShift(-2)},
+      {id:'recap-e',name:'Alex',type:'exercise',date:recapShift(-2)},
+      {id:'recap-m',name:'Alex',type:'mobility',date:recapShift(-2)},
+      {id:'recap-b',name:'Alex',type:'bounty',bountyId:'send-it',bountyTitle:'Send it',date:recapShift(-2)},
+      {id:'recap-bo',name:'Bo',type:'exercise',date:recapShift(-3)},
+      {id:'recap-cy',name:'Cy',type:'climb',hardestGrade:'V17',date:recapShift(-15)}
+    ];
+    render();showTab('crew');
+  `, sandbox);
+  return {document: window.document, store, run: code => vm.runInContext(code, sandbox)};
+}
+
+function assertRecapStartsCollapsed(dom) {
+  const card = dom.document.querySelector('#crewRecapCard');
+  const button = dom.document.querySelector('#crewRecapToggle');
+  const content = dom.document.querySelector('#crewRecapContent');
+  const assertCollapsed = phase => {
+    assert.equal(dom.document.querySelector('#crew').classList.contains('active'), true, phase + ': Crew tab is visible');
+    assert.equal(card.classList.contains('hide'), false, phase + ': recap card is visible after the challenge ends');
+    assert.ok(card.contains(button), phase + ': toggle lives in the visible recap card');
+    assert.equal(button.classList.contains('hide'), false, phase + ': recap toggle is visible');
+    assert.equal(button.disabled, false, phase + ': recap toggle is available');
+    assert.equal(button.textContent, 'Challenge recap', phase + ': toggle names the recap');
+    assert.equal(button.getAttribute('aria-controls'), content.id, phase + ': toggle controls the recap content');
+    assert.equal(button.getAttribute('aria-expanded'), 'false', phase + ': recap is collapsed without a toggle tap');
+    assert.equal(content.classList.contains('hide'), true, phase + ': recap content is hidden');
+    assert.equal(content.innerHTML, '', phase + ': no recap content is rendered');
+    assert.equal(card.querySelector('[data-action="shareCrewRecap"]'), null, phase + ': Share waits for the recap to open');
+  };
+  assertCollapsed('First render');
+  dom.run('render()');
+  assertCollapsed('Rerender');
+  dom.document.querySelector('#navYou').click();
+  assert.equal(dom.document.querySelector('#you').classList.contains('active'), true, 'navigation leaves the Crew tab');
+  dom.document.querySelector('#navCrew').click();
+  assertCollapsed('Return to Crew tab');
+}
+
+test('Challenge recap renders accessible highlights and only credited climber records', () => {
+  const dom = recapDom(), card = dom.document.querySelector('#crewRecapCard');
+  assert.equal(card.classList.contains('hide'), false);
+  assert.equal(dom.document.querySelector('#crew').classList.contains('active'), true);
+  assertRecapStartsCollapsed(dom);
+  dom.document.querySelector('#crewRecapToggle').click();
+  assert.equal(dom.document.querySelector('#crewRecapToggle').getAttribute('aria-expanded'), 'true');
+  assert.equal(dom.document.querySelector('#crewRecapContent').classList.contains('hide'), false);
+  assert.match(card.textContent, /13 points together over 2 weeks/);
+  assert.match(card.textContent, /1 balanced day/);
+  assert.match(card.textContent, /1 bounty claimed/);
+  assert.match(card.textContent, /Hardest send V6 · Alex/);
+  assert.match(card.textContent, /1 graded send · hardest V6/);
+  assert.doesNotMatch(card.textContent, /short|didn't|missed|0 pts/i, 'recap tone surfaces achievements without shortfall wording');
+  assert.doesNotMatch(card.textContent, /Cy|V17|none|\b0\b/i);
+  const rows = [...card.querySelectorAll('.recap-climber')];
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].querySelector('h3').textContent, 'Alex · 11 points');
+  assert.equal(rows[1].querySelector('h3').textContent, 'Bo · 2 points');
+  const alexFields = [...rows[0].querySelectorAll('.records-row')];
+  assert.equal(alexFields.length, 3);
+  assert.equal(alexFields[0].querySelector('.records-label').textContent, 'Best day');
+  assert.equal(alexFields[0].querySelector('.records-value').textContent,
+    dom.run("fmtDay(recapShift(-2))") + ' · 11 points');
+  assert.equal(alexFields[1].querySelector('.records-value').textContent, 'V6');
+  assert.equal(alexFields[2].querySelector('.records-value').textContent, 'Send it × 1');
+  assert.equal(rows[1].querySelectorAll('.records-row').length, 1, 'climber fields with no data are omitted');
+  const pyramid = card.querySelector('.pyramid');
+  assert.equal(pyramid.getAttribute('role'), 'img');
+  assert.equal(pyramid.getAttribute('aria-label'), 'Grade pyramid: 1 send at V6');
+  assert.equal(pyramid.querySelectorAll('i').length, 1);
+  for (const bar of pyramid.querySelectorAll('i')) assert.equal(bar.getAttribute('aria-hidden'), 'true');
+  dom.run('state.config={...state.config,goal:10};render()');
+  assert.match(card.textContent, /13 points together · goal 10/);
+  assert.doesNotMatch(card.textContent, /short|didn't|missed|0 pts/i);
+  dom.run('state.logs=[];render()');
+  assert.match(card.textContent, /Challenge recap/);
+  assert.equal(card.querySelectorAll('.recap-climber,.pyramid').length, 0);
+  assert.doesNotMatch(card.textContent, /short|didn't|missed|0 pts|0 balanced|0 bount/i);
+});
+
+test('Challenge recap toggle clears closed content and retains collapse across renders and tab navigation', () => {
+  const dom = recapDom(), button = dom.document.querySelector('#crewRecapToggle');
+  const content = dom.document.querySelector('#crewRecapContent');
+  assertRecapStartsCollapsed(dom);
+  button.click();
+  assert.equal(button.getAttribute('aria-expanded'), 'true');
+  assert.ok(content.querySelector('[data-action="shareCrewRecap"]'));
+  const stored = [...dom.store];
+  button.click();
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  assert.equal(content.innerHTML, '');
+  assert.equal(content.classList.contains('hide'), true);
+  dom.run("render();showTab('you');showTab('crew')");
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  assert.equal(content.innerHTML, '');
+  assert.deepEqual([...dom.store], stored, 'collapse writes no storage');
+  button.click();
+  assert.equal(button.getAttribute('aria-expanded'), 'true');
+  assert.equal(content.classList.contains('hide'), false);
+  assert.match(content.textContent, /13 points together/);
+  dom.run('state.config={...state.config,tripDate:recapDay};render()');
+  assert.equal(dom.document.querySelector('#crewRecapCard').classList.contains('hide'), true);
+  assert.equal(content.innerHTML, '', 'the trip date itself has no teaser or recap content');
+});
+
+test('Challenge recap Share button uses native sharing with plain text and clipboard fallback', async () => {
+  const shared = [], copied = [];
+  const nav = {share: async payload => shared.push(payload), clipboard: {writeText: async text => copied.push(text)}};
+  const dom = recapDom(nav);
+  assertRecapStartsCollapsed(dom);
+  assert.equal(shared.length, 0, 'the collapsed recap does not share on render or navigation');
+  assert.equal(copied.length, 0, 'the collapsed recap does not copy on render or navigation');
+  dom.document.querySelector('#crewRecapToggle').click();
+  assert.equal(dom.document.querySelector('#crewRecapToggle').getAttribute('aria-expanded'), 'true');
+  assert.equal(dom.document.querySelector('#crewRecapContent').classList.contains('hide'), false);
+  dom.document.querySelector('[data-action="shareCrewRecap"]').click();
+  await Promise.resolve();
+  assert.equal(shared.length, 1, 'the rendered button reaches native sharing through init wiring');
+  assert.equal(copied.length, 0);
+  assert.equal(shared[0].text, 'Challenge recap\n13 points together over 2 weeks\n1 balanced day\n1 bounty claimed\nHardest send V6 · Alex\n1 graded send · hardest V6');
+  assert.doesNotMatch(shared[0].text, /<|sheet=|short|didn't|missed|0 pts/i);
+  nav.share = undefined;
+  assert.equal(await dom.run('shareCrewRecap()'), true);
+  assert.deepEqual(copied, [shared[0].text]);
+  assert.match(dom.document.querySelector('#toast').textContent, /Challenge recap copied/);
+  nav.share = async () => {throw Object.assign(new Error('cancelled'), {name:'AbortError'})};
+  assert.equal(await dom.run('shareCrewRecap()'), false);
+  assert.equal(copied.length, 1, 'dismissing native sharing does not copy');
+  nav.share = async () => {throw new Error('unavailable')};
+  assert.equal(await dom.run('shareCrewRecap()'), true);
+  assert.equal(copied.length, 2, 'a native share failure falls back to clipboard');
+  nav.clipboard.writeText = async () => {throw new Error('denied')};
+  assert.equal(await dom.run('shareCrewRecap()'), false);
+  assert.match(dom.document.querySelector('#toast').textContent, /Copy failed/);
+  dom.run('state.config={...state.config,tripDate:recapDay};render()');
+  assert.equal(await dom.run('shareCrewRecap()'), false, 'no summary is shared before the end');
+});
+
+test('Challenge recap follows the shared-mode challenge day across the trip-date boundary', () => {
+  const dom = recapDom();
+  dom.run(`
+    class RecapDate extends Date {
+      constructor(...args){super(...(args.length?args:['2026-07-20T00:30:00Z']))}
+    }
+    Date=RecapDate;
+    state.endpoint='https://example.test/board';state.challengeTimeZone='America/Los_Angeles';
+    state.config={...state.config,startDate:'2026-07-06',tripDate:'2026-07-19'};
+    render();
+  `);
+  assert.equal(dom.run('challengeToday()'), '2026-07-19');
+  assert.equal(dom.document.querySelector('#crewRecapCard').classList.contains('hide'), true);
+  dom.run("state.challengeTimeZone='UTC';render()");
+  assert.equal(dom.run('challengeToday()'), '2026-07-20');
+  assert.equal(dom.document.querySelector('#crewRecapCard').classList.contains('hide'), false);
+  assert.match(dom.document.querySelector('#crewRecapCard').textContent, /Challenge recap/);
+});
