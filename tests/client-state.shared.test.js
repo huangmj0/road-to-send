@@ -3,18 +3,22 @@
 // real async test() blocks, each building its own context.
 //
 // TRAP — each case uses a fresh happy-dom page so mutations cannot leak between asynchronous
-// cases. Assertions inside a `checks` template literal may contain no backtick and no `${`.
+// cases. Close each page after its case: happy-dom retains page tasks otherwise, exhausting
+// the heap as coverage grows. Assertions inside a `checks` literal may contain no backtick and no `${`.
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-const {test} = require('node:test');
+const {test, afterEach} = require('node:test');
 const {source, createDom} = require('./harness.js');
 
+const sharedWindows=new Set();
+afterEach(async()=>{await Promise.all([...sharedWindows].map(window=>window.happyDOM.close()));sharedWindows.clear()});
 function sharedDom() {
   const window = createDom();
+  sharedWindows.add(window);
   return {window, document: window.document, fire: type => window.document.dispatchEvent(new window.Event(type, {bubbles: true}))};
 }
 
-test('background sync respects the open date picker and refreshes stale caches', async () => {
+test('background sync respects the open date picker and refreshes the board on tab return', async () => {
   const dom = sharedDom();
   const store = new Map();
   store.set('roadToSendEndpoint', 'https://sheet.example.test/exec');
@@ -52,13 +56,13 @@ test('background sync respects the open date picker and refreshes stale caches',
     await loadRemote();
     assert.equal(recordDate(),'${dayShift(-1)}','a background sync leaves the chosen date alone');
 
-    // Returning to the tab only refetches once the cache is older than five minutes.
+    // Returning to the tab checks fresh JSON before any replay, even with a fresh cache.
     const before=countGets();
     fireDocumentEvent('visibilitychange');
-    assert.equal(countGets(),before,'a fresh cache is not refetched on tab return');
+    assert.equal(countGets(),before+1,'a fresh cache is still checked on tab return');
     state.lastSyncedAt=Date.now()-6*60*1000;
     fireDocumentEvent('visibilitychange');
-    assert.equal(countGets(),before+1,'a stale cache refreshes on tab return');
+    assert.equal(countGets(),before+2,'a stale cache also refreshes on tab return');
     // Entry 35: a crew member travelling, or anyone whose device clock has rolled past the Sheet's
     // midnight, can now see which day the app is actually scoring against and whose midnight it is.
     state.lastSyncedAt=Date.now();renderSync();
@@ -1443,7 +1447,7 @@ test('caller cancellation is combined with the deadline and retained on browsers
 });
 
 const v14DraftChecks = `
-  state.endpoint='https://board.example.test/fn';state.protocolVersion=14;state.me='Alex';state.recordingFor='Alex';
+  state.endpoint='https://board.example.test/fn';state.protocolVersion=14;state.outboxConfirmedEndpoint=state.endpoint;state.me='Alex';state.recordingFor='Alex';
   state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
   state.serverDate='2026-07-13';state.challengeTimeZone='';state.lastSyncedAt=Date.now();state.logs=[];
   document.querySelector('#hardestGrade').innerHTML='<option value="">None</option><option value="V4">V4</option>';
@@ -1453,7 +1457,7 @@ const v14DraftChecks = `
 const v14Entry = {id:'00000000-0000-4000-8000-000000000014',name:'Alex',type:'climb',category:'climb',points:3,date:'2026-07-13',createdAt:'2026-07-13T01:00:00.000Z',hardestGrade:'V4',bountyId:'',bountyTitle:'',note:'Original'};
 const v14Board = activities => ({version:14,features:[],activities,config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]},configErrors:[],serverDate:'2026-07-13',timeZone:''});
 
-test('a timed-out create sends the same UUID when the unchanged draft is retried', async () => {
+test('a timed-out create queues the UUID and flushes the same request on retry', async () => {
   const posts=[];
   await timeoutScenario({
     extra:{posted:()=>posts},
@@ -1467,10 +1471,12 @@ test('a timed-out create sends the same UUID when the unchanged draft is retried
     },
     checks:`${v14DraftChecks}
       await submitActivity({preventDefault(){}});${settle}
-      assert.equal(state.logs.length,0);
+      assert.equal(state.logs.length,1,'the pending entry appears immediately');
+      assert.equal(outboxItems()[0].body.id,posted()[0].id);
       assert.match(posted()[0].id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-      assert.equal(document.querySelector('#activityNote').value,'Keep this draft');
-      await submitActivity({preventDefault(){}});${settle}
+      assert.equal(document.querySelector('#activityNote').value,'');
+      await flushOutbox();${settle}
+      assert.equal(outboxItems().length,0);
       assert.equal(posted().length,2);assert.equal(posted()[1].id,posted()[0].id);
       assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,posted()[0].id);
       assert.equal(document.querySelector('#activityNote').value,'');
@@ -1554,7 +1560,7 @@ test('an edit timeout reconciles the committed update and preserves the edit dra
       document.querySelector('input[name="activityType"][value="exercise"]').checked=true;
       document.querySelector('#activityNote').value='Updated remotely';updateRecordPreview();
       await submitActivity({preventDefault(){}});
-      assert.equal(postCount(),1);assert.equal(getCount(),1);
+      assert.equal(postCount(),1);assert.equal(getCount(),1);assert.equal(outboxItems().length,0,'edits remain online-only');
       assert.equal(document.querySelector('#toast').textContent,'Could not confirm the save — refreshing the board. Check your feed before saving again.');
       assert.equal(state.saving,false);assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save changes');
       assert.equal(state.logs[0].type,'climb','no optimistic edit before confirmation');
@@ -1591,5 +1597,385 @@ test('duplicate_bounty on create and edit shows clear copy without adding or cha
         assert.equal(document.querySelector('#activityNote').value,${JSON.stringify(editing?'Original':'Keep this draft')});
       `,
     });
+  }
+});
+
+const outboxBody = (id, note = id) => ({id, name:'Alex', type:'climb', date:'2026-07-13', hardestGrade:'', note, bountyId:''});
+const outboxIds = [1,2,3].map(n=>'00000000-0000-4000-8000-00000000000'+n);
+
+test('queued and in-flight creates hide feed actions until replay settles after refresh confirmation', async () => {
+  const row={...v14Entry,...outboxBody(outboxIds[0])};let finishPost;
+  await timeoutScenario({extra:{finishPost:()=>finishPost()},fetchImpl:(url,options)=>{
+    if(options.method!=='POST')return Promise.resolve({ok:true,json:async()=>v14Board([row])});
+    return new Promise(resolve=>{finishPost=()=>resolve({ok:true,json:async()=>({...row,ok:true})})});
+  },checks:`${v14DraftChecks}
+    enqueueCreate(state.endpoint,${JSON.stringify(outboxBody(outboxIds[0]))});
+    state.logs=[${JSON.stringify(row)}];render();
+    assert.equal(document.querySelectorAll('#personalActivity .activity').length,1);
+    assert.equal(document.querySelector('#personalActivity [data-del],[data-edit]'),null,'a queued id has no actions even on a server row');
+    const sending=flushOutbox();await loadRemote();
+    assert.equal(outboxItems().length,0,'the fresh server id acknowledges the queue');
+    assert.equal(state.logs[0].outboxEndpoint,undefined);
+    assert.equal(document.querySelector('#personalActivity [data-del],[data-edit]'),null,'refresh confirmation cannot expose actions during the POST');
+    finishPost();await sending;
+    assert.equal(outboxItems().length,0);
+    assert.ok(document.querySelector('#personalActivity [data-del]'),'delete returns when replay settles');
+    assert.ok(document.querySelector('#personalActivity [data-edit]'),'edit returns when replay settles');
+  `});
+});
+
+test('a late create timeout cannot enqueue an id already confirmed by a fresh board', async () => {
+  let body,posts=0;
+  await timeoutScenario({extra:{posted:()=>posts},fetchImpl:(url,options,stall)=>{
+    if(options.method==='POST'){posts++;body=JSON.parse(options.body);return stall(options.signal)}
+    return Promise.resolve({ok:true,json:async()=>v14Board([{...v14Entry,...body}])});
+  },checks:`${v14DraftChecks}
+    const saving=submitActivity({preventDefault(){}});await loadRemote();
+    const id=state.logs[0].id;assert.equal(state.logs[0].outboxEndpoint,undefined);
+    await saving;
+    assert.equal(outboxItems().length,0,'the late timeout does not queue the confirmed create');
+    assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,id);
+    await flushOutbox();assert.equal(posted(),1,'the confirmed create is never replayed');
+  `});
+});
+
+test('replay hands off to a freshly confirmed endpoint after the old endpoint POST settles', async () => {
+  const posts=[];let finishPost;
+  await timeoutScenario({extra:{posted:()=>posts,finishPost:()=>finishPost()},fetchImpl:(url,options)=>{
+    if(options.method!=='POST')return Promise.resolve({ok:true,json:async()=>v14Board([])});
+    const body=JSON.parse(options.body);posts.push({endpoint:new URL(url).origin,body});
+    if(posts.length===1)return new Promise(resolve=>{finishPost=()=>resolve({ok:true,json:async()=>({...v14Entry,...body,ok:true})})});
+    return Promise.resolve({ok:true,json:async()=>({...v14Entry,...body,ok:true})});
+  },checks:`${v14DraftChecks}
+    const first=state.endpoint,second='https://other.example.test/fn';
+    enqueueCreate(first,${JSON.stringify(outboxBody(outboxIds[0]))});enqueueCreate(second,${JSON.stringify(outboxBody(outboxIds[1]))});
+    const sending=flushOutbox();state.endpoint=second;state.logs=[];
+    await loadRemote();assert.equal(state.outboxConfirmedEndpoint,second);
+    assert.equal(posted().length,1,'the new endpoint waits for the existing sender');
+    finishPost();await sending;${settle}
+    assert.equal(posted().length,2,'the new endpoint queue resumes without another event');
+    assert.equal(posted()[1].endpoint,'https://other.example.test');assert.equal(posted()[1].body.id,'${outboxIds[1]}');
+    assert.equal(outboxItems(first).length,0);assert.equal(outboxItems(second).length,0);
+    assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,'${outboxIds[1]}');
+  `});
+});
+
+test('offline v14 creates persist on this phone without sending or contaminating the shared cache', async () => {
+  let requests=0;
+  await timeoutScenario({extra:{navigator:{onLine:false},requests:()=>requests},fetchImpl:async()=>{requests++;throw Error('No signal')},checks:`${v14DraftChecks}
+    state.logs=[${JSON.stringify(v14Entry)}];persistShared();
+    const before=['activities','config','meta'].map(k=>localStorage.getItem(cacheKey(k)));
+    await submitActivity({preventDefault(){}});
+    assert.equal(requests(),0);assert.equal(outboxItems().length,1);
+    const item=outboxItems()[0];assert.ok(item.queuedAt>0);assert.equal(item.body.note,'Keep this draft');
+    assert.equal(state.logs.length,2);assert.equal(state.logs[1].id,item.body.id);
+    assert.match(document.querySelector('#toast').textContent,/Saved on this phone/);
+    assert.deepEqual(['activities','config','meta'].map(k=>localStorage.getItem(cacheKey(k))),before);
+    persistShared();assert.equal(JSON.parse(localStorage.getItem(cacheKey('activities'))).length,1);
+    loadSharedCache();assert.equal(state.logs.length,2,'cached board merges the persisted outbox');
+    render();render();assert.equal(state.logs.length,2,'render does not duplicate queued rows');
+    assert.equal(outboxItems().length,1);
+  `});
+});
+
+test('queued bounty claims disable a second claim and contribute to local score previews', async () => {
+  await timeoutScenario({extra:{navigator:{onLine:false}},checks:`${v14DraftChecks}
+    document.querySelector('input[name="activityType"][value="bounty"]').checked=true;
+    populateBountySelect();const bounty=dailyBounties(recordDate())[0];document.querySelector('#bountySelect').value=bounty.id;
+    await submitActivity({preventDefault(){}});
+    assert.equal(outboxItems().length,1);assert.ok(claimedTodayIds('alex',recordDate()).has(bounty.id));
+    assert.equal(computeCredits(state.logs).totals.get('alex'),bounty.points);
+    assert.equal(Number(document.querySelector('#youTotal').textContent),bounty.points);
+    assert.equal(document.querySelector('[data-claim-bounty="'+bounty.id+'"]').disabled,true);
+    document.querySelector('input[name="activityType"][value="bounty"]').checked=true;
+    populateBountySelect();document.querySelector('#bountySelect').value=bounty.id;updateRecordPreview();
+    assert.equal(document.querySelector('#saveActivityBtn').disabled,true);
+    await submitActivity({preventDefault(){}});assert.equal(outboxItems().length,1);
+    assert.equal(document.querySelector('#toast').textContent,'That bounty is already claimed on that date.');
+  `});
+});
+
+test('offline saves below v14 retain the existing network and reconciliation behavior', async () => {
+  for(const version of [0,12,13]){
+    let posts=0,gets=0;
+    await timeoutScenario({extra:{navigator:{onLine:false},posts:()=>posts,gets:()=>gets},fetchImpl:async(url,options)=>{if(options.method==='POST')posts++;else gets++;throw Error('No signal')},checks:`${v14DraftChecks}
+      state.protocolVersion=${version};await submitActivity({preventDefault(){}});${settle}
+      assert.equal(posts(),1);assert.equal(gets(),1);assert.equal(outboxItems().length,0);
+      assert.equal(localStorage.getItem('roadToSendOutboxV1'),null);assert.equal(state.logs.length,0);
+      assert.equal(document.querySelector('#activityNote').value,'Keep this draft');
+      assert.match(document.querySelector('#toast').textContent,/Could not confirm the save/);
+    `});
+  }
+});
+
+test('v14 validation conflict duplicate bounty and HTTP validation rejections are never queued', async () => {
+  for(const code of ['invalid_activity','outside_challenge_window','conflict','duplicate_bounty','http']){
+    await timeoutScenario({fetchImpl:async()=>({ok:code!=='http',status:code==='http'?400:200,json:async()=>({ok:false,error:{code:code==='http'?'invalid_activity':code,message:'Rejected entry'}})}),checks:`${v14DraftChecks}
+      await submitActivity({preventDefault(){}});
+      assert.equal(outboxItems().length,0);assert.equal(localStorage.getItem('roadToSendOutboxV1'),null);
+      assert.equal(state.logs.length,0);assert.equal(document.querySelector('#activityNote').value,'Keep this draft');
+      assert.equal(document.querySelector('#toast').textContent,${JSON.stringify(code==='duplicate_bounty'?'That bounty is already claimed on that date.':'Save failed—Rejected entry It is safe to retry.')});
+    `});
+  }
+});
+
+test('online flushes preserve request ids and queued order with one sender and stop on network failure', async () => {
+  const posts=[];let finishFirst;
+  await timeoutScenario({extra:{navigator:{onLine:false},posted:()=>posts,finishFirst:()=>finishFirst()},fetchImpl:(url,options)=>{
+    if(options.method!=='POST')return Promise.resolve({ok:true,json:async()=>v14Board([])});
+    const body=JSON.parse(options.body);posts.push(body);
+    if(posts.length===1)return new Promise(resolve=>{finishFirst=()=>resolve({ok:true,json:async()=>({...v14Entry,...body,ok:true,alreadyExists:true})})});
+    return Promise.reject(Error('Signal lost'));
+  },checks:`${v14DraftChecks}
+    const bodies=${JSON.stringify(outboxIds.map(id=>outboxBody(id)))};
+    writeOutboxItems(state.endpoint,[{body:bodies[2],queuedAt:3},{body:bodies[0],queuedAt:1},{body:bodies[1],queuedAt:2}]);render();
+    navigator.onLine=true;window.dispatchEvent(new window.Event('online'));window.dispatchEvent(new window.Event('online'));${settle}
+    assert.equal(posted().length,1,'concurrent triggers cannot send a second request');
+    assert.equal(JSON.stringify(posted()[0]),JSON.stringify(bodies[0]));finishFirst();${settle}
+    assert.equal(posted().length,2);assert.equal(JSON.stringify(posted()[1]),JSON.stringify(bodies[1]));
+    assert.equal(outboxItems().length,2,'the failed request and later item remain queued');
+    assert.equal(state.logs.filter(x=>x.id===bodies[0].id).length,1);
+    assert.equal(state.logs.find(x=>x.id===bodies[0].id).outboxEndpoint,undefined);
+    assert.equal(JSON.parse(localStorage.getItem(cacheKey('activities')))[0].id,bodies[0].id,'idempotent success is confirmed in cache');
+  `});
+});
+
+test('flush rejections persist a dismissible failed entry without a toast or score', async () => {
+  for(const code of ['invalid_activity','invalid_request','duplicate_bounty','conflict','outside_challenge_window','http']){
+    let posts=0;
+    await timeoutScenario({extra:{posted:()=>posts},fetchImpl:async()=>{posts++;return {ok:code!=='http',status:code==='http'?400:200,json:async()=>({ok:false,error:{code:code==='http'?'invalid_activity':code,message:'Outside the challenge window.'}})}},checks:`${v14DraftChecks}
+      enqueueCreate(state.endpoint,${JSON.stringify(outboxBody(outboxIds[0]))});render();
+      const before=document.querySelector('#toast').textContent;await flushOutbox();
+      assert.equal(posted(),1);assert.equal(state.logs.length,0);assert.equal(computeCredits(state.logs).totals.get('alex')||0,0);
+      assert.equal(outboxItems()[0].failed,${JSON.stringify(code==='duplicate_bounty'?'That bounty is already claimed on that date.':'Outside the challenge window.')});
+      assert.equal(document.querySelector('#toast').textContent,before);
+      loadSharedCache();state.config=${JSON.stringify(v14Board([]).config)};render();
+      assert.equal(failedOutboxEntries().length,1,'failed state survives reloading the board');
+      await flushOutbox();assert.equal(posted(),1,'failed entries are never retried');
+      document.querySelector('[data-dismiss-outbox]').click();assert.equal(outboxItems().length,0);
+    `});
+  }
+});
+
+test('endpoint changes and local mode preserve other queues and cannot send them to another board', async () => {
+  const posts=[];let complete;
+  await timeoutScenario({extra:{posted:()=>posts,complete:()=>complete()},fetchImpl:(url,options)=>{const body=JSON.parse(options.body);posts.push({url:new URL(url).origin,body});return new Promise(resolve=>{complete=()=>resolve({ok:true,json:async()=>({...v14Entry,...body,ok:true})})})},checks:`${v14DraftChecks}
+    const first=state.endpoint,second='https://other.example.test/fn';
+    enqueueCreate(first,${JSON.stringify(outboxBody(outboxIds[0]))});enqueueCreate(second,${JSON.stringify(outboxBody(outboxIds[1]))});
+    const sending=flushOutbox();state.endpoint=second;state.logs=[];render();complete();await sending;
+    assert.equal(posted().length,1);assert.equal(posted()[0].url,'https://board.example.test');
+    assert.equal(outboxItems(first).length,0);assert.equal(outboxItems(second).length,1);
+    assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,'${outboxIds[1]}');
+    assert.equal(localStorage.getItem(cacheKey('activities',second)),null,'old response cannot enter new board cache');
+    performDisconnect();await flushOutbox();assert.equal(posted().length,1);
+    assert.equal(outboxItems(second).length,1);assert.equal(state.logs.length,0);
+    state.endpoint=second;mergeOutbox();assert.equal(state.logs[0].id,'${outboxIds[1]}');
+  `});
+});
+
+test('corrupt outbox JSON and malformed records are ignored without throwing', async () => {
+  const invalid=[null,{}, {body:outboxBody(outboxIds[0]),queuedAt:1e100},{body:{...outboxBody(outboxIds[0]),action:'delete'},queuedAt:1},{body:{...outboxBody(outboxIds[0]),date:'nonsense'},queuedAt:1}];
+  await timeoutScenario({checks:`${v14DraftChecks}
+    for(const raw of ['{broken','null','[]','42',JSON.stringify({[state.endpoint]:${JSON.stringify(invalid)}})]){
+      writeStore('roadToSendOutboxV1',raw);assert.equal(outboxItems().length,0);render();await flushOutbox();assert.equal(state.logs.length,0);
+    }
+    localStorage.setItem('roadToSendOutboxV1',JSON.stringify({[state.endpoint]:[...${JSON.stringify(invalid)},{body:${JSON.stringify(outboxBody(outboxIds[0]))},queuedAt:1}]}));
+    assert.equal(outboxItems().length,1);render();assert.equal(state.logs.length,1);
+  `});
+});
+
+test('full storage preserves the draft and never claims an offline entry was saved', async () => {
+  await timeoutScenario({extra:{navigator:{onLine:false},localStorage:{getItem:()=>null,setItem(){throw Error('Quota exceeded')},removeItem(){}}},checks:`${v14DraftChecks}
+    await submitActivity({preventDefault(){}});assert.equal(state.logs.length,0);assert.equal(outboxItems().length,0);
+    assert.equal(document.querySelector('#activityNote').value,'Keep this draft');assert.equal(state.saving,false);
+    assert.match(document.querySelector('#toast').textContent,/Could not save on this phone/);
+  `});
+});
+
+test('unconfirmed v14 network and body failures retain the full create request', async () => {
+  for(const failure of ['network','body timeout','unreadable body']){
+    let posted;
+    await timeoutScenario({extra:{posted:()=>posted},fetchImpl:(url,options,stall)=>{
+      posted=JSON.parse(options.body);
+      if(failure==='network')return Promise.reject(Error('No signal'));
+      return Promise.resolve({ok:true,json:()=>failure==='body timeout'?stall(options.signal):Promise.reject(SyntaxError('Broken JSON'))});
+    },checks:`${v14DraftChecks}
+      await submitActivity({preventDefault(){}});
+      assert.equal(outboxItems().length,1);assert.equal(JSON.stringify(outboxItems()[0].body),JSON.stringify(posted()));
+      assert.equal(state.logs[0].id,posted().id);assert.equal(document.querySelector('#activityNote').value,'');
+    `});
+  }
+});
+
+test('page load suspends cached v14 queues after unsupported or failed fresh loads', async () => {
+  for(const failure of ['version','network','json']){
+    const endpoint='https://board.example.test/fn',body=outboxBody(outboxIds[0]),store=new Map([
+      ['roadToSendEndpoint',endpoint],['roadToSendMe','Alex'],
+      ['roadToSendShared:config:'+encodeURIComponent(endpoint),JSON.stringify(v14Board([]).config)],
+      ['roadToSendShared:meta:'+encodeURIComponent(endpoint),JSON.stringify({protocolVersion:14,lastSyncedAt:Date.now(),serverDate:'2026-07-13'})],
+      ['roadToSendOutboxV1',JSON.stringify({[endpoint]:[{body,queuedAt:1}]})],
+    ]);let posts=0,gets=0;
+    await timeoutScenario({extra:{posted:()=>posts,gets:()=>gets,localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)}},fetchImpl:async(url,options)=>{
+      if(options.method==='POST'){posts++;return {ok:true,json:async()=>({...v14Entry,...body,ok:true})}}
+      gets++;if(failure==='network')throw Error('Refresh unavailable');
+      return {ok:true,json:async()=>{if(failure==='json')throw SyntaxError('Unreadable');return {...v14Board([]),version:99}}};
+    },checks:`${settle}
+      assert.equal(gets(),1);assert.equal(posted(),0);assert.equal(outboxItems().length,1);
+      await flushOutbox();assert.equal(posted(),0,'cached protocol never authorizes replay');
+      assert.equal(outboxItems()[0].failed,undefined);
+      assert.equal(state.logs.length,1);assert.equal(state.logs[0].outboxEndpoint,state.endpoint);
+      assert.equal(state.outboxConfirmedEndpoint,'');
+    `});
+  }
+});
+
+test('successful loads and visible-page events flush queues without automatic toast messages', async () => {
+  const posts=[];let saved=[];
+  await timeoutScenario({extra:{navigator:{onLine:false},posted:()=>posts},fetchImpl:async(url,options)=>{
+    if(options.method==='POST'){const body=JSON.parse(options.body);posts.push(body);const row={...v14Entry,...body};saved.push(row);return {ok:true,json:async()=>({...row,ok:true})}}
+    return {ok:true,json:async()=>v14Board(saved)};
+  },checks:`${v14DraftChecks}
+    enqueueCreate(state.endpoint,${JSON.stringify(outboxBody(outboxIds[0]))});
+    navigator.onLine=true;await loadRemote();${settle}
+    assert.equal(posted().length,1);assert.equal(outboxItems().length,0);
+    enqueueCreate(state.endpoint,${JSON.stringify(outboxBody(outboxIds[1]))});navigator.onLine=false;
+    document.dispatchEvent(new window.Event('visibilitychange'));${settle}assert.equal(posted().length,1);
+    navigator.onLine=true;document.dispatchEvent(new window.Event('visibilitychange'));${settle}
+    assert.equal(posted().length,2);assert.equal(outboxItems().length,0);assert.equal(state.logs.length,2);
+    assert.equal(document.querySelector('#toast').textContent,'');
+  `});
+});
+
+test('a refresh started before an outbox confirmation cannot replace the confirmed row with an older snapshot', async () => {
+  let gets=0,finish,confirmed,finishPost;
+  await timeoutScenario({extra:{finish:()=>finish(),finishPost:()=>finishPost(),gets:()=>gets},fetchImpl:(url,options)=>{
+    if(options.method==='POST'){confirmed={...v14Entry,...JSON.parse(options.body)};return new Promise(resolve=>{finishPost=()=>resolve({ok:true,json:async()=>({...confirmed,ok:true})})})}
+    gets++;
+    if(gets===1)return new Promise(resolve=>{finish=()=>resolve({ok:true,json:async()=>v14Board([])})});
+    return Promise.resolve({ok:true,json:async()=>v14Board([confirmed])});
+  },checks:`${v14DraftChecks}
+    enqueueCreate(state.endpoint,${JSON.stringify(outboxBody(outboxIds[0]))});render();
+    const sending=flushOutbox(),refresh=loadRemote();finishPost();await sending;finish();await refresh;${settle}
+    assert.equal(gets(),2,'a snapshot superseded by confirmation is refreshed');assert.equal(outboxItems().length,0);
+    assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,'${outboxIds[0]}');
+    assert.equal(JSON.parse(localStorage.getItem(cacheKey('activities')))[0].id,'${outboxIds[0]}');
+  `});
+});
+
+test('a success body with an unconfirmed id cannot lose a queued create', async () => {
+  await timeoutScenario({fetchImpl:async()=>({ok:true,json:async()=>({ok:true,id:'wrong-id'})}),checks:`${v14DraftChecks}
+    await submitActivity({preventDefault(){}});assert.equal(outboxItems().length,1);
+    const id=outboxItems()[0].body.id;await flushOutbox();assert.equal(outboxItems().length,1);
+    assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,id);assert.equal(outboxItems()[0].failed,undefined);
+    assert.equal(localStorage.getItem(cacheKey('activities')),null);
+  `});
+});
+
+test('a refreshed committed create is removed before deletion and can never be replayed', async () => {
+  const posts=[];let serverRows=[];
+  await timeoutScenario({extra:{posted:()=>posts},fetchImpl:async(url,options)=>{
+    if(options.method!=='POST')return {ok:true,json:async()=>v14Board(serverRows)};
+    const body=JSON.parse(options.body);posts.push(body);
+    if(body.action==='delete'){serverRows=serverRows.filter(x=>x.id!==body.id);return {ok:true,json:async()=>({ok:true})}}
+    serverRows.push({...v14Entry,...body});throw Error('Response lost after commit');
+  },checks:`${v14DraftChecks}
+    await submitActivity({preventDefault(){}});
+    assert.equal(posted().length,1);assert.equal(outboxItems().length,1);
+    const id=outboxItems()[0].body.id;
+    assert.equal(await loadRemote(),true);${settle}
+    assert.equal(outboxItems().length,0,'the server id acknowledges the lost response');
+    assert.equal(JSON.parse(localStorage.getItem('roadToSendOutboxV1'))[state.endpoint].length,0,'confirmation removes the durable request immediately');
+    const row=state.logs.find(x=>x.id===id);assert.ok(row);assert.equal(row.outboxEndpoint,undefined);
+    assert.equal(document.querySelector('#personalActivity [aria-live]'),null);
+    assert.equal(posted().length,1,'refresh does not resend an acknowledged create');
+    state.pendingDelete={entry:row,id,feed:'personal',position:0};await performDelete();${settle}
+    assert.equal(state.logs.length,0);assert.equal(posted().length,2);assert.equal(posted()[1].action,'delete');
+    await flushOutbox();${settle}
+    assert.equal(posted().length,2,'a flush after deletion sends nothing');assert.equal(state.logs.length,0);
+  `});
+});
+
+test('fresh board acknowledgements clear failed creates and their Not saved flags', async () => {
+  const row={...v14Entry,...outboxBody(outboxIds[0])};let posts=0;
+  await timeoutScenario({extra:{posted:()=>posts},fetchImpl:async(url,options)=>{
+    if(options.method==='POST')posts++;
+    return {ok:true,json:async()=>v14Board([row])};
+  },checks:`${v14DraftChecks}
+    writeOutboxItems(state.endpoint,[{body:${JSON.stringify(outboxBody(outboxIds[0]))},queuedAt:1,failed:'Rejected earlier'}]);render();
+    assert.match(document.querySelector('#personalActivity').textContent,/Not saved/);
+    await loadRemote();${settle}
+    assert.equal(outboxItems().length,0);assert.equal(failedOutboxEntries().length,0);
+    const feed=document.querySelector('#personalActivity');assert.equal(feed.querySelectorAll('.activity').length,1);
+    assert.ok(feed.querySelector('[data-del]'));assert.equal(feed.querySelector('[data-dismiss-outbox],[aria-live]'),null);
+    assert.equal(state.logs[0].outboxFailure,undefined);assert.equal(posted(),0);
+  `});
+});
+
+test('every write response reconciles acknowledged queued and failed creates for its endpoint', async () => {
+  for(const action of ['create','update','delete','addParticipant','saveConfig']){
+    const rows=outboxIds.slice(0,2).map(id=>({...v14Entry,...outboxBody(id)}));
+    await timeoutScenario({fetchImpl:async()=>({ok:action!=='delete',json:async()=>({ok:action!=='delete',activities:rows})}),checks:`${v14DraftChecks}
+      const bodies=${JSON.stringify(outboxIds.map(id=>outboxBody(id)))};
+      const other='https://other.example.test/fn';
+      writeOutboxItems(state.endpoint,[{body:bodies[0],queuedAt:1},{body:bodies[1],queuedAt:2,failed:'Not accepted before'}]);
+      enqueueCreate(other,bodies[2]);render();
+      const response=await fetchShared(state.endpoint,{method:'POST',body:JSON.stringify({action:${JSON.stringify(action)}})});
+      await response.json();
+      assert.equal(outboxItems().length,0,'write activity ids confirm both pending and failed creates');
+      assert.equal(JSON.parse(localStorage.getItem('roadToSendOutboxV1'))[state.endpoint].length,0);
+      assert.equal(outboxItems(other).length,1,'another endpoint keeps its request');
+      assert.equal(state.logs.length,2);assert.ok(state.logs.every(x=>!x.outboxEndpoint));
+      const feed=document.querySelector('#personalActivity');assert.equal(feed.querySelectorAll('.activity').length,2);
+      assert.equal(feed.querySelector('[aria-live],[data-dismiss-outbox]'),null);
+      assert.equal(JSON.parse(localStorage.getItem(cacheKey('activities'))).length,2);
+    `});
+  }
+});
+
+test('transient create and replay failures stay queued stop the sender and retry the same ids', async () => {
+  for(const operation of ['create','replay'])for(const failure of ['server_error','5xx','gateway','json','timeout','body timeout','unknown rejection']){
+    const posts=[];
+    await timeoutScenario({extra:{posted:()=>posts},fetchImpl:(url,options,stall)=>{
+      const body=JSON.parse(options.body);posts.push(body);
+      if(posts.length>1)return Promise.resolve({ok:true,json:async()=>({...v14Entry,...body,ok:true})});
+      if(failure==='timeout')return stall(options.signal);
+      if(failure==='body timeout')return Promise.resolve({ok:true,json:()=>stall(options.signal)});
+      if(failure==='json'||failure==='gateway')return Promise.resolve({ok:failure==='json',status:failure==='gateway'?502:200,json:async()=>{throw SyntaxError('Gateway HTML or broken JSON')}});
+      return Promise.resolve({ok:failure!=='5xx',status:failure==='5xx'?503:200,json:async()=>({ok:false,error:{code:failure==='5xx'?'invalid_activity':failure==='server_error'?'server_error':'unknown',message:'Temporary rejection'}})});
+    },checks:`${v14DraftChecks}
+      ${operation==='create'?"await submitActivity({preventDefault(){}});":"enqueueCreate(state.endpoint,"+JSON.stringify(outboxBody(outboxIds[0]))+");enqueueCreate(state.endpoint,"+JSON.stringify(outboxBody(outboxIds[1]))+");render();await flushOutbox();"}
+      assert.equal(posted().length,1,'a transient failure stops this flush before later requests');
+      assert.equal(outboxItems().length,${operation==='create'?1:2});
+      assert.ok(outboxItems().every(x=>x.failed===undefined));
+      assert.equal(JSON.stringify(outboxItems()[0].body),JSON.stringify(posted()[0]));
+      assert.equal(document.querySelectorAll('#personalActivity [data-dismiss-outbox]').length,0);
+      assert.ok(document.querySelector('#personalActivity').textContent.includes('Waiting to send'));
+      await flushOutbox();
+      assert.equal(posted().length,${operation==='create'?2:3});assert.equal(posted()[1].id,posted()[0].id);
+      assert.equal(outboxItems().length,0,'later retry confirms the unchanged requests');
+    `});
+  }
+});
+
+test('a failed or unsupported refresh revokes replay until a fresh supported board succeeds', async () => {
+  for(const failure of ['version','network','json','old version']){
+    let mode='supported',posts=0,gets=0;
+    await timeoutScenario({extra:{setMode:value=>{mode=value},posted:()=>posts,gets:()=>gets},fetchImpl:async(url,options)=>{
+      if(options.method==='POST'){posts++;return {ok:true,json:async()=>({...v14Entry,...JSON.parse(options.body),ok:true})}}
+      gets++;if(mode==='network')throw Error('No signal');
+      return {ok:true,json:async()=>{if(mode==='json')throw SyntaxError('Broken JSON');return {...v14Board([]),version:mode==='version'?99:mode==='old version'?13:14}}};
+    },checks:`${v14DraftChecks}
+      assert.equal(await loadRemote(),true);assert.equal(state.outboxConfirmedEndpoint,state.endpoint);
+      enqueueCreate(state.endpoint,${JSON.stringify(outboxBody(outboxIds[0]))});
+      setMode(${JSON.stringify(failure)});await loadRemote();await flushOutbox();
+      assert.equal(posted(),0);assert.equal(outboxItems().length,1);
+      window.dispatchEvent(new window.Event('online'));${settle}
+      assert.equal(posted(),0,'online checks fresh JSON before replay');
+      document.dispatchEvent(new window.Event('visibilitychange'));${settle}
+      assert.equal(posted(),0,'visible-page replay also waits for a successful load');
+      assert.equal(gets(),4);
+      setMode('supported');window.dispatchEvent(new window.Event('online'));${settle}
+      assert.equal(gets(),5);assert.equal(posted(),1);assert.equal(outboxItems().length,0);
+    `});
   }
 });
