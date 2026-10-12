@@ -98,7 +98,13 @@ import { readFileSync } from 'node:fs';
 // embeds the script for the setup dialog's copy button, measured 158807 -> 136943 bytes (-21864),
 // including the move-follow ordering fix and backend-neutral copy. The cap keeps about the same
 // 5000 bytes of headroom as the previous entry rather than banking the whole saving as slack.
-const BUDGET = 142000;
+// Re-baselined 142000 -> 142600 on 2026-10-09 for the client quick wins and follow-up fixes:
+// measured 142090 bytes, 90 above the old cap. The pass adds a 2095-byte (~2.1 KB) inline
+// PNG touch icon for iOS install, the 15-second timeout, the duplicate-claim guard and
+// uncertain-save reconciliation. Keeping the current endpoint in the Home Screen launch URL
+// and explaining iOS's separate name storage also contribute. This measured cap leaves only
+// 510 bytes of margin; the next budget entry re-measures rather than assuming more growth.
+const BUDGET = 142600;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
