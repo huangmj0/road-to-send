@@ -21,7 +21,9 @@ test('background sync respects the open date picker and refreshes stale caches',
   store.set('roadToSendMe', 'Alex');
   const dayShift = n => {const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`};
   const payload = {version: 12, features: [], activities: [], config: {startDate: dayShift(-5), tripDate: dayShift(5), goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: dayShift(0), timeZone: 'America/Los_Angeles'};
+  store.set('roadToSendShared:config:'+encodeURIComponent(store.get('roadToSendEndpoint')),JSON.stringify(payload.config));
   let gets = 0;
+  const writes = [];
   const syncContext = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
     location: {search: '', href: 'https://example.test/', hash: ''},
@@ -33,11 +35,15 @@ test('background sync respects the open date picker and refreshes stale caches',
     setPayloadVersion: v => {payload.version = v},
     setNumericActivity: activity => {payload.activities = [activity]},
     fetch: async (url, options = {}) => {if (!options.method) gets++; return {ok: true, json: async () => JSON.parse(JSON.stringify(payload))}},
-    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => {writes.push(key);store.set(key, String(value))}, removeItem: key => store.delete(key)},
     setTimeout() {}, clearTimeout() {},
   };
   const syncChecks = `(async()=>{
     await loadRemote();
+    assert.equal(state.me,'Alex','the loaded board retains the selected climber');
+    assert.equal(state.syncState,'live','the selected climber’s board loads successfully');
+    assert.equal(document.querySelector('.modal.open'),null,'loading a board with a selected climber opens no modal');
+    assert.equal(document.querySelector('#weekReviewBtn').classList.contains('hide'),false,'the loaded board offers the tap entry point');
     const dateBox=document.querySelector('#dateFields'),dateField=document.querySelector('#activityDate');
 
     // Closed picker: a sync still re-syncs the record date to today.
@@ -86,6 +92,7 @@ test('background sync respects the open date picker and refreshes stale caches',
     assert.equal(localDetail.indexOf('America/Los_Angeles'),-1,'nor about a timezone it does not follow');
   })()`;
   await vm.runInNewContext(`${source}\n${syncChecks}`, syncContext, {filename: 'index.html'});
+  assert.equal(writes.includes('roadToSendWeekReview'),false,'remote loads never write the historical review key');
 });
 
 // Entry 55: testConnection()'s outdated-board message used to hard-code "deploy v11", which

@@ -12,6 +12,7 @@ const suites = [
     name: 'node --test',
     args: [
       '--test',
+      '--test-concurrency=1',
       'tests/backend-script.test.js',
       'tests/artifact-smoke.test.js',
       'tests/bounty-rotation-agreement.test.js',
