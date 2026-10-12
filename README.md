@@ -12,7 +12,7 @@ A **balanced** economy across three categories — you can't win by grinding one
   - 🧘 **Mobility** — **1 point** (mobility, stretching, prehab, or intentional recovery).
 - Logging a category a second time the same day earns **0** more (it still shows in the feed). This diminishing return is what keeps the game balanced.
 - **Balanced Day bonus: +2** when you log all three categories in one day. A full balanced day is **8 points** (3 + 2 + 1 + 2).
-- **Rotating daily bounties:** each day surfaces **three** bounties (one per category), chosen deterministically from the date so everyone sees the same set. Each has a fun name, a one-line description, and **1–3 points** by difficulty. Claim from that day's offering. The browser prevents the same climber from claiming the same bounty twice on one challenge date, including proxy recording; existing entries keep their credit.
+- **Rotating daily bounties:** each day surfaces **three** bounties (one per category), chosen deterministically from the date so everyone sees the same set. Each has a fun name, a one-line description, and **1–3 points** by difficulty. Claim from that day's offering. The browser and v14 function prevent the same climber from claiming the same bounty twice on one challenge date, including proxy recording; existing entries keep their credit.
 - **Weekly bounty cap:** the first **6 bounty points** each week (Monday–Sunday) count toward your score. You can keep claiming past the cap — those claims score **0** but still count toward the **🏹 Bounty Hunter** tag, awarded to whoever completes the most bounties that week (bragging rights, ties shared).
 - Everyone appears together in one leaderboard. Deleting an entry recomputes credit for the rest of that day/week.
 
@@ -46,19 +46,19 @@ Shared requests time out after 15 seconds. If an activity save cannot be confirm
 
 Shared mode keeps the current crew endpoint in the page URL so adding it to your Home Screen opens the same board. On iOS, the Home Screen app has separate storage from Safari, so climbers pick their name once more there; the identity dialog includes a passive tip. The install icon is an inline 180×180 PNG.
 
-Anyone with the crew link can submit or delete entries and change setup. Keep it within the group and never commit a live endpoint or crew data.
+Anyone with the crew link can submit, edit or delete entries and change setup. Keep it within the group and never commit a live endpoint or crew data.
 
 ### Legacy Sheet redirector
 
-Crews that started on Google Sheets keep their Sheet and its Apps Script deployed at API v13, with a `movedTo` row in the `Settings` tab (key `movedTo`, an `https://` URL as the value; anything else is ignored). The Sheet still serves its frozen board on GET, now including `movedTo`, and refuses every write with error code `moved`. A browser that sees `movedTo` switches to the new endpoint once per page load, before it checks the API version, so old `?sheet=` crew links keep working across future API bumps. Browsers remember a followed move and skip the Sheet on later loads of an old crew link. Saving setup successfully at an origin URL clears its remembered move; choosing **Use local mode** clears every remembered move on that device. **Leave the Sheet deployed and never redeploy it.** The script is no longer offered in the app. `legacy/apps-script-v13.js` is a frozen record of what it runs. Browsers accept API v13 and v12 responses.
+Crews that started on Google Sheets keep their Sheet and its Apps Script deployed at API v13, with a `movedTo` row in the `Settings` tab (key `movedTo`, an `https://` URL as the value; anything else is ignored). The Sheet still serves its frozen board on GET, now including `movedTo`, and refuses every write with error code `moved`. A browser that sees `movedTo` switches to the new endpoint once per page load, before it checks the API version, so old `?sheet=` crew links keep working across future API bumps. Browsers remember a followed move and skip the Sheet on later loads of an old crew link. Saving setup successfully at an origin URL clears its remembered move; choosing **Use local mode** clears every remembered move on that device. **Leave the Sheet deployed and never redeploy it.** The script is no longer offered in the app. `legacy/apps-script-v13.js` is a frozen record of what it runs. Browsers accept API v14, v13 and v12 responses: read JSON and scoring are identical; older functions ignore client ids on create, and Edit is hidden below v14. Idempotent creates and the server duplicate-bounty guard require v14.
 
-## API v13
+## API v14
 
 Reads return the following (`movedTo` appears only while the organizer has set it):
 
 ```json
 {
-  "version": 13,
+  "version": 14,
   "features": ["categories-v1", "balanced-day-bonus", "daily-bounties-v3", "bounty-hunter", "challenge-window", "self-registration-v1"],
   "activities": [],
   "config": {
@@ -74,9 +74,27 @@ Reads return the following (`movedTo` appears only while the organizer has set i
 }
 ```
 
-Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 13, ok, ... }` — the full saved activity record, which the app adds to the feed immediately and then reconciles with a background sync; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
+Activity writes send `name`, `type` (`climb`, `exercise`, `mobility`, or `bounty`), `date`, and optionally `hardestGrade`, `note`, or `bountyId`. The backend ignores submitted points, looks up the participant centrally, derives the category or bounty points, and (for bounties) verifies the claim is one of that date's rotating bounties. New profiles use the `addParticipant` action with just `name`. Writes return `{ version: 14, ok, ... }` — the full saved activity record, which the app adds to the feed immediately and then reconciles with a background sync; structured failures return `{ error: { code, message, details } }`. The machine-readable contract is in `src/schema.json`.
 
-A save is confirmed as soon as the backend accepts the write, so the only outcomes are **Activity saved** and **Save failed** (safe to retry). The Crew sync control refreshes the shared board on demand.
+Creates also accept an optional UUID `id`. The browser generates one per draft and keeps it across retries; browsers without `crypto.randomUUID()` generate a v4 UUID from random bytes. The function inserts with `ON CONFLICT (id) DO NOTHING` and reads the stored row. A repeat with the same id, name, type, date and bountyId returns that row unchanged, including its original grade/note/timestamp. Reusing an id for different content returns `conflict`. An invalid UUID returns `invalid_activity` with an `id` field error. Omitting id still creates a server-generated UUID for browsers that have not reloaded.
+
+`{action: "update", id, type, date, hardestGrade, bountyId, note}` edits an entry. Fields omitted from an update retain their previous values. Type determines category and points; submitted category/points are ignored. Name, id, createdAt and feed order stay unchanged. Updates reuse activity validation, the inclusive challenge window and the bounty-date check. Unknown ids return `not_found`; invalid fields return `invalid_activity`; out-of-window dates return `outside_challenge_window`. Both create and update return the full saved activity. The own feed's **Edit** button opens the Record fields in a sheet, at protocol 14 or in local mode; local edits keep the V9 storage key and row shape. The trust model is the same as delete. Unconfirmed edits refresh via GET, keep the draft, and recompute feed scores from the returned board.
+
+On create and update, `duplicate_bounty` means this climber (case-insensitive name) already claimed this bountyId on this date. Updates exclude their own id. A database trigger serializes competing claims; existing duplicates are retained and keep their current scoring. Idempotent retries return their existing row before this duplicate check.
+
+### Upgrading an existing Supabase board to v14
+
+From this checkout, link the organizer's project if needed, then run:
+
+```bash
+supabase db push
+supabase functions deploy road-to-send
+node scripts/smoke-check.mjs https://<project-ref>.supabase.co/functions/v1/road-to-send
+```
+
+The new migration adds the duplicate-bounty trigger without changing existing rows. Organizer snapshot imports set a transaction-local bypass so historical duplicate claims are preserved. Push it before the function redeploy, then publish the browser after the green test gate. Verify the endpoint reports version 14. Keep the existing endpoint and crew link; leave the frozen Sheet redirector deployed as it is. This upgrade needs one function redeploy.
+
+A readable success response confirms a save immediately, while an explicit rejection is safe to retry. A timeout or unreadable response has an unconfirmed outcome: the browser refreshes the board and keeps the draft. The Crew sync control refreshes the shared board on demand.
 
 ## Moving the shared backend to Supabase
 
@@ -125,7 +143,7 @@ echo "Snapshot and SQL go in $WORK"
 
 ```bash
 curl -fsSL '<app-url>' | grep -o 'SUPPORTED_API_VERSIONS=new Set(\[[0-9,]*\])'
-# expect: SUPPORTED_API_VERSIONS=new Set([13,12])
+# expect: SUPPORTED_API_VERSIONS=new Set([14,13,12])
 ```
 
 **2. Check the new backend.** Complete the two sections above, then run the smoke check against the empty function:
@@ -155,7 +173,7 @@ node scripts/import-snapshot.mjs < "$WORK/snapshot.json" > "$WORK/import.sql"
 psql '<database-connection-string>' --set ON_ERROR_STOP=1 --file "$WORK/import.sql"
 ```
 
-The import tool checks the whole snapshot first. If anything is wrong, it stops with a message and writes no SQL. It stops when the snapshot is not a JSON object or is not version 12 or 13; when it has no activities array, no config or no `timeZone`; when a date is not `YYYY-MM-DD`, the start date is after the trip date, the goal is not a whole number from 50 to 10000, or a crew name is not 1 to 30 characters; and when an activity has an empty id, points that aren't a number, a field that is an object or a list, or the same id as another activity. A value containing a NUL character also stops it. The SQL runs as one transaction. It keeps every activity id, timestamp and the feed order, and running it again changes nothing. Without `psql`, paste the contents of `import.sql` into the SQL editor and run it.
+The import tool checks the whole snapshot first. If anything is wrong, it stops with a message and writes no SQL. It stops when the snapshot is not a JSON object or is not version 12, 13 or 14; when it has no activities array, no config or no `timeZone`; when a date is not `YYYY-MM-DD`, the start date is after the trip date, the goal is not a whole number from 50 to 10000, or a crew name is not 1 to 30 characters; and when an activity has an empty id, points that aren't a number, a field that is an object or a list, or the same id as another activity. A value containing a NUL character also stops it. The SQL runs as one transaction. It keeps every activity id, timestamp and the feed order, and running it again changes nothing. Without `psql`, paste the contents of `import.sql` into the SQL editor and run it.
 
 **5. Verify.** Run the smoke check again. GET now reports the crew and the activity count:
 

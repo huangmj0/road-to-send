@@ -1441,3 +1441,155 @@ test('caller cancellation is combined with the deadline and retained on browsers
     }, checks: `await assert.rejects(fetchShared('https://board.example.test/fn',{signal:callerSignal}),/Caller cancelled/);`});
   }
 });
+
+const v14DraftChecks = `
+  state.endpoint='https://board.example.test/fn';state.protocolVersion=14;state.me='Alex';state.recordingFor='Alex';
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  state.serverDate='2026-07-13';state.challengeTimeZone='';state.lastSyncedAt=Date.now();state.logs=[];
+  document.querySelector('#hardestGrade').innerHTML='<option value="">None</option><option value="V4">V4</option>';
+  setDefaultRecordDate();document.querySelector('input[name="activityType"][value="climb"]').checked=true;
+  document.querySelector('#activityNote').value='Keep this draft';
+`;
+const v14Entry = {id:'00000000-0000-4000-8000-000000000014',name:'Alex',type:'climb',category:'climb',points:3,date:'2026-07-13',createdAt:'2026-07-13T01:00:00.000Z',hardestGrade:'V4',bountyId:'',bountyTitle:'',note:'Original'};
+const v14Board = activities => ({version:14,features:[],activities,config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]},configErrors:[],serverDate:'2026-07-13',timeZone:''});
+
+test('a timed-out create sends the same UUID when the unchanged draft is retried', async () => {
+  const posts=[];
+  await timeoutScenario({
+    extra:{posted:()=>posts},
+    fetchImpl:(url,options,stall)=>{
+      if(options.method==='POST') {
+        const body=JSON.parse(options.body);posts.push(body);
+        if(posts.length===1) return stall(options.signal);
+        return Promise.resolve({ok:true,json:async()=>({...v14Entry,...body,ok:true})});
+      }
+      return Promise.resolve({ok:true,json:async()=>v14Board(posts.length<2?[]:[{...v14Entry,...posts[1]}])});
+    },
+    checks:`${v14DraftChecks}
+      await submitActivity({preventDefault(){}});${settle}
+      assert.equal(state.logs.length,0);
+      assert.match(posted()[0].id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      assert.equal(document.querySelector('#activityNote').value,'Keep this draft');
+      await submitActivity({preventDefault(){}});${settle}
+      assert.equal(posted().length,2);assert.equal(posted()[1].id,posted()[0].id);
+      assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,posted()[0].id);
+      assert.equal(document.querySelector('#activityNote').value,'');
+    `,
+  });
+});
+
+test('creates keep a UUID at v13 because the older function ignores unknown create fields', async () => {
+  for (const version of [12,13,14]) {
+    const posts=[];let saved;
+    await timeoutScenario({
+      extra:{posted:()=>posts},
+      fetchImpl:async(url,options)=>{
+        if(options.method==='POST') {
+          const body=JSON.parse(options.body);posts.push(body);
+          saved={...v14Entry,...body,id:version>=14?body.id:'server-minted',createdAt:v14Entry.createdAt};
+          return {ok:true,json:async()=>({...saved,version,ok:true})};
+        }
+        return {ok:true,json:async()=>({...v14Board(saved?[saved]:[]),version})};
+      },
+      checks:`${v14DraftChecks}
+        state.protocolVersion=${version};await submitActivity({preventDefault(){}});${settle}
+        assert.match(posted()[0].id,/^[0-9a-f-]{36}$/);
+        assert.equal(state.logs.length,1);
+        assert.equal(state.logs[0].id,${version}>=14?posted()[0].id:'server-minted');
+      `,
+    });
+  }
+});
+
+test('an edit updates the shared feed scores and persisted cache while preserving identity and order', async () => {
+  const posts=[];let saved=v14Entry,finish;const cache=new Map();
+  await timeoutScenario({
+    extra:{posted:()=>posts,cache,finish:()=>finish(),localStorage:{getItem:key=>cache.get(key)||null,setItem:(key,value)=>cache.set(key,String(value)),removeItem:key=>cache.delete(key)}},
+    fetchImpl:async(url,options)=>{
+      if(options.method==='POST') {
+        const body=JSON.parse(options.body);posts.push(body);
+        saved={...v14Entry,...body,type:body.type,category:body.type,points:1,hardestGrade:''};
+        delete saved.action;
+        return {ok:true,json:async()=>({...saved,version:14,ok:true})};
+      }
+      return new Promise(resolve=>{finish=()=>resolve({ok:true,json:async()=>v14Board([saved])})});
+    },
+    checks:`${v14DraftChecks}
+      state.logs=${JSON.stringify([v14Entry])};render();
+      assert.equal(Number(document.querySelector('#youTotal').textContent),3);
+      const trigger=document.querySelector('#personalActivity [data-edit]');trigger.focus();openEdit(0,trigger);
+      assert.equal(document.querySelector('#activityNote').value,'Original');
+      assert.equal(document.querySelector('#hardestGrade').value,'V4');
+      document.querySelector('input[name="activityType"][value="mobility"]').checked=true;
+      document.querySelector('#activityNote').value='Edited activity';updateRecordPreview();
+      await submitActivity({preventDefault(){}});${settle}
+      assert.equal(posted().length,1);assert.equal(posted()[0].action,'update');assert.equal(posted()[0].id,'${v14Entry.id}');
+      assert.equal(state.logs.length,1);assert.equal(state.logs[0].createdAt,'${v14Entry.createdAt}');
+      assert.equal(state.logs[0].name,'Alex');assert.equal(state.logs[0].type,'mobility');
+      assert.equal(Number(document.querySelector('#youTotal').textContent),1);
+      assert.ok(document.querySelector('#personalActivity').textContent.includes('Edited activity'));
+      const cached=JSON.parse(cache.get(cacheKey('activities')));
+      assert.equal(cached[0].id,'${v14Entry.id}');assert.equal(cached[0].note,'Edited activity');
+      assert.equal(document.querySelector('#editModal').classList.contains('open'),false);
+      assert.equal(document.querySelector('#recordForm').parentElement.id,'recordFormHome');
+      assert.equal(document.activeElement.dataset.id,'${v14Entry.id}','focus returns to the refreshed row');
+      assert.equal(document.querySelector('#activityNote').value,'Keep this draft','the create draft is restored');
+      assert.equal(state.syncState,'loading','the write is already rendered and cached before GET completes');
+      finish();${settle}
+      assert.equal(document.activeElement.dataset.id,'${v14Entry.id}','background refresh preserves row focus');
+    `,
+  });
+});
+
+test('an edit timeout reconciles the committed update and preserves the edit draft', async () => {
+  let posts=0,gets=0,finish;
+  await timeoutScenario({
+    extra:{postCount:()=>posts,getCount:()=>gets,finish:()=>finish()},
+    fetchImpl:(url,options,stall)=>{
+      if(options.method==='POST'){posts++;assert.equal(JSON.parse(options.body).action,'update');return stall(options.signal)}
+      gets++;return new Promise(resolve=>{finish=()=>resolve({ok:true,json:async()=>v14Board([{...v14Entry,type:'exercise',category:'exercise',points:2,hardestGrade:'',note:'Updated remotely'}])})});
+    },
+    checks:`${v14DraftChecks}
+      state.logs=${JSON.stringify([v14Entry])};render();openEdit(0,document.querySelector('#personalActivity [data-edit]'));
+      document.querySelector('input[name="activityType"][value="exercise"]').checked=true;
+      document.querySelector('#activityNote').value='Updated remotely';updateRecordPreview();
+      await submitActivity({preventDefault(){}});
+      assert.equal(postCount(),1);assert.equal(getCount(),1);
+      assert.equal(document.querySelector('#toast').textContent,'Could not confirm the save — refreshing the board. Check your feed before saving again.');
+      assert.equal(state.saving,false);assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save changes');
+      assert.equal(state.logs[0].type,'climb','no optimistic edit before confirmation');
+      assert.equal(document.querySelector('#editModal').classList.contains('open'),true);
+      assert.equal(document.querySelector('#activityNote').value,'Updated remotely');
+      finish();${settle}
+      assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,'${v14Entry.id}');assert.equal(state.logs[0].type,'exercise');
+      assert.equal(Number(document.querySelector('#youTotal').textContent),2);
+      assert.equal(document.querySelector('#activityNote').value,'Updated remotely');
+      closeModal('editModal');
+      assert.equal(document.activeElement.dataset.id,'${v14Entry.id}','Escape/close can return to a row replaced by reconciliation');
+    `,
+  });
+});
+
+test('duplicate_bounty on create and edit shows clear copy without adding or changing a row', async () => {
+  for (const editing of [false,true]) {
+    let posts=0,gets=0;
+    await timeoutScenario({
+      extra:{postCount:()=>posts,getCount:()=>gets},
+      fetchImpl:async(url,options)=>{
+        if(options.method==='POST'){posts++;return {ok:true,json:async()=>({ok:false,error:{code:'duplicate_bounty',message:'Server technical text'}})}}
+        gets++;throw Error('Unexpected reconciliation');
+      },
+      checks:`${v14DraftChecks}
+        state.logs=${JSON.stringify(editing?[v14Entry]:[])};render();
+        ${editing?"openEdit(0,document.querySelector('#personalActivity [data-edit]'));":''}
+        const original=JSON.stringify(state.logs);
+        document.querySelector('input[name="activityType"][value="bounty"]').checked=true;
+        populateBountySelect();document.querySelector('#bountySelect').value=dailyBounties(recordDate())[0].id;
+        await submitActivity({preventDefault(){}});
+        assert.equal(document.querySelector('#toast').textContent,'That bounty is already claimed on that date.');
+        assert.equal(postCount(),1);assert.equal(getCount(),0);assert.equal(JSON.stringify(state.logs),original);
+        assert.equal(document.querySelector('#activityNote').value,${JSON.stringify(editing?'Original':'Keep this draft')});
+      `,
+    });
+  }
+});
