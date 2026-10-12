@@ -45,7 +45,7 @@ __INLINE_STYLES__
 
   <section id="record" class="tab-panel" data-panel="record" aria-labelledby="navRecord">
     <div class="page-head"><div><span class="eyebrow">Quick entry</span><h1>Record activity</h1></div></div>
-    <form id="recordForm" class="card record-card">
+    <div id="recordFormHome"><form id="recordForm" class="card record-card">
       <div class="recording-for"><span>Recording for</span><strong id="recordingName">Choose a person</strong><button class="text-btn" type="button" data-action="openProxy">Someone else</button></div>
       <fieldset class="activity-picker"><legend>What did you do?</legend><label><input type="radio" name="activityType" value="climb" checked /><span><b><svg class="glyph"><use href="#g-climb"/></svg></b><strong>Climbing</strong><small>3 points</small></span></label><label><input type="radio" name="activityType" value="exercise" /><span><b><svg class="glyph"><use href="#g-exercise"/></svg></b><strong>Exercise</strong><small>2 points</small></span></label><label><input type="radio" name="activityType" value="mobility" /><span><b><svg class="glyph"><use href="#g-mobility"/></svg></b><strong>Mobility</strong><small>1 point</small></span></label><label><input type="radio" name="activityType" value="bounty" /><span><b><svg class="glyph"><use href="#g-bounty"/></svg></b><strong>Bounty</strong><small>1–3 points</small></span></label></fieldset>
       <div id="climbFields" class="field"><label for="hardestGrade">Hardest grade sent <small>(optional)</small></label><select id="hardestGrade"></select></div>
@@ -55,7 +55,7 @@ __INLINE_STYLES__
       <div id="dateFields" class="field hide"><label for="activityDate">Activity date</label><input id="activityDate" type="date" required /></div>
       <div class="preview" role="status" aria-live="polite"><div class="preview-copy"><span>This activity generates</span><strong><span id="rawPreview">3</span> points</strong><small id="creditPreview">Counts in full · +3 today</small></div><div id="recordMeter" class="point-meter compact" role="img" aria-label="3 of 8 points after this activity"></div></div>
       <button id="saveActivityBtn" class="btn primary wide" type="submit">Save activity</button>
-    </form>
+    </form></div>
   </section>
 
   <section id="crew" class="tab-panel" data-panel="crew" aria-labelledby="navCrew">
@@ -66,6 +66,8 @@ __INLINE_STYLES__
     <article class="card"><div class="card-head"><h2>Activity</h2></div><div id="crewFeedFilter" class="cat-chips feed-filter" role="group" aria-label="Filter crew activity by category"></div><div id="activityList" class="activity-list"></div><button id="crewShowMore" class="text-btn hide" type="button">Show more</button></article>
   </section>
 </main>
+
+<div id="editModal" class="modal"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="editTitle"><div class="dialog-head"><h2 id="editTitle">Edit entry</h2><button class="icon-btn" type="button" aria-label="Close entry editor" data-action="closeModal" data-modal="editModal">×</button></div><div id="editFormHost"></div></div></div>
 
 <nav class="bottom-nav" aria-label="Primary"><div class="shell nav-inner"><button id="navYou" class="active" type="button" data-tab="you" aria-current="page"><span aria-hidden="true"><svg class="glyph"><use href="#g-you"/></svg></span>You</button><button id="navRecord" type="button" data-tab="record"><span aria-hidden="true"><svg class="glyph"><use href="#g-plus"/></svg></span>Record</button><button id="navCrew" type="button" data-tab="crew"><span aria-hidden="true"><svg class="glyph"><use href="#g-crew"/></svg></span>Crew</button></div></nav>
 

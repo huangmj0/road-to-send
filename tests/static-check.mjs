@@ -74,7 +74,7 @@ assert.match(script,/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORI
 assert.doesNotMatch(artifactScript,/const SCRIPT=/,'the artifact no longer embeds the Apps Script source');
 assert.doesNotMatch(artifactScript,/copyScript/,'the artifact has no copy-script action');
 const apiVersion=JSON.parse(readFileSync(new URL('../src/schema.json',import.meta.url),'utf8')).properties.version.const;
-assert.ok(artifactScript.trimStart().startsWith(`const SUPPORTED_API_VERSIONS=new Set([${apiVersion},12]);\n`),'the artifact opens with the supported API versions, current version first');
+assert.ok(artifactScript.trimStart().startsWith(`const SUPPORTED_API_VERSIONS=new Set([${apiVersion},13,12]);\n`),'the artifact opens with the supported API versions, current version first');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
 // Saving… was already the label on two buttons (#saveActivityBtn and #saveSetupBtn) before this
 // entry, so the preview branch is the third occurrence — a >=2 guard could never have failed.
@@ -198,7 +198,9 @@ assert.doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|
 // retry" outcome no longer exists. A shared save is confirmed by the write response and the returned
 // record is added to the feed at once, with loadRemote() reconciling in the background — so there is
 // no blocking reload left to fail on the success path. This asserts that replacement invariant.
-assert.match(script,/state\.logs=state\.logs\.concat\(\[\{id:saved\.id/,'a shared save adds the record the write returned straight to the feed');
+// The shared DOM test now holds the reconciliation GET pending and asserts the returned
+// entry is already rendered and cached. That proves the write-response invariant directly.
+assert.match(script,/persistShared\(\); loadRemote\(\)/,'a shared write persists before starting background reconciliation');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');
 assert.match(html,/id="bountyHint"/,'the Record tab has a slot for the chosen bounty description');
@@ -397,3 +399,7 @@ assert.match(identityModal,/<p class="hint">Tip: add this page to your Home Scre
 assert.equal((html.match(/Tip: add this page to your Home Screen/g)||[]).length,1,'there is one install tip');
 assert.doesNotMatch(html.slice(html.indexOf('<div id="setupModal"')),/Home Screen/,'setup has no install tip');
 assert.match(stylesheet,/button\.bounty\{[^}]*min-height:44px/,'Today bounty buttons retain a 44px minimum height');
+
+assert.match(html,/role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="editTitle"/,'the entry editor is a named modal');
+assert.match(html,/aria-label="Close entry editor"/,'the editor has a named close control');
+assert.match(stylesheet,/\.edit-entry\{min-width:44px;min-height:44px/,'edit buttons have 44px touch targets');

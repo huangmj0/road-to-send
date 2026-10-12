@@ -10,6 +10,9 @@ export function createMemoryStore({settings = null, participants = [], activitie
   let roster = participants.map(p => typeof p === 'string' ? {name: p} : {...p});
   const feed = activities.map(a => ({...a}));
   let nextSeq = Math.max(0, ...feed.map(a => a.seq ?? 0)) + 1;
+  const checkBounty = activity => {
+    if (activity.type === 'bounty' && feed.some(a => a.id !== activity.id && a.type === 'bounty' && a.name.toLowerCase() === activity.name.toLowerCase() && a.date === activity.date && a.bountyId === activity.bountyId)) throw Object.assign(new Error('Duplicate bounty'), {code: 'duplicate_bounty'});
+  };
   return {
     async getSettings() { return settings && {...settings}; },
     async listParticipants() { return byKey([...roster].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)), 'position').map(p => ({name: p.name})); },
@@ -24,7 +27,26 @@ export function createMemoryStore({settings = null, participants = [], activitie
       return true;
     },
     async appendActivity(activity) {
+      const existing = feed.find(a => a.id === activity.id);
+      if (existing) { const {seq, ...row} = existing; return {...row}; }
+      checkBounty(activity);
       feed.push({...activity, seq: nextSeq++});
+      return {...activity};
+    },
+    async getActivity(id) {
+      const existing = feed.find(a => a.id === id);
+      if (!existing) return null;
+      const {seq, ...row} = existing;
+      return {...row};
+    },
+    async updateActivity(id, fields) {
+      const existing = feed.find(a => a.id === id);
+      if (!existing) return null;
+      const updated = {...existing, ...fields, id, createdAt: existing.createdAt};
+      if (!(updated.type === existing.type && updated.name.toLowerCase() === existing.name.toLowerCase() && updated.date === existing.date && updated.bountyId === existing.bountyId)) checkBounty(updated);
+      Object.assign(existing, updated);
+      const {seq, ...row} = updated;
+      return row;
     },
     async deleteActivity(id) {
       const index = feed.findIndex(a => a.id === id);
