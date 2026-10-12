@@ -14,6 +14,149 @@ function sharedDom() {
   return {window, document: window.document, fire: type => window.document.dispatchEvent(new window.Event(type, {bubbles: true}))};
 }
 
+async function newerApiScenario(checks, cacheRefreshFails = false) {
+  const dom = sharedDom(), store = new Map([['roadToSendMe', 'Alex']]), requests = [];
+  let payload = {version: 12, features: [], activities: [{id: 'cached-entry', name: 'Alex', type: 'exercise', date: '2026-07-13', createdAt: '1'}], config: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '2026-07-13', timeZone: 'UTC'};
+  let finishRefresh, finishBody, finishReload;
+  const timers = [];
+  const reloaded = new Promise(resolve => {finishReload = resolve});
+  const pageLocation = {search: '', href: 'https://example.test/app/?keep=1#crew', hash: '#crew', reload() {requests.push({action: 'reload'}); finishReload()}};
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: pageLocation, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    localStorage: {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout(fn, ms) {timers.push({fn, ms}); return timers.length}, clearTimeout(id) {if (timers[id - 1]) timers[id - 1].cleared = true},
+    setPayloadVersion: version => {payload.version = version}, setPayload: value => {payload = value},
+    requests: () => requests, cachedActivities: () => store.get('roadToSendShared:activities:' + encodeURIComponent('https://board.example.test/fn')),
+    finishRefresh: () => finishRefresh(cacheRefreshFails), finishBody: () => finishBody(), waitForReload: () => reloaded, refreshFails: () => cacheRefreshFails,
+    fireTimers: ms => timers.filter(timer => timer.ms === ms && !timer.cleared).forEach(timer => timer.fn()), pendingTimers: ms => timers.filter(timer => timer.ms === ms && !timer.cleared).length,
+    settle: () => new Promise(resolve => setImmediate(resolve)),
+    fetch: async (url, options = {}) => {
+      requests.push({action: 'fetch', url, cache: options.cache});
+      if (url === pageLocation.href) return new Promise((resolve, reject) => {
+        finishRefresh = fails => fails ? reject(Error('Cache refresh failed')) : resolve({ok: true, text: () => new Promise(done => {finishBody = done})});
+      });
+      return {ok: true, json: async () => JSON.parse(JSON.stringify(payload))};
+    },
+  };
+  await vm.runInNewContext(source + '\n(async()=>{' + checks + '\n})()', context);
+}
+
+test('a newer API keeps cached entries visible and offers Reload app until a live sync', async () => {
+  await newerApiScenario(`
+    state.endpoint='https://board.example.test/fn';state.me='Alex';state.recordingFor='Alex';
+    assert.equal(await loadRemote(),true);
+    const logsBefore=state.logs,configBefore=state.config,syncedBefore=state.lastSyncedAt,storedBefore=cachedActivities();
+    assert.ok(storedBefore,'the successful read persisted cached entries');
+    const feedBefore=document.querySelector('#personalActivity').innerHTML,rowBefore=document.querySelector('#personalActivity .activity');
+    assert.ok(rowBefore,'a cached entry is rendered before the newer response');
+    const newerVersion=Math.max(...SUPPORTED_API_VERSIONS)+1;
+    setPayloadVersion(newerVersion);
+    assert.equal(await loadRemote(),false);
+    assert.equal(state.syncState,'stale');
+    assert.equal(state.syncDetail,'A newer version of Road to Send is available — reload to update');
+    assert.equal(state.syncErrorCode,'RTS-REFRESH-NEWER');
+    assert.equal(document.querySelector('#diagnosticTitle').textContent,state.syncDetail);
+    assert.equal(document.querySelector('#diagnosticCode').textContent,'RTS-REFRESH-NEWER');
+    assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),false);
+    assert.ok(state.logs===logsBefore,'cached entries are preserved');
+    assert.ok(state.config===configBefore,'cached configuration is preserved');
+    assert.equal(state.lastSyncedAt,syncedBefore);
+    assert.equal(cachedActivities(),storedBefore,'the unsupported response is never cached');
+    assert.equal(document.querySelector('#personalActivity').innerHTML,feedBefore);
+    assert.ok(document.querySelector('#personalActivity .activity')===rowBefore,'the cached entry stays in the DOM');
+    setPayloadVersion(Math.max(...SUPPORTED_API_VERSIONS));
+    const retry=loadRemote();
+    assert.equal(state.syncState,'loading');
+    assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),true,'retry hides the reload action while pending');
+    assert.equal(await retry,true);
+    assert.equal(state.syncState,'live');
+    assert.equal(state.syncErrorCode,'');
+    assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),true,'a live board hides Reload app');
+  `);
+});
+
+test('older and unknown APIs and legacy arrays keep board update diagnostics without Reload app', async () => {
+  await newerApiScenario(`
+    state.endpoint='https://board.example.test/fn';
+    for(const version of [11,undefined,'unknown','Infinity']){
+      setPayloadVersion(version);
+      assert.equal(await loadRemote(),false);
+      assert.equal(state.syncState,'error');
+      assert.equal(state.syncDetail,'Board update required');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+      assert.equal(document.querySelector('#diagnosticTitle').textContent,'Board update required');
+      assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),true);
+    }
+    setPayload([]);
+    assert.equal(await loadRemote(),false);
+    assert.equal(state.syncDetail,'Board update required');
+    assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+    assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),true,'legacy arrays never offer Reload app');
+  `);
+});
+
+test('testConnection asks the climber to reload for a newer API and update an older board', async () => {
+  await newerApiScenario(`
+    document.querySelector('#endpoint').value='https://board.example.test/fn';
+    const newerVersion=Math.max(...SUPPORTED_API_VERSIONS)+1;
+    setPayloadVersion(newerVersion);
+    assert.equal(await testConnection(),false);
+    assert.equal(document.querySelector('#testResult').textContent,'This board runs a newer API (v'+newerVersion+') — reload the app to update');
+    setPayloadVersion(11);
+    assert.equal(await testConnection(),false);
+    assert.equal(document.querySelector('#testResult').textContent,'Outdated board — update it to v'+[...SUPPORTED_API_VERSIONS][0]);
+    setPayloadVersion(Math.max(...SUPPORTED_API_VERSIONS));
+    assert.equal(await testConnection(),true);
+    assert.equal(document.querySelector('#testResult').textContent,'Connected — API v'+Math.max(...SUPPORTED_API_VERSIONS));
+  `);
+});
+
+for (const fails of [false, true]) {
+  test(fails ? 'tapping Reload app reloads even when the cache refresh fails' : 'tapping Reload app waits for the HTTP cache refresh before reloading', async () => {
+    await newerApiScenario(`
+      state.endpoint='https://board.example.test/fn';
+      setPayloadVersion(Math.max(...SUPPORTED_API_VERSIONS)+1);
+      assert.equal(await loadRemote(),false);
+      const button=document.querySelector('#reloadApp');
+      assert.equal(button.classList.contains('hide'),false);
+      const before=requests().length;
+      button.click();
+      assert.equal(requests().length,before+1,'the tap starts exactly one cache refresh');
+      const refresh=requests()[before];
+      assert.equal(refresh.action,'fetch');
+      assert.equal(refresh.url,location.href,'the exact app URL is fetched, including its query and fragment');
+      assert.equal(refresh.cache,'reload');
+      assert.equal(requests().some(request=>request.action==='reload'),false,'navigation waits for the refresh');
+      finishRefresh();
+      await settle();
+      if(!refreshFails()){
+        assert.equal(requests().some(request=>request.action==='reload'),false,'navigation waits for the whole page body');
+        finishBody();
+      }
+      await waitForReload();
+      assert.equal(pendingTimers(PAGE_REFRESH_TIMEOUT_MS),0,'the refresh deadline is cleared');
+      assert.equal(requests().length,before+2);
+      assert.equal(requests()[before+1].action,'reload','navigation follows the completed refresh');
+    `, fails);
+  });
+}
+
+test('tapping Reload app still reloads when the cache refresh stalls', async () => {
+  await newerApiScenario(`
+    state.endpoint='https://board.example.test/fn';
+    setPayloadVersion(Math.max(...SUPPORTED_API_VERSIONS)+1);
+    assert.equal(await loadRemote(),false);
+    document.querySelector('#reloadApp').click();
+    await settle();
+    assert.equal(requests().some(request=>request.action==='reload'),false,'navigation waits while the refresh is pending');
+    assert.equal(pendingTimers(PAGE_REFRESH_TIMEOUT_MS),1,'the refresh has one bounded deadline');
+    fireTimers(PAGE_REFRESH_TIMEOUT_MS);
+    await waitForReload();
+    assert.equal(requests().filter(request=>request.action==='reload').length,1,'the deadline reloads exactly once');
+  `);
+});
+
 test('background sync respects the open date picker and refreshes stale caches', async () => {
   const dom = sharedDom();
   const store = new Map();
@@ -71,7 +214,7 @@ test('background sync respects the open date picker and refreshes stale caches',
     // organizer reading them has a number to deploy against.
     const expectedVersion=[...SUPPORTED_API_VERSIONS][0];
     assert.ok(detail.indexOf('This build expects v'+expectedVersion)>=0,'the diagnostics name the protocol version this build expects');
-    setPayloadVersion(99);
+    setPayloadVersion(11);
     await loadRemote();
     const mismatchDetail=document.querySelector('#diagnosticDetail').textContent;
     assert.ok(mismatchDetail.indexOf('This build expects v'+expectedVersion)>=0,'the expected version is still named after an unsupported payload');
@@ -100,7 +243,7 @@ test('testConnection names the expected protocol version instead of a stale lite
     history: {replaceState() {}},
     window: dom.window,
     document: dom.document,
-    fetch: async () => ({ok: true, json: async () => ({version: 99, features: [], activities: [], config: null, configErrors: []})}),
+    fetch: async () => ({ok: true, json: async () => ({version: 11, features: [], activities: [], config: null, configErrors: []})}),
     localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
     setTimeout() {}, clearTimeout() {},
   };
@@ -787,14 +930,14 @@ test('a redirector answering an unsupported version with movedTo is still follow
   });
 });
 
-test('an unsupported version without movedTo keeps the version error state', async () => {
+test('a newer server without movedTo reports the reload error state', async () => {
   await movedScenario({
     backends: {[OLD_URL]: (m, b, board) => board(99)},
     checks: `
       ${settle}
       assert.equal(state.endpoint,'${OLD_URL}');
       assert.equal(state.syncState,'error');
-      assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-NEWER');
     `,
   });
 });
@@ -839,7 +982,7 @@ test('a failed destination fetch leaves an existing destination cache untouched'
   });
 });
 
-test('an unsupported response carrying movedTo after the hop was used is a version error with nothing cached', async () => {
+test('a newer response carrying movedTo after the hop was used is a reload error with nothing cached', async () => {
   await movedScenario({
     backends: {
       [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
@@ -848,7 +991,7 @@ test('an unsupported response carrying movedTo after the hop was used is a versi
     checks: `
       ${settle}
       assert.equal(state.endpoint,'${NEW_URL}');
-      assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-NEWER');
       assert.notEqual(state.syncState,'live');
       assert.equal(store.get('roadToSendMoves'),undefined,'a failed destination does not record the move');
       assert.equal(store.keys().filter(k=>k.indexOf('roadToSendShared:')===0).length,0,'nothing is cached');

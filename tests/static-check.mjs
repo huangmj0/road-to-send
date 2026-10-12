@@ -43,6 +43,9 @@ assert.match(html,/id="leaderWeekBtn"[^>]*aria-pressed=/,'the Recent toggle keep
 assert.doesNotMatch(html,/review-dialog|trend-hover/,'the three dead class hooks are absent from the built page');
 assert.match(html,/id="recordMeter"[^>]+aria-label=/,'record preview meter is accessible');
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'persistent sync diagnostics are announced');
+const syncDiagnostics=html.match(/<div id="syncDiagnostics"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+assert.ok(syncDiagnostics,'the existing sync diagnostics contain markup');
+assert.match(syncDiagnostics,/<button id="reloadApp" class="btn secondary hide" type="button" data-action="reloadApp">Reload app<\/button>/,'Reload app is a named button initially hidden inside the existing diagnostics');
 assert.match(html,/id="toast"[^>]+role="status"[^>]+aria-live="polite"/,'toast is announced');
 for(const title of ['identityTitle','proxyTitle','setupTitle','confirmTitle','personTitle','weekReviewTitle'])assert.match(html,new RegExp(`role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="${title}"`),`${title} dialog is named`);
 assert.match(html,/aria-label="Close identity picker"/);
@@ -83,6 +86,9 @@ assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption')
 assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
 assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.page-head h1\{overflow-wrap:anywhere\}/,'the page head wraps long names while keeping its actions reachable');
 const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
+const buttonStyles=stylesheet.match(/\.btn\{([^}]*)\}/)?.[1];
+assert.ok(buttonStyles,'the shared button style exists');
+assert.ok(Number(buttonStyles.match(/min-height:(\d+)px/)?.[1])>=44,'Reload app inherits a touch target at least 44px tall');
 assert.match(stylesheet,/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/,'the global focus ring uses the shared high-contrast green treatment');
 assert.equal((stylesheet.match(/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/g)||[]).length,1,'the shared focus ring is declared once globally');
 // Gold is too low-contrast to ring focus on the cream page, and sage is invisible against the sage
