@@ -1202,3 +1202,24 @@ test('UUID fallback uses secure random bytes with v4 and variant bits when rando
   })()`,fallback);
   assert.equal(calls,4,'each new identity obtains secure random bytes once');
 });
+
+test('bounty claim checks include queued creates without mutating logs or counting failed creates', () => {
+  const store=new Map();
+  const pureContext={...context,localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)}};
+  vm.runInNewContext(source+`\n(()=>{
+    state.endpoint='https://board.example.test/fn';
+    const day='2026-07-13',bounties=dailyBounties(day);
+    const body=(n,name,date,bountyId)=>({id:'00000000-0000-4000-8000-00000000000'+n,name,type:'bounty',date,hardestGrade:'',bountyId,note:''});
+    const queued=body(1,'Alex',day,bounties[0].id),failed=body(2,'Alex',day,bounties[1].id);
+    writeOutboxItems(state.endpoint,[{body:queued,queuedAt:1},{body:failed,queuedAt:2,failed:'Invalid'},
+      {body:body(3,'Maya',day,bounties[2].id),queuedAt:3},{body:body(4,'Alex','2026-07-12',bounties[2].id),queuedAt:4}]);
+    const confirmed={id:'confirmed',name:'Alex',type:'bounty',date:day,bountyId:bounties[2].id};
+    state.logs=[confirmed];const logs=state.logs,before=JSON.stringify(logs);
+    for(let i=0;i<3;i++){
+      const claims=claimedTodayIds('alex',day);
+      assert.equal(claims.size,2);assert.ok(claims.has(queued.bountyId));assert.ok(claims.has(confirmed.bountyId));
+      assert.equal(claims.has(failed.bountyId),false);assert.equal(state.logs,logs);assert.equal(JSON.stringify(state.logs),before);
+    }
+    assert.equal(claimedTodayIds('alex',day,queued).has(queued.bountyId),false,'editing excludes the selected claim');
+  })()`,pureContext);
+});

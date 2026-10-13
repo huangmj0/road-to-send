@@ -110,7 +110,17 @@ import { readFileSync } from 'node:fs';
 // the Record form) account for the growth; feed action styling and focus restoration add
 // the remainder. Scoring and the bounty catalog are unchanged. This leaves 557 bytes of
 // margin, close to the previous 496; the next budget entry re-measures rather than assuming.
-const BUDGET = 147500;
+// Re-baselined 147500 -> 151500 on 2026-10-09 for the browser offline outbox:
+// measured 147123 -> 150941 bytes (+3818). Endpoint-scoped durable create requests,
+// sequential idempotent retries, cache isolation, failed-entry dismissal and accessible
+// own-feed status account for the growth. This leaves 559 bytes of margin; re-measure
+// the next change rather than assuming more growth.
+// Re-baselined 151500 -> 152500 on 2026-10-09 for outbox follow-up fixes:
+// measured 150941 -> 152254 bytes (+1313). Fresh-load replay gating, acknowledgement
+// reconciliation across reads and writes, definitive versus transient rejection handling,
+// personal-feed pagination, memoized outbox parsing and replay race guards account for the growth.
+// The cap leaves 246 bytes of margin; re-measure the next change.
+const BUDGET = 152500;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);

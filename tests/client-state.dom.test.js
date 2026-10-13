@@ -1628,3 +1628,84 @@ test('a local note edit changes only the selected id-less V9 entry and keeps its
     assert.deepEqual(persisted,original,'only the selected note changes in V9 storage');
   })()`,context);
 });
+
+test('own feed outbox rows expose polite status and accessible dismissal without crew status', () => {
+  const page=createDom(),store=new Map();
+  const context={...domContext,window:page,document:page.document,navigator:{onLine:false},
+    localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)}};
+  vm.runInNewContext(source+`\n(()=>{
+    state.endpoint='https://board.example.test/fn';state.protocolVersion=14;state.me='Alex';state.recordingFor='Alex';
+    state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+    state.serverDate='2026-07-13';state.lastSyncedAt=Date.now();
+    const bodies=[1,2].map(n=>({id:'00000000-0000-4000-8000-00000000000'+n,name:'Alex',type:n===1?'climb':'exercise',date:'2026-07-13',hardestGrade:'',bountyId:'',note:'Pending '+n}));
+    bodies.forEach(b=>enqueueCreate(state.endpoint,b));render();
+    const rows=[...document.querySelectorAll('#personalActivity .activity')];assert.equal(rows.length,2);
+    for(const row of rows){
+      const status=row.querySelector('[aria-live]');assert.ok(status);assert.equal(status.textContent,'Waiting to send');
+      assert.equal(status.getAttribute('aria-live'),'polite');assert.ok(row.textContent.includes('Pending '));
+      assert.equal(row.querySelector('[data-edit],[data-del]'),null,'unconfirmed rows have no server mutation controls');
+    }
+    assert.equal(Number(document.querySelector('#youTotal').textContent),5);
+    const crew=document.querySelector('#activityList');assert.equal(crew.querySelectorAll('.activity').length,2);
+    assert.ok(crew.textContent.includes('Pending 1'));assert.ok(crew.textContent.includes('Pending 2'));
+    assert.equal(crew.querySelector('[aria-live]'),null);assert.ok(!crew.textContent.includes('Waiting to send'));
+    writeOutboxItems(state.endpoint,outboxItems().map(x=>x.body.id===bodies[0].id?{...x,failed:'Outside <window>'}:x));render();
+    const failed=document.querySelector('[data-dismiss-outbox]').closest('.activity'),status=failed.querySelector('[aria-live]');
+    assert.equal(status.textContent,'Not saved — Outside <window>');assert.equal(status.getAttribute('aria-live'),'polite');
+    assert.equal(failed.querySelector('.pts').textContent,'');
+    const dismiss=failed.querySelector('button');assert.equal(dismiss.textContent,'Dismiss');
+    assert.equal(dismiss.getAttribute('aria-label'),'Dismiss failed Climbing for Alex');assert.ok(dismiss.classList.contains('edit-entry'));
+    assert.equal(Number(document.querySelector('#youTotal').textContent),2,'failed entry leaves scoring');
+    assert.ok(!document.querySelector('#activityList').textContent.includes('Not saved'));
+    dismiss.click();assert.equal(document.querySelectorAll('[data-dismiss-outbox]').length,0);assert.equal(outboxItems().length,1);
+    state.me='Maya';state.recordingFor='Maya';render();assert.equal(document.querySelector('#personalActivity [aria-live]'),null);
+  })()`,context);
+});
+
+test('personal feed pagination reveals and dismisses all six failed creates for the climber', () => {
+  const page=createDom(),store=new Map();
+  const context={...domContext,window:page,document:page.document,
+    localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)}};
+  vm.runInNewContext(source+`\n(()=>{
+    state.endpoint='https://board.example.test/fn';state.me='Alex';state.recordingFor='Alex';
+    state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'},{name:'Maya'}]};
+    const items=Array.from({length:7},(_,i)=>({body:{id:'00000000-0000-4000-8000-00000000000'+i,name:i===6?'Maya':'Alex',type:'exercise',date:'2026-07-13',hardestGrade:'',bountyId:'',note:'Failed '+i},queuedAt:i+1,failed:'Invalid activity'}));
+    writeOutboxItems(state.endpoint,items);render();
+    const feed=document.querySelector('#personalActivity'),more=document.querySelector('#personalShowMore');
+    assert.equal(state.logs.length,0);assert.equal(feed.querySelectorAll('[data-dismiss-outbox]').length,5);
+    assert.equal(more.classList.contains('hide'),false);assert.equal(document.querySelector('#feedCount').textContent,'6 entries');
+    more.click();
+    assert.equal(state.personalFeedLimit,6);assert.equal(feed.querySelectorAll('[data-dismiss-outbox]').length,6);
+    assert.equal(more.classList.contains('hide'),true);
+    for(const item of items.slice(0,6))assert.ok(feed.querySelector('[data-dismiss-outbox="'+item.body.id+'"]'));
+    assert.equal(feed.querySelector('[data-dismiss-outbox="'+items[6].body.id+'"]'),null);
+    setFeedType('climb');assert.equal(feed.querySelectorAll('.activity').length,0);assert.equal(more.classList.contains('hide'),true);
+    setFeedType('exercise');assert.equal(feed.querySelectorAll('.activity').length,5);assert.equal(more.classList.contains('hide'),false);
+    more.click();assert.equal(feed.querySelectorAll('.activity').length,6);assert.equal(more.classList.contains('hide'),true);
+    for(const item of items.slice(0,6))feed.querySelector('[data-dismiss-outbox="'+item.body.id+'"]').click();
+    assert.equal(outboxItems().length,1);assert.equal(outboxItems()[0].body.name,'Maya');
+    assert.equal(feed.querySelectorAll('.activity').length,0);assert.equal(more.classList.contains('hide'),true);
+  })()`,context);
+});
+
+test('renders reuse parsed outbox data until its stored string changes', () => {
+  const page=createDom(),store=new Map();let parses=0;
+  const cachedJson=Object.create(JSON);
+  cachedJson.parse=raw=>{if(raw===store.get('roadToSendOutboxV1'))parses++;return JSON.parse(raw)};
+  const context={...domContext,JSON:cachedJson,window:page,document:page.document,parseCount:()=>parses,
+    localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)}};
+  vm.runInNewContext(source+`\n(()=>{
+    state.endpoint='https://board.example.test/fn';state.me='Alex';state.recordingFor='Alex';
+    state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+    const bodies=[1,2].map(n=>({id:'00000000-0000-4000-8000-00000000000'+n,name:'Alex',type:'bounty',date:'2026-07-13',hardestGrade:'',bountyId:dailyBounties('2026-07-13')[n-1].id,note:'Queued '+n}));
+    localStorage.setItem('roadToSendOutboxV1',JSON.stringify({[state.endpoint]:[{body:bodies[0],queuedAt:1}]}));
+    render();const logs=state.logs;render();render();
+    for(let i=0;i<5;i++)assert.ok(claimedTodayIds('alex','2026-07-13').has(bodies[0].bountyId));
+    assert.equal(parseCount(),1,'render and repeated claim checks parse an unchanged outbox once');
+    assert.equal(state.logs,logs,'display helpers retain the merged log reference');
+    localStorage.setItem('roadToSendOutboxV1',JSON.stringify({[state.endpoint]:bodies.map((body,i)=>({body,queuedAt:i+1}))}));
+    render();assert.equal(parseCount(),2,'an external storage change invalidates the memo');assert.equal(state.logs.length,2);
+    writeOutboxItems(state.endpoint,outboxItems().filter(x=>x.body.id===bodies[0].id));render();render();
+    assert.equal(parseCount(),3,'writes invalidate the memo once');assert.equal(state.logs.length,1);
+  })()`,context);
+});
