@@ -1662,3 +1662,164 @@ test('a local note edit changes only the selected id-less V9 entry and keeps its
     assert.deepEqual(persisted,original,'only the selected note changes in V9 storage');
   })()`,context);
 });
+
+function weekReviewDomContext() {
+  const window = createDom();
+  const now = new Date();
+  const day = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  const store = new Map([
+    ['roadToSendConfigV9', JSON.stringify({startDate: day, tripDate: day, goal: 500, crew: [{name: 'Alex'}]})],
+    ['roadToSendMe', 'Alex'],
+  ]);
+  const writes = [];
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, Intl,
+    window, document: window.document,
+    location: {search: '', href: 'https://example.test/', hash: ''}, history: {replaceState() {}},
+    keyboard: key => window.document.dispatchEvent(new window.KeyboardEvent('keydown', {key, bubbles: true})),
+    localStorage: {
+      getItem: key => store.get(key) ?? null,
+      setItem: (key, value) => {writes.push(key);store.set(key, String(value))},
+      removeItem: key => store.delete(key),
+    },
+    setTimeout() {}, clearTimeout() {},
+  };
+  vm.runInNewContext(source, context);
+  return {context, store, writes};
+}
+
+test('Week in Review stays closed at startup with a stored local roster and selected climber', () => {
+  const {context} = weekReviewDomContext();
+  vm.runInNewContext(`(()=>{
+    const modal=document.querySelector('#weekReviewModal'),button=document.querySelector('#weekReviewBtn');
+    assert.equal(modal.classList.contains('open'),false,'init leaves the review closed before any modal is dismissed');
+    assert.equal(button.classList.contains('hide'),false,'init shows the review button for the stored climber');
+    assert.equal(button.disabled,false,'init enables the review button for the stored climber');
+    assert.equal(button.closest('[data-panel]').classList.contains('active'),true,'the You panel is visible at startup');
+    assert.equal(state.me,'Alex','init preserves an identity in the stored local roster');
+    assert.ok(participant(state.me),'the stored identity resolves to a crew climber');
+    assert.ok(document.querySelector('.modal.open')===null,'startup opens no modal for the stored climber');
+  })()`, context);
+});
+
+test('Week in Review opens from the selected climber’s You button and restores focus on every close', () => {
+  const {context, writes} = weekReviewDomContext();
+  vm.runInNewContext(`(()=>{
+    const shift=n=>{const d=parseDateOnly(challengeToday());d.setDate(d.getDate()+n);return localDate(d)};
+    state.config={startDate:shift(-30),tripDate:shift(20),goal:500,crew:[{name:'Alex'}]};
+    state.me='Alex';state.recordingFor='Alex';state.logs=[];
+    document.querySelectorAll('.modal.open').forEach(m=>closeModal(m.id));render();
+    const button=document.querySelector('#weekReviewBtn'),modal=document.querySelector('#weekReviewModal');
+    assert.equal(button.closest('[data-panel]').dataset.panel,'you');
+    assert.equal(button.textContent,'Week in review');
+    assert.equal(button.classList.contains('secondary'),true);
+    assert.equal(button.getAttribute('aria-haspopup'),'dialog');
+    assert.equal(button.classList.contains('hide'),false);
+    assert.equal(button.disabled,false);
+    assert.equal(modal.classList.contains('open'),false,'rendering a selected climber opens no review');
+    const previous=prevWeekKey(challengeToday());
+    state.logs=[{id:'review-climb',name:'Alex',type:'climb',date:previous,hardestGrade:'V4',createdAt:'1'}];
+    const closers=[()=>document.querySelector('#weekReviewClose').click(),()=>keyboard('Escape'),()=>modal.click()];
+    closers.forEach(close=>{
+      document.querySelector('#changeMeBtn').focus();button.click();
+      assert.equal(modal.classList.contains('open'),true,'tapping the review button opens the dialog');
+      assert.equal(document.querySelector('#weekReviewTitle').textContent,"Alex's week in review");
+      assert.ok(document.querySelector('#weekReviewCelebrate').textContent.includes('You earned'),'the tap renders the review');
+      document.querySelector('#weekReviewClose').focus();close();
+      assert.equal(modal.classList.contains('open'),false,'each close route dismisses the dialog');
+      assert.ok(document.activeElement===button,'each close route returns focus to the review button');
+    });
+    button.click();document.querySelector('#weekReviewCrewBtn').click();
+    assert.equal(modal.classList.contains('open'),false);
+    assert.equal(document.querySelector('#crew').classList.contains('active'),true,'the full crew board button still navigates');
+    const crewTab=document.querySelector('.bottom-nav [data-tab="crew"]');
+    assert.ok(crewTab,'the Crew bottom-nav tab exists');
+    assert.ok(document.activeElement===crewTab,'the full crew board button moves focus to the visible Crew tab');
+    ['', 'Outside the crew'].forEach(name=>{
+      state.me=name;render();
+      assert.equal(button.classList.contains('hide'),true,'no selected crew climber hides the entry point');
+      assert.equal(button.disabled,true,'no selected crew climber disables the entry point');
+    });
+  })()`, context);
+  assert.equal(writes.includes('roadToSendWeekReview'),false,'opening and closing the review never writes the historical key');
+});
+
+test('Week in Review refreshes earned points when logs change while the dialog is open', () => {
+  const {context} = weekReviewDomContext();
+  vm.runInNewContext(`(()=>{
+    const shift=n=>{const d=parseDateOnly(challengeToday());d.setDate(d.getDate()+n);return localDate(d)};
+    state.config={startDate:shift(-30),tripDate:shift(20),goal:500,crew:[{name:'Alex'}]};
+    const previous=prevWeekKey(challengeToday());
+    state.logs=[{id:'review-cached',name:'Alex',type:'climb',date:previous,hardestGrade:'V4',createdAt:'1'}];
+    render();document.querySelector('#weekReviewBtn').click();
+    const modal=document.querySelector('#weekReviewModal'),celebrate=document.querySelector('#weekReviewCelebrate'),leaders=document.querySelector('#weekReviewLeaders');
+    assert.equal(modal.classList.contains('open'),true,'the review opens with the cached logs');
+    assert.equal(celebrate.querySelector('.wr-big').textContent,'3','the opened review shows the original earned points');
+    assert.equal(leaders.querySelector('.records-value').textContent,'3 pts');
+    state.logs=state.logs.concat([{id:'review-fresh',name:'Alex',type:'exercise',date:previous,createdAt:'2'}]);
+    render();
+    assert.equal(modal.classList.contains('open'),true,'render keeps the review open');
+    assert.equal(celebrate.querySelector('.wr-big').textContent,'5','render refreshes the climber’s earned points in the open review');
+    assert.equal(leaders.querySelector('.records-label').textContent,'#1 Alex');
+    assert.equal(leaders.querySelector('.records-value').textContent,'5 pts','render refreshes the last-week leaderboard too');
+  })()`, context);
+});
+
+test('Week in Review hides empty last-week blocks and uses factual countdown copy', () => {
+  const {context} = weekReviewDomContext();
+  vm.runInNewContext(`(()=>{
+    const shift=n=>{const d=parseDateOnly(challengeToday());d.setDate(d.getDate()+n);return localDate(d)};
+    state.config={startDate:shift(-30),tripDate:shift(20),goal:500,crew:[{name:'Alex'},{name:'Bo'}]};
+    state.me='Alex';state.recordingFor='Alex';
+    document.querySelectorAll('.modal.open').forEach(m=>closeModal(m.id));
+    const previous=prevWeekKey(challengeToday()),bounty=dailyBounties(previous)[0];
+    state.logs=[{id:'review-climb',name:'Alex',type:'climb',date:previous,hardestGrade:'V4',createdAt:'1'},
+      {id:'review-bounty',name:'Bo',type:'bounty',bountyId:bounty.id,date:previous,createdAt:'2'}];
+    render();document.querySelector('#weekReviewBtn').click();
+    const celebrate=document.querySelector('#weekReviewCelebrate'),leaders=document.querySelector('#weekReviewLeaders'),hunter=document.querySelector('#weekReviewHunter');
+    assert.equal(celebrate.classList.contains('hide'),false);
+    assert.ok(celebrate.textContent.includes('3')&&celebrate.textContent.includes('V4'),'earned points and sends remain visible');
+    assert.equal(leaders.closest('.review-section').classList.contains('hide'),false);
+    assert.ok(leaders.textContent.includes('Alex'),'last week’s leaders remain visible');
+    assert.equal(hunter.closest('.review-section').classList.contains('hide'),false);
+    assert.ok(hunter.textContent.includes('Bo'),'last week’s Bounty Hunter remains visible');
+    state.me='Bo';state.logs=state.logs.filter(x=>x.type==='climb');renderWeekReview();
+    assert.equal(celebrate.classList.contains('hide'),true,'a viewer with no points has no celebrate block even when others earned points');
+    assert.equal(leaders.closest('.review-section').classList.contains('hide'),false,'other climbers’ earned points remain visible');
+    assert.equal(hunter.closest('.review-section').classList.contains('hide'),true,'no bounties hides the entire Bounty Hunter section');
+    state.me='Alex';state.logs=[];renderWeekReview();
+    assert.equal(celebrate.classList.contains('hide'),true);
+    assert.equal(leaders.closest('.review-section').classList.contains('hide'),true);
+    assert.equal(hunter.closest('.review-section').classList.contains('hide'),true);
+    [celebrate,leaders,hunter].forEach(el=>assert.equal(el.textContent,'','empty blocks clear stale review content'));
+    const countdown=document.querySelector('#weekReviewCountdown');
+    assert.equal(countdown.textContent,'3 weeks left in the challenge');
+    state.config.tripDate=shift(6);renderWeekReview();
+    assert.equal(countdown.textContent,'Final week of the challenge');
+    state.config.tripDate=shift(-1);renderWeekReview();
+    assert.equal(countdown.textContent,'The challenge is complete');
+    const pageText=document.body.textContent;
+    assert.ok(pageText.includes("Alex's week in review")&&pageText.includes('The challenge is complete'),'the page text contains the rendered review');
+    ['Welcome to the crew!', 'Log climbing, exercise, and mobility to start stacking points',
+      'No points logged last week yet', 'be the first this week', 'No bounties claimed last week',
+      'the crown is up for grabs', 'make it count!', 'The challenge is complete — send it!',
+      'weeks until the challenge is done'].forEach(copy=>assert.equal(pageText.includes(copy),false,'removed review copy stays absent: '+copy));
+  })()`, context);
+});
+
+test('Choosing or creating a profile leaves Week in Review closed and preserves its historical storage', async () => {
+  const {context, store, writes} = weekReviewDomContext();
+  store.set('roadToSendWeekReview','historical-week');
+  await vm.runInNewContext(`(async()=>{
+    state.config.crew=[{name:'Alex'}];state.me='';openIdentity();
+    document.querySelector('#identityMember').value='Alex';saveIdentity();
+    assert.equal(state.me,'Alex');
+    assert.equal(document.querySelector('.modal.open'),null,'choosing a profile opens no review');
+    openIdentity();document.querySelector('#newParticipantName').value='Bo';await createProfile();
+    assert.equal(state.me,'Bo');
+    assert.equal(document.querySelector('.modal.open'),null,'creating a profile opens no review');
+    assert.equal(document.querySelector('#weekReviewBtn').classList.contains('hide'),false);
+  })()`, context);
+  assert.equal(writes.includes('roadToSendWeekReview'),false);
+  assert.equal(store.get('roadToSendWeekReview'),'historical-week','historical storage is left intact');
+});

@@ -409,3 +409,7 @@ assert.match(stylesheet,/button\.bounty\{[^}]*min-height:44px/,'Today bounty but
 assert.match(html,/role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="editTitle"/,'the entry editor is a named modal');
 assert.match(html,/aria-label="Close entry editor"/,'the editor has a named close control');
 assert.match(stylesheet,/\.edit-entry\{min-width:44px;min-height:44px/,'edit buttons have 44px touch targets');
+
+// Week in Review is reached from the selected climber’s own summary.
+assert.match(html,/data-panel="you"[\s\S]*today-card[\s\S]*id="weekReviewBtn"[^>]*class="btn secondary hide"[^>]*type="button"[^>]*aria-haspopup="dialog"[^>]*disabled>Week in review<\/button>/,'the You summary offers a secondary dialog button hidden until a climber is selected');
+assert.match(stylesheet,/\.btn\{[^}]*min-height:48px/,'the review button inherits a touch target of at least 44px');
