@@ -110,7 +110,12 @@ import { readFileSync } from 'node:fs';
 // the Record form) account for the growth; feed action styling and focus restoration add
 // the remainder. Scoring and the bounty catalog are unchanged. This leaves 557 bytes of
 // margin, close to the previous 496; the next budget entry re-measures rather than assuming.
-const BUDGET = 147500;
+// Re-baselined 147500 -> 148600 on 2026-10-12 for the newer-server reload prompt: measured
+// 148056 bytes, up 933 from main's 147123. Distinguishing a newer API from an outdated board,
+// its sync and setup copy, and the diagnostics-only Reload app button (which reads the whole
+// refreshed page under an 8-second deadline before reloading) account for the growth.
+// This leaves 544 bytes of margin, in line with the previous entries.
+const BUDGET = 148600;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);

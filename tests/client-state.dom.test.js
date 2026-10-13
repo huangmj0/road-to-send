@@ -1405,6 +1405,40 @@ test('the rendered page reflects the state the app is in', () => {
   vm.runInNewContext(`${source}\n${domChecks}`, domContext, {filename: 'index.html'});
 });
 
+test('Reload app stays in diagnostics and is visible only for a newer API failure', () => {
+  const dom=createDom(),store=new Map();
+  const context={...domContext,window:dom,document:dom.document,
+    localStorage:{getItem:key=>store.get(key)??null,setItem:(key,value)=>store.set(key,String(value)),removeItem:key=>store.delete(key)},
+  };
+  vm.runInNewContext(source+ '\n'+ `(()=>{
+    const button=document.querySelector('#reloadApp');
+    assert.ok(button,'the reload action exists');
+    assert.ok(document.querySelector('#syncDiagnostics #reloadApp')===button,'the action lives in the existing diagnostics');
+    assert.equal(button.classList.contains('hide'),true,'the action starts hidden in local mode');
+    state.endpoint='https://board.example.test/fn';state.syncErrorCode='RTS-REFRESH-NEWER';
+    state.syncDetail='A newer version of Road to Send is available — reload to update';
+    for(const syncState of ['error','stale']){
+      state.syncState=syncState;render();
+      assert.equal(button.classList.contains('hide'),false,'newer API failures offer Reload app with or without a cache');
+      assert.ok(document.querySelector('#reloadApp')===button,'render preserves the reload button identity');
+    }
+    for(const syncState of ['loading','live','local']){
+      state.syncState=syncState;render();
+      assert.equal(button.classList.contains('hide'),true,'every non-failure state hides Reload app even with an old error code');
+    }
+    state.syncState='error';
+    for(const code of ['RTS-REFRESH-VERSION','RTS-REFRESH-NETWORK','RTS-REFRESH-DATA','']){
+      state.syncErrorCode=code;render();
+      assert.equal(button.classList.contains('hide'),true,'other failures never offer Reload app');
+    }
+    state.syncErrorCode='RTS-REFRESH-NEWER';render();
+    assert.equal(button.classList.contains('hide'),false);
+    state.endpoint='';state.syncState='local';render();
+    assert.equal(button.classList.contains('hide'),true,'switching to local mode hides the action');
+    assert.ok(document.querySelector('#syncDiagnostics #reloadApp')===button,'the diagnostics retain the same action throughout');
+  })()`,context);
+});
+
 test('bounty claims are blocked per recording target and challenge date without changing existing credit', async () => {
   const window = createDom();
   const store = new Map();
