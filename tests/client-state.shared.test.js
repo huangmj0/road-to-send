@@ -14,6 +14,149 @@ function sharedDom() {
   return {window, document: window.document, fire: type => window.document.dispatchEvent(new window.Event(type, {bubbles: true}))};
 }
 
+async function newerApiScenario(checks, cacheRefreshFails = false) {
+  const dom = sharedDom(), store = new Map([['roadToSendMe', 'Alex']]), requests = [];
+  let payload = {version: 12, features: [], activities: [{id: 'cached-entry', name: 'Alex', type: 'exercise', date: '2026-07-13', createdAt: '1'}], config: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '2026-07-13', timeZone: 'UTC'};
+  let finishRefresh, finishBody, finishReload;
+  const timers = [];
+  const reloaded = new Promise(resolve => {finishReload = resolve});
+  const pageLocation = {search: '', href: 'https://example.test/app/?keep=1#crew', hash: '#crew', reload() {requests.push({action: 'reload'}); finishReload()}};
+  const context = {
+    assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
+    location: pageLocation, history: {replaceState() {}}, window: dom.window, document: dom.document,
+    localStorage: {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    setTimeout(fn, ms) {timers.push({fn, ms}); return timers.length}, clearTimeout(id) {if (timers[id - 1]) timers[id - 1].cleared = true},
+    setPayloadVersion: version => {payload.version = version}, setPayload: value => {payload = value},
+    requests: () => requests, cachedActivities: () => store.get('roadToSendShared:activities:' + encodeURIComponent('https://board.example.test/fn')),
+    finishRefresh: () => finishRefresh(cacheRefreshFails), finishBody: () => finishBody(), waitForReload: () => reloaded, refreshFails: () => cacheRefreshFails,
+    fireTimers: ms => timers.filter(timer => timer.ms === ms && !timer.cleared).forEach(timer => timer.fn()), pendingTimers: ms => timers.filter(timer => timer.ms === ms && !timer.cleared).length,
+    settle: () => new Promise(resolve => setImmediate(resolve)),
+    fetch: async (url, options = {}) => {
+      requests.push({action: 'fetch', url, cache: options.cache});
+      if (url === pageLocation.href) return new Promise((resolve, reject) => {
+        finishRefresh = fails => fails ? reject(Error('Cache refresh failed')) : resolve({ok: true, text: () => new Promise(done => {finishBody = done})});
+      });
+      return {ok: true, json: async () => JSON.parse(JSON.stringify(payload))};
+    },
+  };
+  await vm.runInNewContext(source + '\n(async()=>{' + checks + '\n})()', context);
+}
+
+test('a newer API keeps cached entries visible and offers Reload app until a live sync', async () => {
+  await newerApiScenario(`
+    state.endpoint='https://board.example.test/fn';state.me='Alex';state.recordingFor='Alex';
+    assert.equal(await loadRemote(),true);
+    const logsBefore=state.logs,configBefore=state.config,syncedBefore=state.lastSyncedAt,storedBefore=cachedActivities();
+    assert.ok(storedBefore,'the successful read persisted cached entries');
+    const feedBefore=document.querySelector('#personalActivity').innerHTML,rowBefore=document.querySelector('#personalActivity .activity');
+    assert.ok(rowBefore,'a cached entry is rendered before the newer response');
+    const newerVersion=Math.max(...SUPPORTED_API_VERSIONS)+1;
+    setPayloadVersion(newerVersion);
+    assert.equal(await loadRemote(),false);
+    assert.equal(state.syncState,'stale');
+    assert.equal(state.syncDetail,'A newer version of Road to Send is available — reload to update');
+    assert.equal(state.syncErrorCode,'RTS-REFRESH-NEWER');
+    assert.equal(document.querySelector('#diagnosticTitle').textContent,state.syncDetail);
+    assert.equal(document.querySelector('#diagnosticCode').textContent,'RTS-REFRESH-NEWER');
+    assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),false);
+    assert.ok(state.logs===logsBefore,'cached entries are preserved');
+    assert.ok(state.config===configBefore,'cached configuration is preserved');
+    assert.equal(state.lastSyncedAt,syncedBefore);
+    assert.equal(cachedActivities(),storedBefore,'the unsupported response is never cached');
+    assert.equal(document.querySelector('#personalActivity').innerHTML,feedBefore);
+    assert.ok(document.querySelector('#personalActivity .activity')===rowBefore,'the cached entry stays in the DOM');
+    setPayloadVersion(Math.max(...SUPPORTED_API_VERSIONS));
+    const retry=loadRemote();
+    assert.equal(state.syncState,'loading');
+    assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),true,'retry hides the reload action while pending');
+    assert.equal(await retry,true);
+    assert.equal(state.syncState,'live');
+    assert.equal(state.syncErrorCode,'');
+    assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),true,'a live board hides Reload app');
+  `);
+});
+
+test('older and unknown APIs and legacy arrays keep board update diagnostics without Reload app', async () => {
+  await newerApiScenario(`
+    state.endpoint='https://board.example.test/fn';
+    for(const version of [11,undefined,'unknown','Infinity']){
+      setPayloadVersion(version);
+      assert.equal(await loadRemote(),false);
+      assert.equal(state.syncState,'error');
+      assert.equal(state.syncDetail,'Board update required');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+      assert.equal(document.querySelector('#diagnosticTitle').textContent,'Board update required');
+      assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),true);
+    }
+    setPayload([]);
+    assert.equal(await loadRemote(),false);
+    assert.equal(state.syncDetail,'Board update required');
+    assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+    assert.equal(document.querySelector('#reloadApp').classList.contains('hide'),true,'legacy arrays never offer Reload app');
+  `);
+});
+
+test('testConnection asks the climber to reload for a newer API and update an older board', async () => {
+  await newerApiScenario(`
+    document.querySelector('#endpoint').value='https://board.example.test/fn';
+    const newerVersion=Math.max(...SUPPORTED_API_VERSIONS)+1;
+    setPayloadVersion(newerVersion);
+    assert.equal(await testConnection(),false);
+    assert.equal(document.querySelector('#testResult').textContent,'This board runs a newer API (v'+newerVersion+') — reload the app to update');
+    setPayloadVersion(11);
+    assert.equal(await testConnection(),false);
+    assert.equal(document.querySelector('#testResult').textContent,'Outdated board — update it to v'+[...SUPPORTED_API_VERSIONS][0]);
+    setPayloadVersion(Math.max(...SUPPORTED_API_VERSIONS));
+    assert.equal(await testConnection(),true);
+    assert.equal(document.querySelector('#testResult').textContent,'Connected — API v'+Math.max(...SUPPORTED_API_VERSIONS));
+  `);
+});
+
+for (const fails of [false, true]) {
+  test(fails ? 'tapping Reload app reloads even when the cache refresh fails' : 'tapping Reload app waits for the HTTP cache refresh before reloading', async () => {
+    await newerApiScenario(`
+      state.endpoint='https://board.example.test/fn';
+      setPayloadVersion(Math.max(...SUPPORTED_API_VERSIONS)+1);
+      assert.equal(await loadRemote(),false);
+      const button=document.querySelector('#reloadApp');
+      assert.equal(button.classList.contains('hide'),false);
+      const before=requests().length;
+      button.click();
+      assert.equal(requests().length,before+1,'the tap starts exactly one cache refresh');
+      const refresh=requests()[before];
+      assert.equal(refresh.action,'fetch');
+      assert.equal(refresh.url,location.href,'the exact app URL is fetched, including its query and fragment');
+      assert.equal(refresh.cache,'reload');
+      assert.equal(requests().some(request=>request.action==='reload'),false,'navigation waits for the refresh');
+      finishRefresh();
+      await settle();
+      if(!refreshFails()){
+        assert.equal(requests().some(request=>request.action==='reload'),false,'navigation waits for the whole page body');
+        finishBody();
+      }
+      await waitForReload();
+      assert.equal(pendingTimers(PAGE_REFRESH_TIMEOUT_MS),0,'the refresh deadline is cleared');
+      assert.equal(requests().length,before+2);
+      assert.equal(requests()[before+1].action,'reload','navigation follows the completed refresh');
+    `, fails);
+  });
+}
+
+test('tapping Reload app still reloads when the cache refresh stalls', async () => {
+  await newerApiScenario(`
+    state.endpoint='https://board.example.test/fn';
+    setPayloadVersion(Math.max(...SUPPORTED_API_VERSIONS)+1);
+    assert.equal(await loadRemote(),false);
+    document.querySelector('#reloadApp').click();
+    await settle();
+    assert.equal(requests().some(request=>request.action==='reload'),false,'navigation waits while the refresh is pending');
+    assert.equal(pendingTimers(PAGE_REFRESH_TIMEOUT_MS),1,'the refresh has one bounded deadline');
+    fireTimers(PAGE_REFRESH_TIMEOUT_MS);
+    await waitForReload();
+    assert.equal(requests().filter(request=>request.action==='reload').length,1,'the deadline reloads exactly once');
+  `);
+});
+
 test('background sync respects the open date picker and refreshes stale caches', async () => {
   const dom = sharedDom();
   const store = new Map();
@@ -71,7 +214,7 @@ test('background sync respects the open date picker and refreshes stale caches',
     // organizer reading them has a number to deploy against.
     const expectedVersion=[...SUPPORTED_API_VERSIONS][0];
     assert.ok(detail.indexOf('This build expects v'+expectedVersion)>=0,'the diagnostics name the protocol version this build expects');
-    setPayloadVersion(99);
+    setPayloadVersion(11);
     await loadRemote();
     const mismatchDetail=document.querySelector('#diagnosticDetail').textContent;
     assert.ok(mismatchDetail.indexOf('This build expects v'+expectedVersion)>=0,'the expected version is still named after an unsupported payload');
@@ -100,7 +243,7 @@ test('testConnection names the expected protocol version instead of a stale lite
     history: {replaceState() {}},
     window: dom.window,
     document: dom.document,
-    fetch: async () => ({ok: true, json: async () => ({version: 99, features: [], activities: [], config: null, configErrors: []})}),
+    fetch: async () => ({ok: true, json: async () => ({version: 11, features: [], activities: [], config: null, configErrors: []})}),
     localStorage: {getItem: key => store.has(key) ? store.get(key) : null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
     setTimeout() {}, clearTimeout() {},
   };
@@ -291,7 +434,7 @@ test('a successful shared delete disappears without waiting on a reload', async 
     document.querySelector('#personalActivity [data-del]').dispatchEvent(new window.Event('click',{bubbles:true}));
     assert.equal(document.querySelector('#confirmModal').classList.contains('open'),true,'the rendered delete control opens confirmation');
     document.querySelector('#confirmOk').dispatchEvent(new window.Event('click',{bubbles:true}));
-    await Promise.resolve();await Promise.resolve();
+    for(let i=0;i<20;i++)await Promise.resolve();
     assert.equal(JSON.stringify(postedActions()),JSON.stringify([{action:'delete',id:'srv-delete-1'}]),'confirmation posts the exact shared row id');
     assert.equal(state.logs.length,0,'the accepted delete leaves memory immediately');
     assert.equal(document.querySelector('#personalActivity [data-del]'),null,'the deleted row leaves the rendered feed without waiting on GET');
@@ -435,18 +578,23 @@ test('the share sheet is tried first, and a dismissed one is not a failure', asy
 // Protocol v13: a backend that answers with movedTo is followed, once per page load.
 const OLD_URL = 'https://old.example.test/exec';
 const NEW_URL = 'https://new.example.test/fn';
-async function movedScenario({endpoint = OLD_URL, search = '', seed = {}, extra = {}, backends, checks}) {
+async function movedScenario({endpoint = OLD_URL, search = '', hash = '', seed = {}, extra = {}, backends, checks}) {
   const dom = sharedDom();
   const store = new Map(Object.entries(seed));
   if (endpoint) store.set('roadToSendEndpoint', endpoint);
-  store.set('roadToSendMe', 'Alex');
+  if (!store.has('roadToSendMe')) store.set('roadToSendMe', 'Alex');
   const fetched = [];
   const replaced = [];
+  const pageLocation = {search, href: 'https://example.test/app/' + search + hash, hash};
   const board = version => ({version, features: [], activities: [{id: 'a1', name: 'Alex', type: 'exercise', date: '2026-07-13', createdAt: '1'}], config: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]}, configErrors: [], serverDate: '2026-07-13', timeZone: 'UTC'});
   const context = {
     assert, console, URL, URLSearchParams, Map, Set, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, Intl, Promise,
-    location: {search, href: 'https://example.test/app/' + search, hash: ''},
-    history: {replaceState: (state, title, url) => replaced.push(url)},
+    location: pageLocation,
+    history: {replaceState: (state, title, url) => {
+      replaced.push(url);
+      const page = new URL(url, pageLocation.href);
+      Object.assign(pageLocation, {href: page.toString(), search: page.search, hash: page.hash});
+    }},
     window: dom.window, document: dom.document,
     store: {get: key => store.get(key), keys: () => [...store.keys()].sort()},
     fetched: () => fetched, replaced: () => replaced,
@@ -465,6 +613,95 @@ async function movedScenario({endpoint = OLD_URL, search = '', seed = {}, extra 
 }
 const movedReply = (to = NEW_URL) => ({version: 13, ok: false, error: {code: 'moved', message: 'The crew board has moved. Try again.', details: []}, movedTo: to});
 const settle = 'for(let i=0;i<20;i++)await Promise.resolve();';
+
+test('loading shared mode keeps the resolved endpoint in the URL and preserves other params and the hash', async () => {
+  for (const search of ['', '?keep=1', '?sheet=' + encodeURIComponent(OLD_URL) + '&keep=1']) {
+    await movedScenario({
+      search, hash: '#crew',
+      seed: {roadToSendMoves: JSON.stringify({[OLD_URL]: NEW_URL})},
+      backends: {[NEW_URL]: (m, b, board) => board(13)},
+      checks: `
+        ${settle}
+        const page=new URL(location.href);
+        assert.equal(page.searchParams.get('sheet'),'${NEW_URL}');
+        assert.equal(page.searchParams.get('keep'),${search ? "'1'" : 'null'});
+        assert.equal(page.hash,'#crew');
+      `,
+    });
+  }
+});
+
+test('local mode removes an empty sheet param and preserves other params and the hash', async () => {
+  await movedScenario({endpoint: '', search: '?sheet=&keep=1', hash: '#crew', backends: {}, checks: `
+    assert.equal(state.endpoint,'');
+    const page=new URL(location.href);
+    assert.equal(page.searchParams.has('sheet'),false);
+    assert.equal(page.searchParams.get('keep'),'1');
+    assert.equal(page.hash,'#crew');
+    assert.equal(fetched().length,0);
+  `});
+});
+
+test('successful setup keeps its endpoint in the URL while rejected setup keeps the current board URL', async () => {
+  for (const accepted of [true, false]) {
+    await movedScenario({search: '?keep=1', hash: '#crew', backends: {
+      [OLD_URL]: (m, b, board) => board(13),
+      [NEW_URL]: (m, b, board) => m === 'POST'
+        ? accepted ? {ok: true, config: b.config} : {ok: false, error: {message: 'Setup rejected.'}}
+        : board(13),
+    }, checks: `
+      ${settle}
+      populateSetup();document.querySelector('#endpoint').value='${NEW_URL}';
+      await saveSetup();
+      const page=new URL(location.href);
+      assert.equal(page.searchParams.get('sheet'),'${accepted ? NEW_URL : OLD_URL}');
+      assert.equal(page.searchParams.get('keep'),'1');
+      assert.equal(page.hash,'#crew');
+    `});
+  }
+});
+
+test('confirming local mode removes sheet from the URL while opening confirmation keeps it', async () => {
+  await movedScenario({search: '?sheet=' + encodeURIComponent(OLD_URL) + '&keep=1', hash: '#crew',
+    backends: {[OLD_URL]: (m, b, board) => board(13)}, checks: `
+      ${settle}
+      disconnect();
+      assert.equal(new URL(location.href).searchParams.get('sheet'),'${OLD_URL}');
+      confirmProceed();
+      const page=new URL(location.href);
+      assert.equal(page.searchParams.has('sheet'),false);
+      assert.equal(page.searchParams.get('keep'),'1');
+      assert.equal(page.hash,'#crew');
+      assert.equal(state.endpoint,'');
+    `,
+  });
+});
+
+test('blocked URL replacement does not prevent loading the shared board or switching to local mode', async () => {
+  await movedScenario({extra: {history: {replaceState(state, title, url) {if (!url.startsWith('#')) throw Error('History unavailable')}}},
+    backends: {[OLD_URL]: (m, b, board) => board(13)}, checks: `
+      ${settle}
+      assert.equal(state.syncState,'live');
+      performDisconnect();
+      assert.equal(state.endpoint,'');
+    `,
+  });
+});
+
+test('a Home Screen launch URL loads the shared board with empty storage and asks for identity again', async () => {
+  await movedScenario({endpoint: '', search: '?sheet=' + encodeURIComponent(NEW_URL) + '&keep=1', hash: '#crew',
+    seed: {roadToSendMe: ''}, backends: {[NEW_URL]: (m, b, board) => board(13)}, checks: `
+      ${settle}
+      assert.equal(state.endpoint,'${NEW_URL}');
+      assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}');
+      assert.equal(state.syncState,'live');
+      assert.equal(state.me,'');
+      assert.equal(document.querySelector('#identityModal').classList.contains('open'),true);
+      assert.equal(new URL(location.href).searchParams.get('keep'),'1');
+      assert.equal(new URL(location.href).hash,'#crew');
+    `,
+  });
+});
 
 test('a GET carrying movedTo adopts the new endpoint, caches there, keeps the old cache and rewrites the sheet param', async () => {
   let releaseDestination;
@@ -489,7 +726,7 @@ test('a GET carrying movedTo adopts the new endpoint, caches there, keeps the ol
       assert.equal(store.get(cacheKey('activities','${OLD_URL}')),'[]','the old activities cache is byte-for-byte unchanged');
       assert.equal(store.keys().filter(k=>k.endsWith(':'+encodeURIComponent('${OLD_URL}'))).length,1,'no other old endpoint cache key is created');
       assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${OLD_URL}','GET ${NEW_URL}']),'the next fetch goes to the new URL');
-      const rewritten=new URL(replaced().filter(u=>u[0]!=='#')[0]);
+      const rewritten=new URL(replaced().filter(u=>u[0]!=='#').at(-1));
       assert.equal(rewritten.searchParams.get('sheet'),'${NEW_URL}','the sheet param is rewritten');
       assert.equal(rewritten.searchParams.get('keep'),'1','other params are left alone');
       assert.equal(state.syncState,'live');
@@ -498,7 +735,7 @@ test('a GET carrying movedTo adopts the new endpoint, caches there, keeps the ol
   });
 });
 
-test('adopting a move without a sheet param does not touch the address bar', async () => {
+test('adopting a move from a bare URL keeps the destination in the address bar', async () => {
   await movedScenario({
     backends: {
       [OLD_URL]: (m, b, board) => Object.assign(board(12), {movedTo: NEW_URL}),
@@ -506,7 +743,7 @@ test('adopting a move without a sheet param does not touch the address bar', asy
     },
     checks: `
       ${settle}
-      assert.equal(replaced().filter(u=>u[0]!=='#').length,0,'no sheet param means no address bar rewrite');
+      assert.equal(new URL(location.href).searchParams.get('sheet'),'${NEW_URL}','a bare URL keeps the moved board for Home Screen launches');
       assert.equal(state.endpoint,'${NEW_URL}','a v12 payload carrying movedTo is followed too');
     `,
   });
@@ -693,14 +930,14 @@ test('a redirector answering an unsupported version with movedTo is still follow
   });
 });
 
-test('an unsupported version without movedTo keeps the version error state', async () => {
+test('a newer server without movedTo reports the reload error state', async () => {
   await movedScenario({
     backends: {[OLD_URL]: (m, b, board) => board(99)},
     checks: `
       ${settle}
       assert.equal(state.endpoint,'${OLD_URL}');
       assert.equal(state.syncState,'error');
-      assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-NEWER');
     `,
   });
 });
@@ -745,7 +982,7 @@ test('a failed destination fetch leaves an existing destination cache untouched'
   });
 });
 
-test('an unsupported response carrying movedTo after the hop was used is a version error with nothing cached', async () => {
+test('a newer response carrying movedTo after the hop was used is a reload error with nothing cached', async () => {
   await movedScenario({
     backends: {
       [OLD_URL]: (m, b, board) => Object.assign(board(13), {movedTo: NEW_URL}),
@@ -754,7 +991,7 @@ test('an unsupported response carrying movedTo after the hop was used is a versi
     checks: `
       ${settle}
       assert.equal(state.endpoint,'${NEW_URL}');
-      assert.equal(state.syncErrorCode,'RTS-REFRESH-VERSION');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-NEWER');
       assert.notEqual(state.syncState,'live');
       assert.equal(store.get('roadToSendMoves'),undefined,'a failed destination does not record the move');
       assert.equal(store.keys().filter(k=>k.indexOf('roadToSendShared:')===0).length,0,'nothing is cached');
@@ -966,7 +1203,7 @@ test('an old crew link with a remembered move fetches only the destination and r
       assert.equal(state.endpoint,'${NEW_URL}');
       assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}');
       assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${NEW_URL}']));
-      const rewritten=new URL(replaced().filter(u=>u[0]!=='#')[0]);
+      const rewritten=new URL(replaced().filter(u=>u[0]!=='#').at(-1));
       assert.equal(rewritten.searchParams.get('sheet'),'${NEW_URL}');
       assert.equal(rewritten.searchParams.get('keep'),'1');
       assert.equal(JSON.stringify(state.logs.map(x=>x.id)),'["d1","d2"]');
@@ -988,7 +1225,7 @@ test('a remembered move from the stored endpoint fetches only the destination wi
       assert.equal(state.endpoint,'${NEW_URL}');
       assert.equal(store.get('roadToSendEndpoint'),'${NEW_URL}');
       assert.equal(JSON.stringify(fetched()),JSON.stringify(['GET ${NEW_URL}']));
-      assert.equal(replaced().filter(u=>u[0]!=='#').length,0);
+      assert.equal(new URL(location.href).searchParams.get('sheet'),'${NEW_URL}','the remembered destination is kept for Home Screen launches');
     `,
   });
 });
@@ -1104,4 +1341,398 @@ test('recording a followed move retains only the ten most recent valid origins',
       assert.equal(moves[9][1],'${NEW_URL}');
     `,
   });
+});
+
+test('saving setup at a remembered origin removes only that origin and old crew links reach it again', async () => {
+  const other = 'https://other.example.test/fn';
+  await movedScenario({
+    seed: {roadToSendMoves: JSON.stringify({[OLD_URL]: NEW_URL, [other]: NEW_URL})},
+    backends: {
+      [NEW_URL]: (method, body, board) => board(13),
+      [OLD_URL]: (method, body, board) => method === 'POST' ? {ok: true, config: body.config} : board(13),
+    },
+    checks: `
+      await loadRemote();
+      populateSetup();document.querySelector('#endpoint').value='${OLD_URL}';
+      await saveSetup();
+      const moves=JSON.parse(store.get('roadToSendMoves'));
+      assert.equal(Object.hasOwn(moves,'${OLD_URL}'),false,'the deliberately saved origin is forgotten');
+      assert.equal(moves['${other}'],'${NEW_URL}','unrelated moves stay remembered');
+      assert.equal(state.endpoint,'${OLD_URL}');
+      assert.equal(resolveMove('${OLD_URL}'),'${OLD_URL}','an old crew link will reach the saved URL on its next load');
+      assert.ok(fetched().includes('POST ${OLD_URL}'));
+      assert.ok(fetched().includes('GET ${OLD_URL}'));
+    `,
+  });
+});
+
+test('a failed setup save keeps remembered moves', async () => {
+  const moves = JSON.stringify({[OLD_URL]: NEW_URL});
+  await movedScenario({
+    seed: {roadToSendMoves: moves},
+    backends: {[NEW_URL]: (method, body, board) => board(13), [OLD_URL]: () => ({ok: false, error: {message: 'Setup rejected.'}})},
+    checks: `
+      await loadRemote();populateSetup();document.querySelector('#endpoint').value='${OLD_URL}';
+      await saveSetup();
+      assert.equal(store.get('roadToSendMoves'),${JSON.stringify(moves)});
+      assert.equal(document.querySelector('#setupErrors').textContent,'Setup rejected.');
+    `,
+  });
+});
+
+test('confirming local mode clears all remembered moves and a pending move', async () => {
+  for (const moves of [JSON.stringify({[OLD_URL]: NEW_URL}), 'broken JSON']) {
+    await movedScenario({
+      seed: {roadToSendMoves: moves},
+      backends: {[OLD_URL]: (method, body, board) => board(13), [NEW_URL]: (method, body, board) => board(13)},
+      checks: `
+        await loadRemote();pendingMove={from:'${OLD_URL}',to:'${NEW_URL}'};
+        disconnect();
+        assert.ok(store.get('roadToSendMoves'),'opening the confirmation keeps the record');
+        confirmProceed();
+        assert.equal(store.get('roadToSendMoves'),undefined,'confirming removes the whole key');
+        assert.equal(pendingMove,null,'a pending adoption cannot remember the move again');
+        assert.equal(state.endpoint,'');
+        assert.equal(resolveMove('${OLD_URL}'),'${OLD_URL}');
+      `,
+    });
+  }
+});
+
+// Real aborts with a short test deadline; the watchdog makes a missing timeout fail promptly.
+async function timeoutScenario({signalApi = AbortSignal, checks, bodyStalls = false, callerSignal, fetchImpl, extra = {}}) {
+  const dom = sharedDom();
+  const store = new Map();
+  let aborts = 0;
+  const stall = signal => new Promise((resolve, reject) => {
+    const watchdog = setTimeout(() => reject(Error('Timeout did not abort the request')), 500);
+    const abort = () => {aborts++; clearTimeout(watchdog); reject(signal.reason || Error('aborted'))};
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, {once: true});
+  });
+  const context = {
+    assert, console, URL, URLSearchParams, AbortSignal: signalApi, AbortController, callerSignal,
+    window: dom.window, document: dom.document,
+    location: {search: '', href: 'https://example.test/', hash: ''}, history: {replaceState() {}},
+    localStorage: {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key)},
+    // Only the abort fallback needs a real timer; toast dismissal is irrelevant to these checks.
+    setTimeout: (fn, ms) => ms === 10 ? setTimeout(fn, ms) : undefined, clearTimeout,
+    abortedCount: () => aborts,
+    fetch: fetchImpl ? (url, options) => fetchImpl(url, options, stall) : ((url, options) => bodyStalls ? Promise.resolve({ok: true, json: () => stall(options.signal)}) : stall(options.signal)),
+    ...extra,
+  };
+  assert.ok(source.includes('const SHARED_REQUEST_TIMEOUT_MS = 15000;'),'the shipped deadline is 15 seconds');
+  const shortSource = source.replace('const SHARED_REQUEST_TIMEOUT_MS = 15000;', 'const SHARED_REQUEST_TIMEOUT_MS = 10;');
+  await vm.runInNewContext(`${shortSource}\n(async()=>{${checks}})()`, context);
+}
+
+const saveDraftChecks = `
+  state.endpoint='https://board.example.test/fn';state.me='Alex';state.recordingFor='Alex';
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  state.serverDate='2026-07-13';state.challengeTimeZone='';state.lastSyncedAt=Date.now();state.logs=[];
+  setDefaultRecordDate();
+  document.querySelector('input[name="activityType"][value="bounty"]').checked=true;
+  populateBountySelect();document.querySelector('#bountySelect').value=dailyBounties(challengeToday())[0].id;
+  document.querySelector('#activityNote').value='Keep this draft';
+`;
+
+test('an unconfirmed activity save refreshes the board without holding the button or clearing the draft', async () => {
+  for (const failure of ['timeout', 'body timeout', 'network', 'unreadable body']) {
+    let gets = 0, posts = 0, completeRefresh, savedPost;
+    await timeoutScenario({
+      extra: {getCount: () => gets, postCount: () => posts, completeRefresh: () => completeRefresh()},
+      fetchImpl: (url, options, stall) => {
+        if (options.method === 'POST') {
+          posts++;
+          savedPost = JSON.parse(options.body);
+          if (failure === 'timeout') return stall(options.signal);
+          if (failure === 'network') return Promise.reject(Error('Connection lost'));
+          return Promise.resolve({ok: true, json: () => failure === 'body timeout'
+            ? stall(options.signal) : Promise.reject(SyntaxError('Unreadable response'))});
+        }
+        gets++;
+        return new Promise(resolve => {completeRefresh = () => resolve({ok: true, json: async () => ({
+          version: 13, activities: [{id: 'saved-remotely', name: 'Alex', type: 'bounty',
+            bountyId: savedPost.bountyId, date: '2026-07-13', createdAt: '1'}],
+          config: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, crew: [{name: 'Alex'}]},
+          configErrors: [], serverDate: '2026-07-13', timeZone: '',
+        })})});
+      },
+      checks: `${saveDraftChecks}
+        const bountyId=document.querySelector('#bountySelect').value;
+        await submitActivity({preventDefault(){}});
+        assert.equal(document.querySelector('#toast').textContent,'Could not confirm the save — refreshing the board. Check your feed before saving again.');
+        assert.equal(getCount(),1,'one reconciliation GET is sent');
+        assert.equal(postCount(),1,'the save is never automatically reposted');
+        assert.equal(state.syncState,'loading','the reconciliation GET is still pending');
+        assert.equal(state.saving,false);
+        assert.equal(document.querySelector('#saveActivityBtn').disabled,false);
+        assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save activity');
+        assert.equal(document.querySelector('#activityNote').value,'Keep this draft');
+        assert.equal(document.querySelector('#bountySelect').value,bountyId);
+        assert.equal(state.logs.length,0,'the unconfirmed save does not create a local row');
+        completeRefresh();${settle}
+        assert.equal(state.logs.length,1,'the refresh discovers the server-committed entry');
+        assert.equal(state.logs[0].id,'saved-remotely');
+        assert.equal(document.querySelector('#saveActivityBtn').disabled,true,'the reconciled bounty cannot be claimed again');
+      `,
+    });
+  }
+});
+
+test('explicit activity save rejections keep safe retry copy and send no reconciliation GET', async () => {
+  for (const httpRejected of [true, false]) {
+    let gets = 0, posts = 0;
+    await timeoutScenario({
+      extra: {getCount: () => gets, postCount: () => posts},
+      fetchImpl: async (url, options) => {
+        if (options.method !== 'POST') {gets++; throw Error('Unexpected refresh')}
+        posts++;
+        return {ok: !httpRejected, json: async () => {
+          assert.equal(httpRejected,false,'a rejected HTTP response needs no readable body');
+          return {ok: false, error: {message: 'The shared board rejected this entry.'}};
+        }};
+      },
+      checks: `${saveDraftChecks}
+        await submitActivity({preventDefault(){}});
+        assert.equal(document.querySelector('#toast').textContent,'Save failed—${httpRejected ? 'Request failed.' : 'The shared board rejected this entry.'} It is safe to retry.');
+        assert.equal(getCount(),0);
+        assert.equal(postCount(),1);
+        assert.equal(state.saving,false);
+        assert.equal(document.querySelector('#saveActivityBtn').disabled,false);
+        assert.equal(document.querySelector('#activityNote').value,'Keep this draft');
+        assert.equal(state.logs.length,0);
+      `,
+    });
+  }
+});
+
+test('stalled shared requests use network failures and restore every busy control after timeout', async () => {
+  for (const signalApi of [AbortSignal, { /* timeout unavailable */ }]) {
+    await timeoutScenario({signalApi, checks: `
+      state.endpoint='https://board.example.test/fn';state.me='Alex';state.recordingFor='Alex';
+      state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+      state.serverDate='2026-07-13';state.challengeTimeZone='UTC';
+      state.logs=[{id:'keep',name:'Alex',type:'exercise',date:'2026-07-13',createdAt:'1'}];
+      setDefaultRecordDate();
+      assert.equal(await loadRemote(),false);
+      assert.equal(state.syncState,'error');
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-NETWORK');
+      assert.equal(state.syncDetail,'Could not reach the shared board');
+      assert.equal(document.querySelector('#syncStatus').textContent,'Sync failed · retry ↻');
+      document.querySelector('input[name="activityType"][value="climb"]').checked=true;
+      const saving=submitActivity({preventDefault(){}});
+      assert.equal(state.saving,true);assert.equal(document.querySelector('#saveActivityBtn').textContent,'Saving…');
+      await saving;
+      assert.equal(state.saving,false);
+      assert.equal(document.querySelector('#saveActivityBtn').disabled,false);
+      assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save activity');
+      assert.notEqual(document.querySelector('#creditPreview').textContent,'Saving…');
+      assert.equal(document.querySelector('#toast').textContent,'Could not confirm the save — refreshing the board. Check your feed before saving again.');
+      assert.equal(state.logs.length,1,'a timed-out save does not add a local row');
+      state.pendingDelete={entry:state.logs[0],id:'keep',feed:'personal',position:0};
+      await performDelete();
+      assert.equal(state.logs.length,1,'a timed-out delete keeps the entry');
+      assert.match(document.querySelector('#toast').textContent,/Delete failed.*Could not reach the shared board/);
+      document.querySelector('#newParticipantName').value='Maya';
+      await createProfile();
+      assert.equal(document.querySelector('#createProfile').disabled,false);
+      assert.equal(document.querySelector('#createProfile').textContent,'Create my profile');
+      assert.equal(document.querySelector('#createProfileError').textContent,'Could not reach the shared board.');
+      populateSetup();document.querySelector('#endpoint').value=state.endpoint;
+      assert.equal(await testConnection(),false);
+      assert.equal(document.querySelector('#testResult').textContent,'Connection failed');
+      const setupSaving=saveSetup();
+      assert.equal(document.querySelector('#saveSetupBtn').textContent,'Saving…');
+      await setupSaving;
+      assert.equal(document.querySelector('#saveSetupBtn').disabled,false);
+      assert.equal(document.querySelector('#saveSetupBtn').textContent,'Save centrally & copy crew link');
+      assert.equal(document.querySelector('#setupErrors').textContent,'Could not reach the shared board.');
+      assert.equal(abortedCount(),7,'each shared operation and the uncertain-save refresh was aborted');
+    `});
+  }
+});
+
+test('the request deadline also covers stalled JSON bodies', async () => {
+  for (const signalApi of [AbortSignal, {}]) {
+    await timeoutScenario({signalApi, bodyStalls: true, checks: `
+      state.endpoint='https://board.example.test/fn';
+      assert.equal(await loadRemote(),false);
+      assert.equal(state.syncErrorCode,'RTS-REFRESH-NETWORK');
+      assert.equal(abortedCount(),1);
+      assert.equal(state.syncDetail,'Could not reach the shared board');
+    `});
+  }
+});
+
+test('caller cancellation is combined with the deadline and retained on browsers without signal composition', async () => {
+  const controller = new AbortController();
+  controller.abort(Error('Caller cancelled'));
+  await timeoutScenario({callerSignal: controller.signal, checks: `
+    await assert.rejects(fetchShared('https://board.example.test/fn',{signal:callerSignal}),/Caller cancelled/);
+    assert.equal(abortedCount(),1);
+  `});
+  // A non-aborted caller still gets a timeout when AbortSignal.any is available.
+  await timeoutScenario({callerSignal: new AbortController().signal, checks: `
+    await assert.rejects(fetchShared('https://board.example.test/fn',{signal:callerSignal}),/Could not reach the shared board/);
+    assert.equal(callerSignal.aborted,false,'the timeout never aborts the caller controller');
+  `});
+  for (const signalApi of [{timeout: ms => AbortSignal.timeout(ms)}, {}]) {
+    await timeoutScenario({signalApi, callerSignal: controller.signal, fetchImpl: async (url, options) => {
+      assert.equal(options.signal, controller.signal,'older browsers retain the caller signal');
+      throw options.signal.reason;
+    }, checks: `await assert.rejects(fetchShared('https://board.example.test/fn',{signal:callerSignal}),/Caller cancelled/);`});
+  }
+});
+
+const v14DraftChecks = `
+  state.endpoint='https://board.example.test/fn';state.protocolVersion=14;state.me='Alex';state.recordingFor='Alex';
+  state.config={startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]};
+  state.serverDate='2026-07-13';state.challengeTimeZone='';state.lastSyncedAt=Date.now();state.logs=[];
+  document.querySelector('#hardestGrade').innerHTML='<option value="">None</option><option value="V4">V4</option>';
+  setDefaultRecordDate();document.querySelector('input[name="activityType"][value="climb"]').checked=true;
+  document.querySelector('#activityNote').value='Keep this draft';
+`;
+const v14Entry = {id:'00000000-0000-4000-8000-000000000014',name:'Alex',type:'climb',category:'climb',points:3,date:'2026-07-13',createdAt:'2026-07-13T01:00:00.000Z',hardestGrade:'V4',bountyId:'',bountyTitle:'',note:'Original'};
+const v14Board = activities => ({version:14,features:[],activities,config:{startDate:'2026-07-01',tripDate:'2026-07-31',goal:500,crew:[{name:'Alex'}]},configErrors:[],serverDate:'2026-07-13',timeZone:''});
+
+test('a timed-out create sends the same UUID when the unchanged draft is retried', async () => {
+  const posts=[];
+  await timeoutScenario({
+    extra:{posted:()=>posts},
+    fetchImpl:(url,options,stall)=>{
+      if(options.method==='POST') {
+        const body=JSON.parse(options.body);posts.push(body);
+        if(posts.length===1) return stall(options.signal);
+        return Promise.resolve({ok:true,json:async()=>({...v14Entry,...body,ok:true})});
+      }
+      return Promise.resolve({ok:true,json:async()=>v14Board(posts.length<2?[]:[{...v14Entry,...posts[1]}])});
+    },
+    checks:`${v14DraftChecks}
+      await submitActivity({preventDefault(){}});${settle}
+      assert.equal(state.logs.length,0);
+      assert.match(posted()[0].id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      assert.equal(document.querySelector('#activityNote').value,'Keep this draft');
+      await submitActivity({preventDefault(){}});${settle}
+      assert.equal(posted().length,2);assert.equal(posted()[1].id,posted()[0].id);
+      assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,posted()[0].id);
+      assert.equal(document.querySelector('#activityNote').value,'');
+    `,
+  });
+});
+
+test('creates keep a UUID at v13 because the older function ignores unknown create fields', async () => {
+  for (const version of [12,13,14]) {
+    const posts=[];let saved;
+    await timeoutScenario({
+      extra:{posted:()=>posts},
+      fetchImpl:async(url,options)=>{
+        if(options.method==='POST') {
+          const body=JSON.parse(options.body);posts.push(body);
+          saved={...v14Entry,...body,id:version>=14?body.id:'server-minted',createdAt:v14Entry.createdAt};
+          return {ok:true,json:async()=>({...saved,version,ok:true})};
+        }
+        return {ok:true,json:async()=>({...v14Board(saved?[saved]:[]),version})};
+      },
+      checks:`${v14DraftChecks}
+        state.protocolVersion=${version};await submitActivity({preventDefault(){}});${settle}
+        assert.match(posted()[0].id,/^[0-9a-f-]{36}$/);
+        assert.equal(state.logs.length,1);
+        assert.equal(state.logs[0].id,${version}>=14?posted()[0].id:'server-minted');
+      `,
+    });
+  }
+});
+
+test('an edit updates the shared feed scores and persisted cache while preserving identity and order', async () => {
+  const posts=[];let saved=v14Entry,finish;const cache=new Map();
+  await timeoutScenario({
+    extra:{posted:()=>posts,cache,finish:()=>finish(),localStorage:{getItem:key=>cache.get(key)||null,setItem:(key,value)=>cache.set(key,String(value)),removeItem:key=>cache.delete(key)}},
+    fetchImpl:async(url,options)=>{
+      if(options.method==='POST') {
+        const body=JSON.parse(options.body);posts.push(body);
+        saved={...v14Entry,...body,type:body.type,category:body.type,points:1,hardestGrade:''};
+        delete saved.action;
+        return {ok:true,json:async()=>({...saved,version:14,ok:true})};
+      }
+      return new Promise(resolve=>{finish=()=>resolve({ok:true,json:async()=>v14Board([saved])})});
+    },
+    checks:`${v14DraftChecks}
+      state.logs=${JSON.stringify([v14Entry])};render();
+      assert.equal(Number(document.querySelector('#youTotal').textContent),3);
+      const trigger=document.querySelector('#personalActivity [data-edit]');trigger.focus();openEdit(0,trigger);
+      assert.equal(document.querySelector('#activityNote').value,'Original');
+      assert.equal(document.querySelector('#hardestGrade').value,'V4');
+      document.querySelector('input[name="activityType"][value="mobility"]').checked=true;
+      document.querySelector('#activityNote').value='Edited activity';updateRecordPreview();
+      await submitActivity({preventDefault(){}});${settle}
+      assert.equal(posted().length,1);assert.equal(posted()[0].action,'update');assert.equal(posted()[0].id,'${v14Entry.id}');
+      assert.equal(state.logs.length,1);assert.equal(state.logs[0].createdAt,'${v14Entry.createdAt}');
+      assert.equal(state.logs[0].name,'Alex');assert.equal(state.logs[0].type,'mobility');
+      assert.equal(Number(document.querySelector('#youTotal').textContent),1);
+      assert.ok(document.querySelector('#personalActivity').textContent.includes('Edited activity'));
+      const cached=JSON.parse(cache.get(cacheKey('activities')));
+      assert.equal(cached[0].id,'${v14Entry.id}');assert.equal(cached[0].note,'Edited activity');
+      assert.equal(document.querySelector('#editModal').classList.contains('open'),false);
+      assert.equal(document.querySelector('#recordForm').parentElement.id,'recordFormHome');
+      assert.equal(document.activeElement.dataset.id,'${v14Entry.id}','focus returns to the refreshed row');
+      assert.equal(document.querySelector('#activityNote').value,'Keep this draft','the create draft is restored');
+      assert.equal(state.syncState,'loading','the write is already rendered and cached before GET completes');
+      finish();${settle}
+      assert.equal(document.activeElement.dataset.id,'${v14Entry.id}','background refresh preserves row focus');
+    `,
+  });
+});
+
+test('an edit timeout reconciles the committed update and preserves the edit draft', async () => {
+  let posts=0,gets=0,finish;
+  await timeoutScenario({
+    extra:{postCount:()=>posts,getCount:()=>gets,finish:()=>finish()},
+    fetchImpl:(url,options,stall)=>{
+      if(options.method==='POST'){posts++;assert.equal(JSON.parse(options.body).action,'update');return stall(options.signal)}
+      gets++;return new Promise(resolve=>{finish=()=>resolve({ok:true,json:async()=>v14Board([{...v14Entry,type:'exercise',category:'exercise',points:2,hardestGrade:'',note:'Updated remotely'}])})});
+    },
+    checks:`${v14DraftChecks}
+      state.logs=${JSON.stringify([v14Entry])};render();openEdit(0,document.querySelector('#personalActivity [data-edit]'));
+      document.querySelector('input[name="activityType"][value="exercise"]').checked=true;
+      document.querySelector('#activityNote').value='Updated remotely';updateRecordPreview();
+      await submitActivity({preventDefault(){}});
+      assert.equal(postCount(),1);assert.equal(getCount(),1);
+      assert.equal(document.querySelector('#toast').textContent,'Could not confirm the save — refreshing the board. Check your feed before saving again.');
+      assert.equal(state.saving,false);assert.equal(document.querySelector('#saveActivityBtn').textContent,'Save changes');
+      assert.equal(state.logs[0].type,'climb','no optimistic edit before confirmation');
+      assert.equal(document.querySelector('#editModal').classList.contains('open'),true);
+      assert.equal(document.querySelector('#activityNote').value,'Updated remotely');
+      finish();${settle}
+      assert.equal(state.logs.length,1);assert.equal(state.logs[0].id,'${v14Entry.id}');assert.equal(state.logs[0].type,'exercise');
+      assert.equal(Number(document.querySelector('#youTotal').textContent),2);
+      assert.equal(document.querySelector('#activityNote').value,'Updated remotely');
+      closeModal('editModal');
+      assert.equal(document.activeElement.dataset.id,'${v14Entry.id}','Escape/close can return to a row replaced by reconciliation');
+    `,
+  });
+});
+
+test('duplicate_bounty on create and edit shows clear copy without adding or changing a row', async () => {
+  for (const editing of [false,true]) {
+    let posts=0,gets=0;
+    await timeoutScenario({
+      extra:{postCount:()=>posts,getCount:()=>gets},
+      fetchImpl:async(url,options)=>{
+        if(options.method==='POST'){posts++;return {ok:true,json:async()=>({ok:false,error:{code:'duplicate_bounty',message:'Server technical text'}})}}
+        gets++;throw Error('Unexpected reconciliation');
+      },
+      checks:`${v14DraftChecks}
+        state.logs=${JSON.stringify(editing?[v14Entry]:[])};render();
+        ${editing?"openEdit(0,document.querySelector('#personalActivity [data-edit]'));":''}
+        const original=JSON.stringify(state.logs);
+        document.querySelector('input[name="activityType"][value="bounty"]').checked=true;
+        populateBountySelect();document.querySelector('#bountySelect').value=dailyBounties(recordDate())[0].id;
+        await submitActivity({preventDefault(){}});
+        assert.equal(document.querySelector('#toast').textContent,'That bounty is already claimed on that date.');
+        assert.equal(postCount(),1);assert.equal(getCount(),0);assert.equal(JSON.stringify(state.logs),original);
+        assert.equal(document.querySelector('#activityNote').value,${JSON.stringify(editing?'Original':'Keep this draft')});
+      `,
+    });
+  }
 });

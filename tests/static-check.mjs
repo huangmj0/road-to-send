@@ -43,6 +43,9 @@ assert.match(html,/id="leaderWeekBtn"[^>]*aria-pressed=/,'the Recent toggle keep
 assert.doesNotMatch(html,/review-dialog|trend-hover/,'the three dead class hooks are absent from the built page');
 assert.match(html,/id="recordMeter"[^>]+aria-label=/,'record preview meter is accessible');
 assert.match(html,/id="syncDiagnostics"[^>]+role="status"[^>]+aria-live="polite"/,'persistent sync diagnostics are announced');
+const syncDiagnostics=html.match(/<div id="syncDiagnostics"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+assert.ok(syncDiagnostics,'the existing sync diagnostics contain markup');
+assert.match(syncDiagnostics,/<button id="reloadApp" class="btn secondary hide" type="button" data-action="reloadApp">Reload app<\/button>/,'Reload app is a named button initially hidden inside the existing diagnostics');
 assert.match(html,/id="toast"[^>]+role="status"[^>]+aria-live="polite"/,'toast is announced');
 for(const title of ['identityTitle','proxyTitle','setupTitle','confirmTitle','personTitle','weekReviewTitle'])assert.match(html,new RegExp(`role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="${title}"`),`${title} dialog is named`);
 assert.match(html,/aria-label="Close identity picker"/);
@@ -74,7 +77,7 @@ assert.match(script,/const GRADES=SCORING\.grades,CATEGORIES=Object\.keys\(SCORI
 assert.doesNotMatch(artifactScript,/const SCRIPT=/,'the artifact no longer embeds the Apps Script source');
 assert.doesNotMatch(artifactScript,/copyScript/,'the artifact has no copy-script action');
 const apiVersion=JSON.parse(readFileSync(new URL('../src/schema.json',import.meta.url),'utf8')).properties.version.const;
-assert.ok(artifactScript.trimStart().startsWith(`const SUPPORTED_API_VERSIONS=new Set([${apiVersion},12]);\n`),'the artifact opens with the supported API versions, current version first');
+assert.ok(artifactScript.trimStart().startsWith(`const SUPPORTED_API_VERSIONS=new Set([${apiVersion},13,12]);\n`),'the artifact opens with the supported API versions, current version first');
 assert.doesNotMatch(html,/Hard mode|Super hard mode|pull-up mode|Record send pyramid|Balanced week bonus/i,'removed pull-up-mode and legacy features are absent from the UI');
 // Saving… was already the label on two buttons (#saveActivityBtn and #saveSetupBtn) before this
 // entry, so the preview branch is the third occurrence — a >=2 guard could never have failed.
@@ -83,6 +86,9 @@ assert.match(html,/id="heatmapSummary"/,'the heatmap carries a visible caption')
 assert.match(html,/id="trendSummary"/,'the trend chart carries a visible caption');
 assert.match(html,/\.page-head\{flex-wrap:wrap\}\.page-head>div\{min-width:0\}\.page-head h1\{overflow-wrap:anywhere\}/,'the page head wraps long names while keeping its actions reachable');
 const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)?.[1]||'';
+const buttonStyles=stylesheet.match(/\.btn\{([^}]*)\}/)?.[1];
+assert.ok(buttonStyles,'the shared button style exists');
+assert.ok(Number(buttonStyles.match(/min-height:(\d+)px/)?.[1])>=44,'Reload app inherits a touch target at least 44px tall');
 assert.match(stylesheet,/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/,'the global focus ring uses the shared high-contrast green treatment');
 assert.equal((stylesheet.match(/:focus-visible\{outline:3px solid var\(--green\);outline-offset:2px\}/g)||[]).length,1,'the shared focus ring is declared once globally');
 // Gold is too low-contrast to ring focus on the cream page, and sage is invisible against the sage
@@ -198,7 +204,9 @@ assert.doesNotMatch(script,/\blogs\.(push|splice|unshift|shift|pop|sort|reverse|
 // retry" outcome no longer exists. A shared save is confirmed by the write response and the returned
 // record is added to the feed at once, with loadRemote() reconciling in the background — so there is
 // no blocking reload left to fail on the success path. This asserts that replacement invariant.
-assert.match(script,/state\.logs=state\.logs\.concat\(\[\{id:saved\.id/,'a shared save adds the record the write returned straight to the feed');
+// The shared DOM test now holds the reconciliation GET pending and asserts the returned
+// entry is already rendered and cached. That proves the write-response invariant directly.
+assert.match(script,/persistShared\(\); loadRemote\(\)/,'a shared write persists before starting background reconciliation');
 assert.match(html,/Climbing[\s\S]*Exercise[\s\S]*Mobility/,'the three categories appear in the record picker');
 assert.match(html,/Today's bounties/,'the rotating bounty card is present');
 assert.match(html,/id="bountyHint"/,'the Record tab has a slot for the chosen bounty description');
@@ -387,3 +395,23 @@ assert.match(html, /id="crewRecapContent" class="hide"><\/div>/, 'recap starts w
 assert.ok(html.indexOf('id="crewRecapCard"') > html.indexOf('id="crew"'), 'recap belongs to the Crew tab');
 assert.ok(html.indexOf('id="crewRecapCard"') < html.indexOf('class="card group-card"'), 'recap precedes the group goal near the top');
 assert.match(html, /#crewRecapCard \.text-btn\{min-width:44px;min-height:44px\}/, 'recap toggle and Share retain 44px touch targets');
+// Home Screen assets stay inline and retain the existing SVG favicon.
+const touchIcon=html.match(/<link[^>]+rel="apple-touch-icon"[^>]+sizes="180x180"[^>]+href="data:image\/png;base64,([^"]+)"/);
+assert.ok(touchIcon,'iOS gets an inline 180x180 PNG touch icon');
+const touchPng=Buffer.from(touchIcon[1],'base64');
+assert.deepEqual([...touchPng.subarray(0,8)],[137,80,78,71,13,10,26,10],'the touch icon is a PNG');
+assert.equal(touchPng.readUInt32BE(16),180,'the PNG width is 180 pixels');
+assert.equal(touchPng.readUInt32BE(20),180,'the PNG height is 180 pixels');
+assert.ok(touchPng.length<3000,'the touch icon stays below 3 KB');
+for(const [name,content] of [['apple-mobile-web-app-capable','yes'],['mobile-web-app-capable','yes'],['apple-mobile-web-app-title','Road to Send'],['apple-mobile-web-app-status-bar-style','default']]) {
+  assert.match(html,new RegExp('<meta[^>]+name="'+name+'"[^>]+content="'+content+'"'),'Home Screen metadata: '+name);
+}
+const identityModal=html.slice(html.indexOf('<div id="identityModal"'),html.indexOf('<div id="proxyModal"'));
+assert.match(identityModal,/<p class="hint">Tip: add this page to your Home Screen so the app keeps your board and name\. You'll pick your name once more there\.<\/p>/,'the passive install tip stays inside the identity modal and explains choosing a name again');
+assert.equal((html.match(/Tip: add this page to your Home Screen/g)||[]).length,1,'there is one install tip');
+assert.doesNotMatch(html.slice(html.indexOf('<div id="setupModal"')),/Home Screen/,'setup has no install tip');
+assert.match(stylesheet,/button\.bounty\{[^}]*min-height:44px/,'Today bounty buttons retain a 44px minimum height');
+
+assert.match(html,/role="dialog"[^>]+aria-modal="true"[^>]+aria-labelledby="editTitle"/,'the entry editor is a named modal');
+assert.match(html,/aria-label="Close entry editor"/,'the editor has a named close control');
+assert.match(stylesheet,/\.edit-entry\{min-width:44px;min-height:44px/,'edit buttons have 44px touch targets');

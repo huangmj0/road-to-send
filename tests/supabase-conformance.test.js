@@ -178,11 +178,11 @@ test('a store failure on a write becomes the server_error envelope', async () =>
   }
 });
 
-test('an activity takes its id from crypto.randomUUID and createdAt from the injected clock', async () => {
+test('a create without id takes its id from crypto.randomUUID and createdAt from the injected clock', async () => {
   const {handle} = await fn('core.mjs');
   const {createMemoryStore} = await helper('memory-store.mjs');
   const store = createMemoryStore({settings: {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500, timeZone: 'America/Los_Angeles'}, participants: ['Alex']});
-  const reply = await handle({method: 'POST', bodyText: JSON.stringify({name: 'Alex', type: 'climb', date: '2026-07-13', id: 'forged', createdAt: '2000-01-01T00:00:00.000Z'})}, store, clock('2026-07-14T06:30:00Z'));
+  const reply = await handle({method: 'POST', bodyText: JSON.stringify({name: 'Alex', type: 'climb', date: '2026-07-13', createdAt: '2000-01-01T00:00:00.000Z'})}, store, clock('2026-07-14T06:30:00Z'));
   assert.equal(reply.createdAt, '2026-07-14T06:30:00.000Z');
   assert.match(reply.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   const [stored] = await store.listActivities();

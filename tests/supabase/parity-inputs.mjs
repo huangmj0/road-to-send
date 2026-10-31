@@ -1,3 +1,4 @@
+// TRAP: changing these input tables requires matching hand-edited golden entries; never recapture.
 // Input tables shared by scripts/capture-validation-golden.mjs (which records the Apps Script's
 // outputs) and tests/supabase-conformance.test.js (which asserts the Supabase core against them).
 // Changing a table means updating tests/fixtures/supabase-validation.golden.json to match: by hand once
@@ -94,6 +95,7 @@ export const PARITY_ACTIVITIES = rotation => {
     {name: 'Alex', type: 'mobility', date: '2026-07-01'},
     {name: 'Alex', type: 'mobility', date: '2026-07-31'},
     {name: 'Alex', type: 'mobility', date: '2026-08-01'},
+    {name: 'Alex', type: 'climb', date: DAY, id: 'forged'},
   ];
 };
 export const PARITY_SETTINGS = {startDate: '2026-07-01', tripDate: '2026-07-31', goal: 500};

@@ -1,3 +1,4 @@
+// TRAP: current follows the schema version; moved and v12 pin frozen compatibility versions.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -35,12 +36,12 @@ test('compatibility fixtures retain intentionally unsafe response shapes', () =>
 });
 
 test('the v13 moved fixture carries an https movedTo, and the v12 fixture predates it', () => {
-  assert.equal(fixtures.moved.version, schema.properties.version.const);
+  assert.equal(fixtures.moved.version, 13);
   assert.match(fixtures.moved.movedTo, new RegExp(schema.properties.movedTo.pattern));
   assert.equal(schema.properties.movedTo.type, 'string');
   assert.equal(schema.required.includes('movedTo'), false, 'movedTo stays optional');
-  assert.equal(fixtures.v12.version, schema.properties.version.const - 1);
+  assert.equal(fixtures.v12.version, 12);
   assert.equal('movedTo' in fixtures.v12, false);
   assert.equal('movedTo' in fixtures.current, false);
-  assert.match(schema.$id, /v13\.json$/);
+  assert.match(schema.$id, /v14\.json$/);
 });

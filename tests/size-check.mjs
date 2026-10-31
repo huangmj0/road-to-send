@@ -98,7 +98,29 @@ import { readFileSync } from 'node:fs';
 // embeds the script for the setup dialog's copy button, measured 158807 -> 136943 bytes (-21864),
 // including the move-follow ordering fix and backend-neutral copy. The cap keeps about the same
 // 5000 bytes of headroom as the previous entry rather than banking the whole saving as slack.
-const BUDGET = 142000;
+// Re-baselined 142000 -> 142600 on 2026-10-09 for the client quick wins and follow-up fixes:
+// measured 142090 bytes, 90 above the old cap. The pass adds a 2095-byte (~2.1 KB) inline
+// PNG touch icon for iOS install, the 15-second timeout, the duplicate-claim guard and
+// uncertain-save reconciliation. Keeping the current endpoint in the Home Screen launch URL
+// and explaining iOS's separate name storage also contribute. This measured cap leaves only
+// 510 bytes of margin; the next budget entry re-measures rather than assuming more growth.
+// Re-baselined 142600 -> 147500 on 2026-10-09 for API v14: measured 146943 bytes,
+// up 4839 from the 142104-byte branch baseline. Stable client UUIDs and retry identities,
+// the shared/local update flow and reconciliation, and the accessible edit sheet (reusing
+// the Record form) account for the growth; feed action styling and focus restoration add
+// the remainder. Scoring and the bounty catalog are unchanged. This leaves 557 bytes of
+// margin, close to the previous 496; the next budget entry re-measures rather than assuming.
+// Re-baselined 147500 -> 148600 on 2026-10-12 for the newer-server reload prompt: measured
+// 148056 bytes, up 933 from main's 147123. Distinguishing a newer API from an outdated board,
+// its sync and setup copy, and the diagnostics-only Reload app button (which reads the whole
+// refreshed page under an 8-second deadline before reloading) account for the growth.
+// This leaves 544 bytes of margin, in line with the previous entries.
+// Re-baselined 148600 -> 152500 when merging main into the crew recap (#201):
+// main measures 148056 bytes; the combined artifact measures 151950 (+3894).
+// The recap adds the tap-open crew highlights, grade pyramid, climber records and
+// sharing of both summaries alongside main's editing and reload diagnostics.
+// This leaves 550 bytes, preserving roughly the previous 544-byte margin.
+const BUDGET = 152500;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);

@@ -1032,6 +1032,8 @@ const checks = `(()=>{
   assert.equal(creditPreviewCopy({type:'climb',hasTarget:true,inWindow:true,base:3,credit:0,reason:'already logged'}),CAT_LABELS.climb+' already logged today · earns 0 more','a repeat category keeps its wording');
   assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'',base:0,credit:0,reason:''}),'Choose one of today’s bounties.','an unchosen bounty keeps its wording');
   assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'century-club',base:3,credit:0,reason:'weekly cap'}),'Weekly bounty cap reached · bragging rights only','an over-cap bounty keeps its wording');
+  assert.equal(creditPreviewCopy({type:'bounty',claimed:true,hasTarget:true,inWindow:true,bountyId:'send-it',base:3,credit:3}),'That bounty is already claimed on that date.','a claimed bounty explains why Save is disabled');
+  assert.equal(creditPreviewCopy({saving:true,type:'bounty',claimed:true}),'Saving…','saving still takes precedence over a changed claim state');
   assert.equal(creditPreviewCopy({type:'bounty',hasTarget:true,inWindow:true,bountyId:'send-it',base:3,credit:3,reason:''}),'Bounty! +3 toward your week','a credited bounty keeps its wording');
   assert.equal(creditPreviewCopy({type:'climb',hasTarget:false,inWindow:true,base:3,credit:3,reason:''}),'Choose who you are to save this.','no target explains why Save is dead');
   const outCopy=creditPreviewCopy({type:'climb',hasTarget:true,inWindow:false,base:3,credit:3,reason:'',startDate:'2026-07-01',tripDate:'2026-07-31'});
@@ -1267,4 +1269,18 @@ test('Challenge recap records best credited day, graded sends, bounty counts and
     assert.deepEqual(ties.hardest,{name:'Alex',grade:'V6'},'equal hardest sends use name order');
     assert.deepEqual(ties.pyramid,[{grade:'V6',count:4}]);
   `);
+});
+
+test('UUID fallback uses secure random bytes with v4 and variant bits when randomUUID is unavailable', () => {
+  let calls=0;
+  const fallback={...context,crypto:{getRandomValues:bytes=>{calls++;bytes.fill(255);bytes[0]=calls;return bytes}}};
+  vm.runInNewContext(source+`\n(()=>{
+    const first=newActivityId(),second=newActivityId();
+    assert.match(first,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.notEqual(first,second,'separate new entries have separate request identities');
+    const fields={name:'Alex',type:'climb',date:'2026-07-13',note:'same'};
+    const id=createIdFor(fields);assert.equal(createIdFor(fields),id,'unchanged draft retains its UUID');
+    assert.notEqual(createIdFor({...fields,note:'changed'}),id,'changing the draft creates a new identity');
+  })()`,fallback);
+  assert.equal(calls,4,'each new identity obtains secure random bytes once');
 });
