@@ -2,6 +2,10 @@
 
 A self-contained, mobile-first climbing challenge. The app has three views: **You**, **Record**, and **Crew**. It remembers the selected person on each device, lets new crew members create their own profile, supports temporary proxy recording, and shares data through a Supabase backend.
 
+## How it works
+
+After the challenge ends, the Crew tab offers a Challenge recap that starts collapsed. Tap its toggle to see crew highlights, climber records, and a shareable summary.
+
 ## Scoring
 
 A **balanced** economy across three categories — you can't win by grinding one activity.

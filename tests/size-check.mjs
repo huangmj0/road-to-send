@@ -115,7 +115,12 @@ import { readFileSync } from 'node:fs';
 // its sync and setup copy, and the diagnostics-only Reload app button (which reads the whole
 // refreshed page under an 8-second deadline before reloading) account for the growth.
 // This leaves 544 bytes of margin, in line with the previous entries.
-const BUDGET = 148600;
+// Re-baselined 148600 -> 152500 when merging main into the crew recap (#201):
+// main measures 148056 bytes; the combined artifact measures 151950 (+3894).
+// The recap adds the tap-open crew highlights, grade pyramid, climber records and
+// sharing of both summaries alongside main's editing and reload diagnostics.
+// This leaves 550 bytes, preserving roughly the previous 544-byte margin.
+const BUDGET = 152500;
 
 const bytes = readFileSync(new URL('../index.html', import.meta.url)).length;
 const pct = ((bytes / BUDGET) * 100).toFixed(1);
