@@ -1531,7 +1531,7 @@ test('Challenge recap Share button uses native sharing with plain text and clipb
   await Promise.resolve();
   assert.equal(shared.length, 1, 'the rendered button reaches native sharing through init wiring');
   assert.equal(copied.length, 0);
-  assert.equal(shared[0].text, 'Challenge recap\n13 points together over 2 weeks\n1 balanced day\n1 bounty claimed\nHardest send V6 · Alex\n1 graded send · hardest V6');
+  assert.equal(shared[0].text, 'Challenge recap\n13 points together over 2 weeks\n1 balanced day\n1 bounty claimed\nHardest send V6 · Alex\n1 graded send · hardest V6\n\nAlex · 11 points\nBest day: ' + dom.run('fmtDay(recapShift(-2))') + ' · 11 points\nHardest send: V6\nMost-claimed bounty: Send it × 1\n\nBo · 2 points\nBest day: ' + dom.run('fmtDay(recapShift(-3))') + ' · 2 points');
   assert.doesNotMatch(shared[0].text, /<|sheet=|short|didn't|missed|0 pts/i);
   nav.share = undefined;
   assert.equal(await dom.run('shareCrewRecap()'), true);

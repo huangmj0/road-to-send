@@ -52,7 +52,19 @@ function crewRecapHighlights(model){
   if(model.hardest)lines.push(`Hardest send ${model.hardest.grade} · ${model.hardest.name}`);
   return lines;
 }
-function crewRecapSummary(model){return model?['Challenge recap',model.summary,...crewRecapHighlights(model),pyramidCaption(model.pyramid)].filter(Boolean).join('\n'):''}
+function climberRecapRecords(row){
+  return [
+    row.bestDay&&['Best day',`${fmtDay(row.bestDay.date)} · ${row.bestDay.points} points`],
+    row.hardest&&['Hardest send',row.hardest],
+    row.bounty&&['Most-claimed bounty',`${row.bounty.title} × ${row.bounty.count}`]
+  ].filter(Boolean);
+}
+function crewRecapSummary(model){
+  if(!model)return '';
+  return ['Challenge recap',model.summary,...crewRecapHighlights(model),pyramidCaption(model.pyramid),
+    ...model.climbers.flatMap(row=>[`\n${row.name} · ${row.total} points`,...climberRecapRecords(row).map(([label,value])=>`${label}: ${value}`)])
+  ].filter(Boolean).join('\n');
+}
 function renderCrewRecap(model){
   const card=document.querySelector('#crewRecapCard'),toggle=document.querySelector('#crewRecapToggle'),box=document.querySelector('#crewRecapContent');
   card.classList.toggle('hide',!model);
@@ -61,7 +73,7 @@ function renderCrewRecap(model){
   box.classList.toggle('hide',!open);
   if(!open){paint(box,'');return}
   const pyramid=model.pyramid,max=Math.max(1,...pyramid.map(row=>row.count));
-  paint(box,`<p>${esc(model.summary)}</p>${crewRecapHighlights(model).map(line=>`<p class="hint">${esc(line)}</p>`).join('')}${pyramid.length?`<h3>Grade pyramid</h3><div class="pyramid" role="img" aria-label="${esc(pyramidLabel(pyramid))}">${pyramid.map(row=>pyramidRow(row.grade,row.count,Math.round(row.count/max*100))).join('')}</div><p class="hint">${esc(pyramidCaption(pyramid))}</p>`:''}${model.climbers.map(row=>`<div class="recap-climber"><h3>${esc(row.name)} · ${row.total} points</h3>${row.bestDay?recordsRow('Best day',`${fmtDay(row.bestDay.date)} · ${row.bestDay.points} points`):''}${row.hardest?recordsRow('Hardest send',row.hardest):''}${row.bounty?recordsRow('Most-claimed bounty',`${row.bounty.title} × ${row.bounty.count}`):''}</div>`).join('')}<button class="text-btn" type="button" data-action="shareCrewRecap">Share</button>`);
+  paint(box,`<p>${esc(model.summary)}</p>${crewRecapHighlights(model).map(line=>`<p class="hint">${esc(line)}</p>`).join('')}${pyramid.length?`<h3>Grade pyramid</h3><div class="pyramid" role="img" aria-label="${esc(pyramidLabel(pyramid))}">${pyramid.map(row=>pyramidRow(row.grade,row.count,Math.round(row.count/max*100))).join('')}</div><p class="hint">${esc(pyramidCaption(pyramid))}</p>`:''}${model.climbers.map(row=>`<div class="recap-climber"><h3>${esc(row.name)} · ${row.total} points</h3>${climberRecapRecords(row).map(record=>recordsRow(...record)).join('')}</div>`).join('')}<button class="text-btn" type="button" data-action="shareCrewRecap">Share</button>`);
 }
 function toggleCrewRecap(){state.crewRecapOpen=!state.crewRecapOpen;render()}
 function shareCrewRecap(){return shareText(crewRecapSummary(crewRecapModel()),'Challenge recap copied — paste it anywhere.')}
